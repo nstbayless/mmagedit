@@ -97,9 +97,9 @@ object_names = [
     # 0
     ["none"],
     
-    [""],
-    [""],
-    [""],
+    ["boss-grim", "boss-grimmig", "boss-1"],
+    ["boss-thor", "boss-thorrix", "boss-2"],
+    ["boss-eye", "boss-4"],
     
     # 4
     ["flag"],
@@ -114,7 +114,7 @@ object_names = [
     ["goat"],
     
     # 8
-    [""],
+    ["boss-3"],
     
     # 9
     ["wisp", "willowisp"],
@@ -194,13 +194,42 @@ object_names = [
     # 22
     [""],
     [""],
-    [""],
+    
+    # 24
+    ["boss-3-staff"],
+    
+    # 25
     [""],
     [""],
     [""],
     
     # 28
     ["torch"],
+    
+    # 29
+    [""],
+    [""],
+    [""],
+    [""],
+    [""],
+    
+    # 2e
+    ["pipe-A"],
+    
+    # 2f
+    ["boss-bats"],
+    
+    # 30
+    ["pipe-B"],
+    
+    # 31
+    ["gate", "boss-gate"],
+    
+    # 32
+    [""],
+    
+    # 33
+    ["pipe-C"],
 ]
 
 object_names_to_gid = {"": -1}

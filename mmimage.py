@@ -73,6 +73,12 @@ def export_images(data):
                 x = obj.x * 8 - 4
                 y = obj.y * 8
                 text = hb(obj.gid)
-                draw.text((x, y), text, fill="white")
+                if obj.flipx and obj.flipy:
+                    text += "+"
+                elif obj.flipx:
+                    text += "-"
+                elif obj.flipy:
+                    text += "|"
+                draw.text((x, y), text, fill="white" if obj.name[0:4] != "unk-" else "red")
             
             img.save(outfile)

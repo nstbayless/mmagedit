@@ -53,7 +53,7 @@ class ObjectStream:
     def length_bytes(self):
         lb = self.length_bits()
         if lb % 8 == 0:
-            return lb / 8
+            return int(lb / 8)
         else:
             return int(lb / 8) + 1
     
@@ -72,9 +72,9 @@ class ObjectStream:
             self.entries.append( [0, 0] + self.as_bits(ydiff - 1, 3) )
         
         if (obj.compressible()):
-            self.entries.append( [1, 0] + self.as_bits(int((obj.x - 1) / 2), 4) + self.as_bits(obj.i, 4) )
+            self.entries.append( [1, 0] + self.as_bits(int((obj.x - 1) / 2), 4) + self.as_bits(obj.get_i(), 4) )
         else:
-            self.entries.append( [0, 1] + [1 if obj.flipx else 0] + [1 if obj.flipy else 0] + self.as_bits(obj.x, 5) + self.as_bits(obj.i, 5) )
+            self.entries.append( [0, 1] + [1 if obj.flipx else 0] + [1 if obj.flipy else 0] + self.as_bits(obj.x, 5) + self.as_bits(obj.get_i(), 5) )
     
     def finalize(self):
         assert(not self.complete)
@@ -82,8 +82,8 @@ class ObjectStream:
         self.entries.append( [1, 1] )
 
 class Object:
-    def __init__(self):
-        self.i = 0
+    def __init__(self, data):
+        self.data = data
         self.x = 0 # in microtiles
         self.y = 0 # in microtiles
         self.gid = 0 # lookup (0xdab1),i
@@ -92,10 +92,14 @@ class Object:
         self.flipy = False
         self.compressed = False
     
+    # gets placing index of object
+    def get_i(self):
+        return self.data.spawnable_objects.index(self.gid)
+    
     def compressible(self):
         if self.flipx or self.flipy:
             return False
-        if self.i >= 0x10:
+        if self.get_i() >= 0x10:
             return False
         if self.x % 2 == 0:
             return False
@@ -144,8 +148,6 @@ class Level:
         self.macro_rows = []
         self.objects = []
         self.hardmode_patches = []
-        self.hardmode_length = None
-        self.objects_length = None
         self.total_length = None
     
     def get_name(self, hard=False):
@@ -162,7 +164,7 @@ class Level:
         self.ram = self.data.read_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table))
         
         # read data from start address...
-        self.hardmode_length = self.data.read_byte(self.data.ram_to_rom(self.ram))
+        hardmode_length = self.data.read_byte(self.data.ram_to_rom(self.ram))
         
         row_count = constants.macro_rows_per_level
         for i in range(row_count):
@@ -174,7 +176,7 @@ class Level:
         patch_y = 0
         patch_x = 0
         
-        for i in range(self.hardmode_length):
+        for i in range(hardmode_length):
             while patch_x >= 4:
                 patch_x -= 4
                 patch_y += 1
@@ -195,12 +197,13 @@ class Level:
         # read object data
         object_y = constants.objects_start_y
         
-        ram_objects_start = self.ram + self.hardmode_length + 1 + row_count * 4
+        ram_objects_start = self.ram + hardmode_length + 1 + row_count * 4
         bs = BitStream(self.data.bin, self.data.ram_to_rom(ram_objects_start))
         while True:
             type = bs.read_bits(2)
-            obj = Object()
+            obj = Object(self.data)
             obj.type = type
+            i = 0
             if type == 0:
                 # skip rows
                 object_y -= bs.read_bits(3) + 1
@@ -212,7 +215,7 @@ class Level:
                 obj.flipy = bs.read_bit() == 1
                 obj.flipx = bs.read_bit() == 1
                 obj.x = bs.read_bits(5)
-                obj.i = bs.read_bits(5)
+                i = bs.read_bits(5)
                 obj.compressed = False
                 
             elif type == 2:
@@ -221,20 +224,20 @@ class Level:
                 obj.flipy = False
                 obj.flipx = False
                 obj.x = bs.read_bits(4) * 2 + 1
-                obj.i = bs.read_bits(4)
+                i = bs.read_bits(4)
                 obj.compressed = True
                 
             elif type == 3:
                 # end-of-stream
                 break
-            
-            obj.gid = self.data.spawnable_objects[obj.i]
+                
+            obj.gid = self.data.spawnable_objects[i]
             obj.name = self.data.get_object_name(obj.gid)
             if obj.y >= 0:
                 self.objects.append(obj)
         
-        self.objects_length = bs.offset - self.data.ram_to_rom(ram_objects_start) + (1 if bs.bitoffset > 0 else 0)
-        self.total_length = self.objects_length + self.hardmode_length
+        objects_length = bs.offset - self.data.ram_to_rom(ram_objects_start) + (1 if bs.bitoffset > 0 else 0)
+        self.total_length = objects_length + hardmode_length
         
     def commit(self):
         ps = self.produce_patches_stream()
@@ -329,8 +332,7 @@ class World:
         self.macro_tiles = [] # array of [tl, tr, bl, br]
         self.med_tiles = [] # array of [tl, tr, bl, br]
         self.med_tile_palettes = []
-        self.med_tile_count = None
-        self.macro_tile_count = None
+        self.total_length = None
         self.max_symmetry_idx = 0
         self.palettes = []
         
@@ -350,7 +352,7 @@ class World:
     def get_macro_tile(self, idx):
         if idx < constants.global_macro_tiles_count:
             return self.data.macro_tiles[idx]
-        elif idx < constants.global_macro_tiles_count + self.macro_tile_count:
+        elif idx < constants.global_macro_tiles_count + len(self.macro_tiles):
             return self.macro_tiles[idx - constants.global_macro_tiles_count]
         else:
             # TODO
@@ -359,7 +361,7 @@ class World:
     def get_med_tile(self, idx):
         if idx < constants.global_med_tiles_count:
             return self.data.med_tiles[idx]
-        elif idx < constants.global_med_tiles_count + self.med_tile_count:
+        elif idx < constants.global_med_tiles_count + len(self.med_tiles):
             return self.med_tiles[idx - constants.global_med_tiles_count]
         else:
             # TODO
@@ -405,19 +407,21 @@ class World:
         self.ram = data_ptr
         
         # tile counts
-        self.med_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
+        med_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
         data_ptr += 1
-        self.macro_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
+        macro_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
         data_ptr += 1
+        
+        self.total_length = med_tile_count + macro_tile_count
         
         # dummy -- to fill in later
         self.med_tile_palettes = [0] * 0x100
         
         # med-tiles
         next_data_ptr = data_ptr
-        for i in range(self.med_tile_count):
+        for i in range(med_tile_count):
             self.med_tiles.append([
-                self.data.read_byte(self.data.ram_to_rom(data_ptr + self.med_tile_count * j)) for j in range(4)
+                self.data.read_byte(self.data.ram_to_rom(data_ptr + med_tile_count * j)) for j in range(4)
             ])
             data_ptr += 1
             next_data_ptr += 4
@@ -425,20 +429,20 @@ class World:
             
         # med-tile palette data
         idx = 0
-        for i in range(int((self.med_tile_count + constants.global_med_tiles_count + 3) / 4)):
+        for i in range(int((med_tile_count + constants.global_med_tiles_count + 3) / 4)):
             b = self.data.read_byte(self.data.ram_to_rom(data_ptr))
             for j in range(4):
-                if idx < self.med_tile_count + constants.global_med_tiles_count:
+                if idx < med_tile_count + constants.global_med_tiles_count:
                     self.med_tile_palettes[idx] = (b >> (2 * j)) % 4
                     idx += 1
             data_ptr += 1
         
         # macro-tiles
         next_data_ptr = data_ptr
-        for i in range(self.macro_tile_count):
+        for i in range(macro_tile_count):
             macro_tile = []
             for j in range(4):
-                byte = self.data.read_byte(self.data.ram_to_rom(data_ptr + self.macro_tile_count * j))
+                byte = self.data.read_byte(self.data.ram_to_rom(data_ptr + macro_tile_count * j))
                 macro_tile.append(byte)
             self.macro_tiles.append(macro_tile)
             data_ptr += 1
@@ -461,11 +465,8 @@ class World:
             
     def commit(self):
         # assert lengths not exceeded
-        if self.med_tile_count != len(self.med_tiles):
-            self.data.errors += ["med-tile length mismatch in world " + str(world_idx + 1)]
-            return False
-        if self.macro_tile_count != len(self.macro_tiles):
-            self.data.errors += ["med-tile length mismatch in world " + str(world_idx + 1)]
+        if self.total_length < len(self.med_tiles) + len(self.macro_tiles):
+            self.data.errors += ["size exceeded for world " + str(world_idx + 1)]
             return False
         
         # max symmetry index
@@ -514,7 +515,7 @@ class World:
         bs = BitStream(self.data.bin, data_ptr)
         for i in range(8):
             for j in range(3):
-                b = self.palettes[i][j]
+                b = self.palettes[i][j + 1]
                 bs.write_bits(b, 6)
         
         return True
@@ -764,7 +765,7 @@ class MMData:
                 out("# \"..\" entries are shared between all worlds; only the palette is world-specific.")
                 out("# m idx: tl tr bl br   :(palette 0-3)")
                 out()
-                for med_idx in range(constants.global_med_tiles_count + world.med_tile_count):
+                for med_idx in range(constants.global_med_tiles_count + len(world.med_tiles)):
                     palette = ":" + str(world.med_tile_palettes[med_idx])
                     if (med_idx >= constants.global_med_tiles_count):
                         med_tile = world.med_tiles[med_idx - constants.global_med_tiles_count]
@@ -779,7 +780,7 @@ class MMData:
                 out("# macro-tiles (32x32) specific to this world.")
                 out("# M idx: tl tr bl br")
                 out()
-                for macro_idx in range(constants.global_macro_tiles_count + world.macro_tile_count):
+                for macro_idx in range(constants.global_macro_tiles_count + len(world.macro_tiles)):
                     if (macro_idx >= constants.global_macro_tiles_count):
                         macro_tile = world.macro_tiles[macro_idx - constants.global_macro_tiles_count]
                         out("M", hb(macro_idx) + ":  ", hb(macro_tile[0]), hb(macro_tile[1]), hb(macro_tile[2]), hb(macro_tile[3]))
@@ -789,21 +790,19 @@ class MMData:
             for level_idx in range(constants.level_count):
                 out("-- level", hx(level_idx), "--")
                 level = self.levels[level_idx]
-                if level.hardmode_length is not None or level.objects_length is not None:
-                    out("# " + level.get_name())
-                    out("# data from rom " + hex(self.ram_to_rom(level.ram)) + " / ram " + hex(level.ram))
-                    out()
-                    out("# These fields measure (in bytes, hex) the total length of the level data.")
-                    out("# Each is optional, but recommended. If exceeded, an error will be thrown. If underrun, will be padded.")
-                    out()
-                    if level.hardmode_length is not None:
-                        out("# Length of hardmode data.")
-                        out("H" if level.hardmode_length >= 0 else "# H", hb(abs(level.hardmode_length)))
-                        out()
-                    if level.objects_length is not None:
-                        out("# Length of object data.")
-                        out("O" if level.objects_length >= 0 else "# O", hb(abs(level.objects_length)))
-                        out()
+                
+                out("# " + level.get_name())
+                out("# data from rom " + hex(self.ram_to_rom(level.ram)) + " / ram " + hex(level.ram))
+                out("ram", HW(level.ram))
+                out()
+                out("# This field measures (in bytes, hex) the total length of the level data.")
+                out("# Optional, but recommended. If exceeded, an error will be thrown. If underrun, will be padded.")
+                calculated_length = level.produce_objects_stream().length_bytes() + level.produce_patches_stream().length_bytes()
+                if level.total_length is not None:
+                    out("size", HB(level.total_length))
+                else:
+                    out("# size", HB(calculated_length))
+                out()
                     
                 out("# 32x32 macro-tile rows (from the top/end of the level to bottom/start).")
                 out("# Each row is 256x32 pixels.")
@@ -891,17 +890,16 @@ class MMData:
                             level_complete = level
                             level = self.levels[level_idx]
                             level.objects = []
-                            level.hardmode_length = None
-                            level.objects_length = None
+                            level.total_length = None
                             level.hardmode_patches = []
                             row = constants.macro_rows_per_level - 1
                             obji = 0
                             
-                    if directive == "H":
-                        level.hardmode_length = int(tokens[1], 16)
-                        
-                    if directive == "O":
-                        level.objects_length = int(tokens[1], 16)
+                    if directive == "ram":
+                        level.ram = int(tokens[1], 16)
+                    
+                    if directive == "size":
+                        level.total_length = int(tokens[1], 16)
                     
                     # palette data
                     if directive[0] == "P":
@@ -972,7 +970,7 @@ class MMData:
                     # object
                     if directive == "-":
                         assert(len(tokens) > 3)
-                        obj = Object()
+                        obj = Object(self)
                         force_compress = False
                         
                         # look up name.
@@ -983,8 +981,6 @@ class MMData:
                         else:
                             assert(name in constants.object_names_to_gid)
                             obj.gid = constants.object_names_to_gid[name]
-                        
-                        obj.i = self.spawnable_objects.index(obj.gid)
                         
                         for token in tokens[2:]:
                             if token[0] == "x":
@@ -1007,17 +1003,6 @@ class MMData:
                         level.objects.append(obj)
                 
                 if level_complete is not None:
-                    # length bounds
-                    calculated_hardmode_patches_length = len(level_complete.hardmode_patches)
-                    calculated_objects_length = level_complete.produce_objects_stream().length_bytes()
-                    if level_complete.hardmode_length is not None:
-                        assert(level_complete.hardmode_length >= calculated_hardmode_patches_length)
-                    else:
-                        level_complete.hardmode_length = -calculated_hardmode_patches_length
-                    if level_complete.objects_length is not None:
-                        assert(level_complete.objects_length >= calculated_objects_length)
-                    else:
-                        level_complete.objects_length = -calculated_objects_length
                     level_complete = None
                     
                 if parsing_globals:

@@ -6,9 +6,18 @@ def hb(a):
     if (len(str) < 2):
          str = "0" + str
     return str
+
+def hw(a):
+    str = hex(a)[2:]
+    if (len(str) < 4):
+         str = "0" + str
+    return str
     
 def HB(a):
     return hb(a).upper()
+    
+def HW(a):
+    return hw(a).upper()
     
 def json_list(list, map):
     str = "["

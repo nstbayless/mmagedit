@@ -314,13 +314,12 @@ class Gui:
                         break
                 
             if action == "place":
-                obj = mmdata.Object()
+                obj = mmdata.Object(self.data)
                 obj.x = objx
                 obj.y = objy
                 obj.flipx = self.flipx
                 obj.flipy = self.flipy
                 obj.gid = self.object_select_gid
-                obj.i = self.data.spawnable_objects.index(obj.gid)
                 obj.name = constants.object_names[obj.gid][0]
                 level.objects.append(obj)
                 self.dirty = True
@@ -357,9 +356,6 @@ class Gui:
                     patch.y = macro_row_idx
                     level.hardmode_patches.append(patch)
                     self.dirty = True
-                    
-                    # force display patches after placing a patch.
-                    self.show_patches = True
                 
                 self.refresh_patch_rects()
             else:
@@ -382,6 +378,8 @@ class Gui:
         self.refresh_title()
         
     def on_macro_click(self, event):
+        if len(self.placable_tiles) == 0:
+            return
         h = ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1)
         y = self.get_event_y(event, self.macro_canvas, h)
         x = clamp_hoi(event.x, 0, (macro_width + 1) * self.macro_tile_select_width)
@@ -392,6 +390,8 @@ class Gui:
         self.refresh_label()
         
     def on_object_click(self, event):
+        if len(self.placable_objects) == 0:
+            return
         y = self.get_event_y(event, self.object_canvas, len(self.placable_objects) * (macro_height + 1))
         idx = clamp_hoi(y / (objheight), 0, len(self.placable_objects))
         self.macro_tile_select_id = None
@@ -556,6 +556,9 @@ class Gui:
                     self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=img)
     
     def select_stage(self, stage_idx, hard=False):
+        if self.data is None:
+            return
+            
         self.object_select_gid = None
         self.macro_tile_select_id = 0x30 if hard else 0xd # a good default selection.
         self.stage_idx = stage_idx
@@ -574,7 +577,7 @@ class Gui:
         
         # filter out tiles not in world
         for tile_idx in self.placable_tiles + []:
-            if tile_idx >= self.level.world.macro_tile_count + constants.global_macro_tiles_count:
+            if tile_idx >= len(self.level.world.macro_tiles) + constants.global_macro_tiles_count:
                 self.placable_tiles.remove(tile_idx)
         
         # decide on placable objects

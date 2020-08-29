@@ -11,7 +11,7 @@ try:
 except ImportError:
     available = False
     
-def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False):
+def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, sprite=False, semi=False):
     for y in range(8):
         l = data.read_byte(data.chr_to_rom(chr_address + y))
         u = data.read_byte(data.chr_to_rom(chr_address + y + 8))
@@ -23,9 +23,17 @@ def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False):
             col = palette[col_idx]
             colrgb = constants.palette_rgb[col]
             
+            # sprite transparency
+            if sprite:
+                colrgb = (colrgb[0], colrgb[1], colrgb[2], 0xff)
+                if col == 0xf:
+                    colrgb = (0, 0, 0, 0)
+                elif semi:
+                    colrgb = (colrgb[0], colrgb[1], min(0xff, colrgb[2] + 0x40), 0x50)
+            
             img.putpixel((7 - x + offset[0] if flipx else x + offset[0], y + offset[1]), colrgb)
     
-def produce_object_images(data):
+def produce_object_images(data, semi=False):
     object_images = []
     for object_data in constants.object_data:
         if "chr" in object_data:
@@ -33,7 +41,7 @@ def produce_object_images(data):
             offset = object_data["offset"] if "offset" in object_data else (0, 0)
             height = 8 * len(chr)
             width = 8 * len(chr[0])
-            img = Image.new('RGB', (width, height), color = 'black')
+            img = Image.new('RGBA', (width, height))
             for i in range(len(chr)):
                 for j in range(len(chr[i])):
                     chr_idx = chr[i][j]
@@ -47,7 +55,7 @@ def produce_object_images(data):
                         chr_address += 0x1000
                     flipx = chr_idx & 0x200 != 0
                     
-                    chr_to_img(data, chr_address, img, [0xf, 0x0, 0x10, 0x20], (x, y), flipx)
+                    chr_to_img(data, chr_address, img, [0x0f, 0x0, 0x10, 0x20], (x, y), flipx, True, semi)
             
             img._mm_offset = offset
             img._mm_hard = object_data["hard"] if "hard" in object_data else False
@@ -77,7 +85,12 @@ def produce_micro_tile_images(world, hard=False):
                         # hidden block effect
                         if i in constants.hidden_micro_tiles and palette_idx == 1:
                             if (x + y) % 2 == 1:
-                                rgb = constants.meta_colour
+                                rgb = constants.hidden_colour
+                        
+                        # dangerous block effect
+                        if i in constants.dangerous_micro_tiles:
+                            if (x + y) % 2 == 1:
+                                rgb = (0xff, 0x30, 0x38)
                                 
                         img.putpixel((x, y), rgb)
             minitile_images_paletted.append(img)

@@ -3,6 +3,7 @@ from util import *
 import constants
 import json
 import functools
+import hashlib
 
 class PatchStream:
     def __init__(self):
@@ -55,11 +56,11 @@ class ObjectStream:
             return lb / 8
         else:
             return int(lb / 8) + 1
-        
+    
     def as_bits(self, value, n):
         l = []
         for i in range(n):
-            l.append(0 if n & (1 << (n - i - 1)) == 0 else 1)
+            l.append(0 if value & (1 << (n - i - 1)) == 0 else 1)
         return l
     
     def add_object(self, obj):
@@ -130,7 +131,7 @@ class LevelMacroRow:
             self.data.write_byte(rom + 3 - i, b)
 
 class Level:
-    def __init__(self, data, ram, idx):
+    def __init__(self, data, idx):
         self.level_idx = idx
         if idx == 0xc:
             self.world_idx = 3
@@ -140,7 +141,6 @@ class Level:
             self.world_sublevel = idx % 3
         self.world = data.worlds[self.world_idx]
         self.data = data
-        self.ram = ram
         self.macro_rows = []
         self.objects = []
         self.hardmode_patches = []
@@ -158,6 +158,10 @@ class Level:
         self.macro_rows = []
         self.objects = []
         
+        # get ram start address
+        self.ram = self.data.read_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table))
+        
+        # read data from start address...
         self.hardmode_length = self.data.read_byte(self.data.ram_to_rom(self.ram))
         
         row_count = constants.macro_rows_per_level
@@ -233,11 +237,21 @@ class Level:
         self.total_length = self.objects_length + self.hardmode_length
         
     def commit(self):
-        rom = self.data.ram_to_rom(self.ram)
+        ps = self.produce_patches_stream()
+        os = self.produce_objects_stream()
+        
+        # check length (sanity)
+        if self.total_length is not None:
+            if ps.length_bytes() + os.length_bytes() > self.total_length:
+                self.data.errors += ["Size limit exceeded: " + self.get_name()]
+                return False
+        
+        # write level ram offset
+        self.data.write_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table), self.ram)
         
         # write hardmode data length
-        if self.hardmode_length is not None:
-            self.data.write_byte(rom, abs(self.hardmode_length))
+        rom = self.data.ram_to_rom(self.ram)
+        self.data.write_byte(rom, ps.length_bytes())
             
         # write tile data
         for i in range(constants.macro_rows_per_level):
@@ -245,12 +259,16 @@ class Level:
             macro_row.commit(rom + i * 4 + 1)
         
         # write hardmode patch data
-        ps = self.produce_patches_stream()
-        if self.hardmode_length is not None and self.hardmode_length >= 0:
-            assert(self.hardmode_length >= ps.length_bytes())
         for i in range(len(ps.entries)):
             entry = ps.entries[i]
             self.data.write_byte(rom + 4 * constants.macro_rows_per_level + 1 + i, entry)
+        
+        # write objects data
+        bs = BitStream(self.data.bin, rom + 4 * constants.macro_rows_per_level + 1 + ps.length_bytes())
+        for entry in os.entries:
+            bs.write_bits_list(entry)
+        
+        return True
         
     def produce_patches_stream(self):
         ps = PatchStream()
@@ -385,13 +403,15 @@ class World:
         self.max_symmetry_idx = self.data.read_byte(self.data.ram_to_rom(constants.ram_world_mirror_index_table + self.idx))
         data_ptr = self.data.read_word(self.data.ram_to_rom(constants.ram_world_macro_tiles_table + self.idx * 2))
         self.ram = data_ptr
+        
+        # tile counts
         self.med_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
         data_ptr += 1
         self.macro_tile_count = self.data.read_byte(self.data.ram_to_rom(data_ptr))
         data_ptr += 1
         
         # dummy -- to fill in later
-        self.med_tile_palettes = [0] * constants.global_med_tiles_count
+        self.med_tile_palettes = [0] * 0x100
         
         # med-tiles
         next_data_ptr = data_ptr
@@ -401,9 +421,6 @@ class World:
             ])
             data_ptr += 1
             next_data_ptr += 4
-            
-            # dummy -- to fill in later
-            self.med_tile_palettes.append(0)
         data_ptr = next_data_ptr
             
         # med-tile palette data
@@ -429,7 +446,7 @@ class World:
         
         data_ptr = next_data_ptr
         
-        # read palette data.
+        # read palettes.
         bs = BitStream(self.data.bin, self.data.ram_to_rom(data_ptr))
         for i in range(8):
             a = bs.read_bits(6)
@@ -443,7 +460,64 @@ class World:
             ])
             
     def commit(self):
-        pass
+        # assert lengths not exceeded
+        if self.med_tile_count != len(self.med_tiles):
+            self.data.errors += ["med-tile length mismatch in world " + str(world_idx + 1)]
+            return False
+        if self.macro_tile_count != len(self.macro_tiles):
+            self.data.errors += ["med-tile length mismatch in world " + str(world_idx + 1)]
+            return False
+        
+        # max symmetry index
+        self.data.write_byte(self.data.ram_to_rom(constants.ram_world_mirror_index_table + self.idx), self.max_symmetry_idx)
+        
+        # ram start
+        data_ptr = self.data.ram_to_rom(self.ram)
+        self.data.write_word(self.data.ram_to_rom(constants.ram_world_macro_tiles_table + self.idx * 2), self.ram)
+        
+        # tile counts
+        self.data.write_byte(data_ptr, len(self.med_tiles))
+        data_ptr += 1
+        
+        self.data.write_byte(data_ptr, len(self.macro_tiles))
+        data_ptr += 1
+        
+        # med-tiles
+        next_data_ptr = data_ptr
+        for med_tile in self.med_tiles:
+            for j in range(4):
+                self.data.write_byte(data_ptr + len(self.med_tiles) * j, med_tile[j])
+            data_ptr += 1
+            next_data_ptr += 4
+        data_ptr = next_data_ptr
+        
+        # med-tile palette data
+        palette_start = data_ptr
+        for i in range(len(self.med_tiles) + constants.global_med_tiles_count):
+            data_ptr = palette_start + (i // 4)
+            bit = (i % 4) * 2
+            bprev = self.data.read_byte(data_ptr)
+            bprev &= ~(0x3 << bit)
+            bprev |= self.med_tile_palettes[i] << bit
+            data_ptr += 1 # if loop ends here.
+        
+        # macro-tiles
+        next_data_ptr = data_ptr
+        for macro_tile in self.macro_tiles:
+            for j in range(4):
+                self.data.write_byte(data_ptr + len(self.macro_tiles) * j, macro_tile[j])
+            data_ptr += 1
+            next_data_ptr += 4
+        data_ptr = next_data_ptr
+        
+        # palettes
+        bs = BitStream(self.data.bin, data_ptr)
+        for i in range(8):
+            for j in range(3):
+                b = self.palettes[i][j]
+                bs.write_bits(b, 6)
+        
+        return True
 
 class MMData:
     # convert ram address to rom address
@@ -464,14 +538,21 @@ class MMData:
     
     def write_word(self, addr, w):
         self.write_byte(addr,     w & 0x00ff)
-        self.write_byte(addr + 1, w & 0xff00)
+        self.write_byte(addr + 1, (w & 0xff00) >> 8)
     
     def read(self, file):
+        self.errors = []
         with open(file, "rb") as f:
-            self.bin = f.read()
+            hasher = hashlib.md5()
+            self.bin = bytearray(f.read())
+            hasher.update(self.bin)
+            hashval = str(hasher.hexdigest())
+            if hashval not in constants.base_hashes:
+                self.errors += ["ROM \"" + file + "\" has an unexpected hash (" + hashval + "); is this an unmodified base ROM?"]
+                # don't fail; just use this as a warning.
                 
             if len(self.bin) <= 0x10:
-                print("NES file", filepath , "is empty.")
+                self.errors += ["NES file " + filepath + " is empty."]
                 return False
             
             self.levels = []
@@ -537,13 +618,13 @@ class MMData:
                 self.levels.append(
                     Level(
                         self,
-                        self.read_word(self.ram_to_rom(level_idx * 2 + constants.ram_level_table)),
                         level_idx
                     )
                 )
                 self.levels[-1].read()
         
             return True
+        self.errors += ["Failed to open file \"" + file + "\" for reading."]
         return False
     
     # edits the binary data to be in line with everything else
@@ -580,17 +661,24 @@ class MMData:
         
         # write levels
         for level in self.levels:
-            level.commit()
+            # write level data
+            if not level.commit():
+                return False
+        return True
         
     def write(self, file):
-        self.commit()
+        self.errors = []
+        if not self.commit():
+            return False
         with open(file, "wb") as nes:
             nes.write(self.bin)
             return True
+        self.errors += ["Failed to open file \"" + file + "\" for writing."]
         return False
     
     def __init__(self):
         self.bin = None
+        self.errors = []
         pass
         
     def get_object_name(self, gid):
@@ -702,7 +790,7 @@ class MMData:
                 out("-- level", hx(level_idx), "--")
                 level = self.levels[level_idx]
                 if level.hardmode_length is not None or level.objects_length is not None:
-                    out("# stage " + str(level.world_idx + 1) + "-" + str(level.world_sublevel + 1))
+                    out("# " + level.get_name())
                     out("# data from rom " + hex(self.ram_to_rom(level.ram)) + " / ram " + hex(level.ram))
                     out()
                     out("# These fields measure (in bytes, hex) the total length of the level data.")

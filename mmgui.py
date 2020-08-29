@@ -11,7 +11,7 @@ available = True
 try:
     from PIL import Image, ImageDraw, ImageOps, ImageTk
     import tkinter as tk
-    import tkinter.filedialog
+    import tkinter.filedialog, tkinter.messagebox
 except ImportError:
     available = False
    
@@ -26,6 +26,8 @@ med_height = 16
 micro_width = 8
 micro_height = 8
 
+max_select_width = 0x4
+
 objwidth = 32
 objheight = 33
 screenwidth = 256
@@ -34,6 +36,8 @@ level_width = 256
 level_height = macro_height * constants.macro_rows_per_level
 gridcol = "#333"
 seamcol = "#ddd"
+linecol = "#888"
+divcol = "#cff"
 selcol = constants.meta_colour_str
 patchcol = constants.meta_colour_str
 objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str_b}
@@ -50,6 +54,7 @@ class Gui:
         self.show_lines = True
         self.show_patches = True
         self.show_objects = True
+        self.show_crosshairs = True
         self.placable_objects = []
         self.placable_tiles = []
         self.menu_commands = dict()
@@ -60,6 +65,9 @@ class Gui:
         self.hard = False
         self.flipx = False
         self.flipy = False
+        
+        # preferences
+        self.macro_tile_select_width = 4
         
         # clearable elts
         self.elts_macro_select = []
@@ -100,6 +108,8 @@ class Gui:
         
         if path is None:
             path = promptfn(title=title)
+        if path == "" or path == ():
+            path = None
         
         result = self.fio_direct(path, type, save)
         
@@ -108,6 +118,19 @@ class Gui:
         self.refresh_title()
         self.refresh_label()
         return result
+        
+    # display error boxes if data has errors.
+    def errorbox(self, warning):
+        if len(self.data.errors) > 0:
+            title = "Warning" if warning else "Error"
+            message = "" if warning else "An error occurred, preventing the file I/O operation:\n\n"
+            for error in self.data.errors:
+                message += ("Warning: " if len(self.data.errors) <= 1 else "- ") + error + "\n"
+            if warning:
+                tkinter.messagebox.showwarning(title, message)
+            else:
+                tkinter.messagebox.showerror(title, message)
+            self.data.errors = []
         
     # loads/saves rom/hack/image
     # after loading, please call refresh_all().
@@ -121,7 +144,7 @@ class Gui:
                 return False
                 
             # cannot load rom twice
-            if type == "rom" and self.data is not None:
+            if type == "rom" and not save and self.data is not None:
                 return False
             
             # cannot load image
@@ -130,7 +153,9 @@ class Gui:
             
             if type == "rom":
                 if save:
-                    return self.data.write(path)
+                    rval = self.data.write(path)
+                    self.errorbox(rval)
+                    return rval
                 else:
                     self.data = mmdata.MMData()
                     if self.data.read(path):
@@ -139,27 +164,37 @@ class Gui:
                         for m in self.menu_fio:
                             self.filemenu.entryconfig(m, state=tk.NORMAL)
                         self.file[type] = path
+                        self.errorbox(True)
                         return True
-                    self.data = None # set data to none so we don't later think the data exists.
-                    return False
+                    else:
+                        self.errorbox(False)
+                        self.data = None # set data to none so we don't later think the data exists.
+                        return False
             
             if type == "image" and save:
                 self.file[type] = path
                 return mmimage.export_images(self.data, path)
             
             if type == "hack" and not save:
+                self.dirty = False
                 self.file[type] = path
-                return self.data.parse(path)
+                rval = self.data.parse(path)
+                self.errorbox(rval)
+                return rval
             
             if type == "hack" and save:
+                self.dirty = False
                 self.file[type] = path
-                return self.data.stat(path)
+                rval = self.data.stat(path)
+                self.errorbox(rval)
+                return rval
             
             # note: do not refresh anything directly
             # the caller is expected to call the refresh functions
             # this allows the caller to invoke several fio_direct commands before refreshing
         except Exception as e:
             print(e)
+            tkinter.messagebox.showerror("Internal Error", "An internal error occurred during the I/O process:\n\n" + str(e))
             # catch any save/load error, and return false if one occurs.
             pass # fallthrough
         return False
@@ -191,28 +226,32 @@ class Gui:
         if "show_objects" in kw:
             self.show_objects = kw["show_objects"]
             self.refresh_objects()
+        if "show_crosshairs" in kw and self.show_objects:
+            self.show_crosshairs = kw["show_crosshairs"]
+            self.refresh_objects()
         if "show_lines" in kw:
             self.show_lines = kw["show_lines"]
             for i in range(constants.macro_rows_per_level):
                 self.refresh_row_lines(i)
             self.refresh_horizontal_lines()
-        if "show_patches" in kw:
+        if "show_patches" in kw and self.hard:
             self.show_patches = kw["show_patches"]
             self.refresh_patch_rects()
         
         self.refresh_label()
     
     def clear_stage(self):
-        level = self.level
-        if level:
-            level.hardmode_patches = []
-            level.objects = []
-            for macro_row in level.macro_rows:
-                macro_row.macro_tiles = [0, 0, 0, 0]
-                macro_row.seam = 0
-            
-            # lazy, but this is one way to refresh everything.
-            self.select_stage(self.stage_idx, self.hard)
+        if tkinter.messagebox.askyesno("Clear Stage", "Clearing the stage cannot be undone. Are you sure you'd like to proceed?"):
+            level = self.level
+            if level:
+                level.hardmode_patches = []
+                level.objects = []
+                for macro_row in level.macro_rows:
+                    macro_row.macro_tiles = [0, 0, 0, 0]
+                    macro_row.seam = 0
+                
+                # lazy, but this is one way to refresh everything.
+                self.select_stage(self.stage_idx, self.hard)
         
     # handles a kepyress event
     def on_keypress(self, event):
@@ -238,7 +277,13 @@ class Gui:
             if event.keysym is not None and acc == event.keysym.lower():
                 command()
                 return
-        
+    
+    def get_tile_dangerous(self, x, y):
+        if x in range(0x20) and y in range(4 * constants.macro_rows_per_level):
+            if self.stage_micro_dangerous[x][y]:
+                return True
+        return False
+    
     def get_event_y(self, event, canvas, height):
         return event.y + canvas.yview()[0] * height
         
@@ -263,8 +308,7 @@ class Gui:
             if (action == "place" and not place_duplicates) or (action == "remove" and self.show_objects):
                 for obj in level.objects:
                     object_data = constants.object_data[obj.gid]
-                    hard_only = object_data["hard"] if "hard" in object_data else False
-                    if obj.x == objx and obj.y == objy and hard_only == self.hard:
+                    if obj.x == objx and obj.y == objy:
                         level.objects.remove(obj)
                         self.dirty = True
                         break
@@ -277,6 +321,7 @@ class Gui:
                 obj.flipy = self.flipy
                 obj.gid = self.object_select_gid
                 obj.i = self.data.spawnable_objects.index(obj.gid)
+                obj.name = constants.object_names[obj.gid][0]
                 level.objects.append(obj)
                 self.dirty = True
                 self.show_objects = True
@@ -284,7 +329,7 @@ class Gui:
             self.refresh_objects()
         
         # tile adjustment
-        if self.macro_tile_select_id is not None:
+        if self.macro_tile_select_id is not None or action == "seam":
             macro_row_idx = clamp_hoi(constants.macro_rows_per_level - int(y / macro_height) - 1, 0, constants.macro_rows_per_level)
             macro_row = level.macro_rows[macro_row_idx]
             seam_x = macro_row.seam * med_width
@@ -331,12 +376,16 @@ class Gui:
             
             self.refresh_row_tiles(macro_row_idx)
             self.refresh_row_lines(macro_row_idx)
+            # needed for the weird "normal-mode grinder" effect
+            self.refresh_objects()
         self.refresh_label()
         self.refresh_title()
         
     def on_macro_click(self, event):
-        y = self.get_event_y(event, self.macro_canvas, len(self.placable_tiles) * (macro_height + 1))
-        idx = clamp_hoi(y / (macro_height + 1), 0, len(self.placable_tiles))
+        h = ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1)
+        y = self.get_event_y(event, self.macro_canvas, h)
+        x = clamp_hoi(event.x, 0, (macro_width + 1) * self.macro_tile_select_width)
+        idx = clamp_hoi(int(x // (macro_width + 1)) + int(y / (macro_height + 1)) * self.macro_tile_select_width, 0, len(self.placable_tiles))
         self.macro_tile_select_id = self.placable_tiles[idx]
         self.object_select_gid = None
         self.refresh_selection_rect()
@@ -359,7 +408,7 @@ class Gui:
     # self.data need not be set yet.
     def init(self):
         self.window = tk.Tk()
-        self.window.iconphoto(False, tk.PhotoImage(file=icon_path))
+        self.window.iconphoto(True, tk.PhotoImage(file=icon_path))
         
         self.window.bind("<Key>", self.on_keypress)
         self.blank_image = ImageTk.PhotoImage(image=Image.new('RGB', (4, 4), color='black'))
@@ -388,8 +437,9 @@ class Gui:
         menu.add_cascade(label="File", menu=filemenu)
         
         editmenu = tk.Menu(menu, tearoff=0)
-        self.add_menu_command(editmenu, "Flip Object X", lambda: self.ctl(flipx=not self.flipx), "x")
-        self.add_menu_command(editmenu, "Flip Object Y", lambda: self.ctl(flipy=not self.flipy), "y")
+        self.add_menu_command(editmenu, "Flip Object X", lambda: self.ctl(flipx=not self.flipx), "X")
+        self.add_menu_command(editmenu, "Flip Object Y", lambda: self.ctl(flipy=not self.flipy), "Y")
+        editmenu.add_separator()
         self.add_menu_command(editmenu, "Clear Stage", partial(self.clear_stage), None)
         menu.add_cascade(label="Edit", menu=editmenu)
         
@@ -401,19 +451,20 @@ class Gui:
             if level_idx in [3, 6, 9]:
                 stagemenu.add_separator()
             
-            sublevel = (level_idx % 3) + 1 if level_idx < 12 else 13
+            sublevel = (level_idx % 3) + 1 if level_idx < 12 else 4
             world_idx = (level_idx // 3) + 1 if level_idx < 12 else 4
             name = "Tower " + str(world_idx) + "-" + str(sublevel)
             accelerator = ("Shift+F" + str(24 - level_idx)) if level_idx >= 12 else "F" + str(level_idx + 1)
             self.add_menu_command(stagemenu, name, partial(self.select_stage, level_idx), accelerator)
             
         viewmenu.add_cascade(label="Stage", menu=stagemenu)
-        self.menu_view_hard = self.add_menu_command(viewmenu, "Hard Mode", lambda: self.select_stage(self.stage_idx, not self.hard), "h")
+        self.menu_view_hard = self.add_menu_command(viewmenu, "Hard Mode", lambda: self.select_stage(self.stage_idx, not self.hard), "H")
         viewmenu.add_separator()
         
-        self.add_menu_command(viewmenu, "Objects", lambda: self.ctl(show_objects=not self.show_objects), "o")
-        self.add_menu_command(viewmenu, "Grid", lambda: self.ctl(show_lines=not self.show_lines), "g")
-        self.menu_view_patches = self.add_menu_command(viewmenu, "Patches", lambda: self.ctl(show_patches=not self.show_patches), "p")
+        self.add_menu_command(viewmenu, "Objects", lambda: self.ctl(show_objects=not self.show_objects), "O")
+        self.menu_view_crosshairs = self.add_menu_command(viewmenu, "Object Crosshairs", lambda: self.ctl(show_crosshairs=not self.show_crosshairs), "C")
+        self.add_menu_command(viewmenu, "Grid", lambda: self.ctl(show_lines=not self.show_lines), "G")
+        self.menu_view_patches = self.add_menu_command(viewmenu, "Patches", lambda: self.ctl(show_patches=not self.show_patches), "P")
         
         menu.add_cascade(label="View", menu=viewmenu)
         
@@ -441,7 +492,7 @@ class Gui:
         stage_canvas.bind("<Button-2>", partial(self.on_stage_click, 2))
         stage_canvas.bind("<Button-3>", partial(self.on_stage_click, 3))
         
-        macro_canvas = tk.Canvas(selector_macro_frame, width=macro_width, height=screenheight, bg="black")
+        macro_canvas = tk.Canvas(selector_macro_frame, width=macro_width * self.macro_tile_select_width, height=screenheight, bg="black")
         self.attach_scrollbar(macro_canvas, selector_macro_frame)
         macro_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
         macro_canvas.bind("<Button-1>", partial(self.on_macro_click))
@@ -457,8 +508,9 @@ class Gui:
         self.object_canvas = object_canvas
         
         # canvas images (reused):
+        self.stage_micro_dangerous = [[False for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
         self.stage_micro_images = [[stage_canvas.create_image(x * micro_width, y * micro_height, image=self.blank_image, anchor=tk.NW) for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
-        self.macro_micro_images = [[macro_canvas.create_image(x * micro_width, y * micro_height + (y // 4), image=self.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height)] for x in range(macro_width // micro_width)]
+        self.macro_micro_images = [[macro_canvas.create_image(x * micro_width + (x // 4), y * micro_height + (y // 4), image=self.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height // self.macro_tile_select_width)] for x in range(self.macro_tile_select_width * 4)]
         self.object_select_images = [object_canvas.create_image(objwidth / 2, objheight / 2 + objheight * y, image=self.blank_image, anchor=tk.CENTER) for y in range(0x100)]
         
         # bottom label
@@ -475,11 +527,12 @@ class Gui:
         
         # object images
         # list [flip][gid]
-        self.object_images = [None] * 4
-        for j in range(4):
+        self.object_images = [None] * 8
+        for j in range(8):
             flipx = j % 2 == 1
-            flipy = j >= 2
-            self.object_images[j] = mmimage.produce_object_images(self.data)
+            flipy = (j % 4) >= 2
+            semi = j >= 4
+            self.object_images[j] = mmimage.produce_object_images(self.data, semi)
             
             # flip x and/or y
             for i in range(len(self.object_images[j])):
@@ -528,7 +581,8 @@ class Gui:
         for gid in self.data.spawnable_objects:
             objdata = constants.object_data[gid]
             hard_only = objdata["hard"] if "hard" in objdata else False
-            if hard_only == self.hard and self.object_images[0][gid] is not None:
+            # skip objects without images, and only have grinders on hard mode.
+            if (hard_only == self.hard or not self.hard) and self.object_images[0][gid] is not None:
                 self.placable_objects.append(gid)
         
         # refresh the selectors
@@ -558,8 +612,8 @@ class Gui:
         self.elts_macro_select = []
         
         # clear images
-        for x in range(macro_width // micro_width):
-            for y in range(0x100 * macro_height // micro_height):
+        for x in range(self.macro_tile_select_width * macro_width // micro_width):
+            for y in range(0x100 * macro_height // micro_height // self.macro_tile_select_width):
                 self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=self.blank_image)
                 
         if self.level is None:
@@ -568,24 +622,30 @@ class Gui:
         world = self.level.world
         
         # set scrollable region
-        self.macro_canvas.configure(scrollregion=(0, 0, macro_width, len(self.placable_tiles) * (macro_height + 1)))
+        self.macro_canvas.configure(scrollregion=(0, 0, (macro_width + 1) * self.macro_tile_select_width - 1, ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1) - 1))
         
         # populate
-        for macro_y in range(len(self.placable_tiles)):
-            macro_idx = self.placable_tiles[macro_y]
+        for macro_sel_idx in range(len(self.placable_tiles)):
+            macro_idx = self.placable_tiles[macro_sel_idx]
+            macro_y = (macro_sel_idx // self.macro_tile_select_width)
+            macro_x = (macro_sel_idx % self.macro_tile_select_width)
             line_y = macro_y * (macro_height + 1) + macro_height
+            line_x = (macro_x) * (macro_width + 1)
+            
+            divide = (macro_sel_idx - (macro_sel_idx % self.macro_tile_select_width) + self.macro_tile_select_width == constants.global_macro_tiles_count)
             
             # add line
-            self.elts_macro_select.append(self.macro_canvas.create_line(0, line_y, macro_width, line_y, fill="#888"))
-            macro_tile = world.get_macro_tile(macro_idx)
+            self.elts_macro_select.append(self.macro_canvas.create_line(line_x, line_y, line_x + macro_width, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
+            self.elts_macro_select.append(self.macro_canvas.create_line(line_x + macro_width, line_y - macro_height, line_x + macro_width, line_y + 1, fill=linecol))
             
             # set images
+            macro_tile = world.get_macro_tile(macro_idx)
             for i in range(4):
                 med_tile_idx = macro_tile[i]
                 med_tile = world.get_med_tile(med_tile_idx)
                 for j in range(4):
                     micro_tile_idx = world.get_micro_tile(med_tile[j], self.hard)
-                    x = (i % 2) * 2 + (j % 2)
+                    x = (i % 2) * 2 + (j % 2) + macro_x * 4
                     y = (i // 2) * 2 + (j // 2) + macro_y * 4
                     palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
                     img = self.micro_images[world.idx][palette_idx][micro_tile_idx]
@@ -601,7 +661,7 @@ class Gui:
             self.object_canvas.itemconfig(self.object_select_images[y], image=self.blank_image)
 
         # set scrollable region
-        self.object_canvas.configure(scrollregion=(0, 0, macro_width, len(self.placable_objects) * (objheight)))
+        self.object_canvas.configure(scrollregion=(0, 0, objwidth, len(self.placable_objects) * objheight - 1))
 
         flip_idx = (2 if self.flipy else 0) + (1 if self.flipx else 0)
 
@@ -609,8 +669,10 @@ class Gui:
             gid = self.placable_objects[i]
             line_y = i * objheight + objheight
             
+            divide = i == 0xf
+            
             # place line
-            self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth, line_y, fill="#888"))
+            self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
             
             # set object
             self.object_canvas.itemconfig(self.object_select_images[i], image=self.object_images[flip_idx][gid])
@@ -642,9 +704,10 @@ class Gui:
         # place the selection rect (if tile selected)
         if self.macro_tile_select_id is not None:
             i = self.placable_tiles.index(self.macro_tile_select_id)
-            y = i * (macro_height + 1)
+            y = (i // self.macro_tile_select_width) * (macro_height + 1)
+            x = (i % self.macro_tile_select_width) * (macro_width + 1)
             self.elt_macro_select_rect = self.macro_canvas.create_rectangle(
-                rect_margin, y + rect_margin, macro_width - rect_margin, y + macro_height - rect_margin,
+                x + rect_margin, y + rect_margin, x + macro_width - rect_margin, y + macro_height - rect_margin,
                 width=rect_width,
                 outline=rect_colstr
              )
@@ -687,7 +750,7 @@ class Gui:
             
             # place thin vertical lines
             for i in range(level_width // macro_width):
-                x = (2 * (i + 1) + (seam % 2)) * med_width
+                x = (2 * i + (seam % 2)) * med_width
                 if x < level_width and x != seam_x:
                     self.elts_row_lines[row_idx].append(
                         self.stage_canvas.create_line(x, y, x, y + macro_height, fill=gridcol)
@@ -716,46 +779,60 @@ class Gui:
                         x = med_tile_col_idx * 2 + (i % 2)
                         y = micro_y + (1 - med_tile_row_idx) * 2 + (i // 2)
                         img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx]
+                        self.stage_micro_dangerous[x][y] = micro_tile_idx in constants.dangerous_micro_tiles
                         self.stage_canvas.itemconfig(self.stage_micro_images[x][y], image=img)
         
     def refresh_objects(self):
+        # clear previous
         self.delete_elements(self.stage_canvas, self.elts_objects)
         self.elts_objects = []
+        
+        # update menu enabled/disabled
+        self.viewmenu.entryconfig(self.menu_view_crosshairs, state=tk.NORMAL if self.show_objects else tk.DISABLED)
+        
+        # add new objects
         if self.show_objects and self.level is not None:
             for obj in self.level.objects:
-                flip_idx = (2 if obj.flipy else 0) + (1 if obj.flipx else 0)
-                img = self.object_images[flip_idx][obj.gid]
-                
                 obj_data = constants.object_data[obj.gid]
                 hard_only = obj_data["hard"] if "hard" in obj_data else False
+                # check if tile allows displaying hard-mode-only objects
+                tile_dangerous = self.get_tile_dangerous(obj.x, obj.y)
+                semi = (hard_only and not tile_dangerous)
+                
+                flip_idx = (4 if semi else 0) + (2 if obj.flipy else 0) + (1 if obj.flipx else 0)
+                img = self.object_images[flip_idx][obj.gid]
+
                 offset = obj_data["offset"] if "offset" in obj_data else (0, 0)
                 offset = (offset[0] - (img.width() // 2), offset[1] + 8 - (img.height()))
-                if not hard_only or self.hard:
-                    # add image
-                    self.elts_objects.append(
-                        self.stage_canvas.create_image(
-                            obj.x * micro_width + offset[0], obj.y * micro_height + offset[1],
-                            image=img,
-                            anchor=tk.NW
-                        )
+                
+                # add image
+                self.elts_objects.append(
+                    self.stage_canvas.create_image(
+                        obj.x * micro_width + offset[0], obj.y * micro_height + offset[1],
+                        image=img,
+                        anchor=tk.NW
                     )
-                    
-                    # add crosshairs
-                    x = obj.x * micro_width
-                    y = obj.y * micro_height
-                    colstr = objcrosscol[obj.compressible()]
-                    r = 3 # radius
-                    
-                    self.elts_objects.append(
-                        self.stage_canvas.create_line(
-                            x - r, y, x + r, y, fill=colstr
-                        )
+                )
+                
+                if not self.show_crosshairs:
+                    continue
+                
+                # add crosshairs
+                x = obj.x * micro_width
+                y = obj.y * micro_height
+                colstr = objcrosscol[obj.compressible()]
+                r = 3 # radius
+                
+                self.elts_objects.append(
+                    self.stage_canvas.create_line(
+                        x - r, y, x + r, y, fill=colstr
                     )
-                    self.elts_objects.append(
-                        self.stage_canvas.create_line(
-                            x, y - r, x, y + r, fill=colstr
-                        )
+                )
+                self.elts_objects.append(
+                    self.stage_canvas.create_line(
+                        x, y - r, x, y + r, fill=colstr
                     )
+                )
         
     def refresh_patch_rects(self):
         self.delete_elements(self.stage_canvas, self.elts_patch_rects)
@@ -782,7 +859,7 @@ class Gui:
     def refresh_title(self):
         str = "MMagEdit"
         if self.file["hack"]:
-            str += " - " + self.file["hack"]
+            str += " - " + os.path.basename(self.file["hack"])
         if self.dirty:
             str += " *"
         self.window.title(str)
@@ -813,10 +890,10 @@ class Gui:
                 
             # space remaining
             max = self.level.total_length
-            ps = self.level.produce_patches_stream()
-            os = self.level.produce_objects_stream()
+            ps_ = self.level.produce_patches_stream()
+            os_ = self.level.produce_objects_stream()
             
-            bits_used = int(ps.length_bytes() * 8 + os.length_bits())
+            bits_used = int(ps_.length_bytes() * 8 + os_.length_bits())
             if max is None:
                 bytes_used = int((bits_used) / 8)
                 bits_used = int(bits_used % 8)

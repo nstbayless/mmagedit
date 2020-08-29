@@ -339,7 +339,7 @@ class Gui:
             macro_idx = clamp_hoi(macro_col_x, 0, 4)
             
             if self.hard:
-                # place macro tile patch
+                # place macro tile hard-mode patch
                 
                 # remove existing patch if applicable
                 if action == "place" or action == "remove":
@@ -352,7 +352,7 @@ class Gui:
                 # add a patch
                 if action == "place" and self.macro_tile_select_id != 0:
                     patch = mmdata.HardPatch()
-                    patch.i = self.macro_tile_select_id
+                    patch.i = self.macro_tile_select_id - 0x2f
                     patch.x = macro_idx
                     patch.y = macro_row_idx
                     level.hardmode_patches.append(patch)

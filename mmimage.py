@@ -19,7 +19,7 @@ def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, spri
             bl = (l >> (7 - x)) & 0x1
             bu = (u >> (7 - x)) & 0x1
             
-            col_idx = (bl << 1) | (bu)
+            col_idx = (bu << 1) | (bl)
             col = palette[col_idx]
             colrgb = constants.palette_rgb[col]
             
@@ -42,6 +42,11 @@ def produce_object_images(data, semi=False):
             height = 8 * len(chr)
             width = 8 * len(chr[0])
             img = Image.new('RGBA', (width, height))
+            
+            palette = [0x0f, 0x0, 0x10, 0x20] # a simple grayscale palette
+            if "palette" in object_data:
+                palette = constants.sprite_palettes[object_data["palette"]]
+            
             for i in range(len(chr)):
                 for j in range(len(chr[i])):
                     chr_idx = chr[i][j]
@@ -55,7 +60,7 @@ def produce_object_images(data, semi=False):
                         chr_address += 0x1000
                     flipx = chr_idx & 0x200 != 0
                     
-                    chr_to_img(data, chr_address, img, [0x0f, 0x0, 0x10, 0x20], (x, y), flipx, True, semi)
+                    chr_to_img(data, chr_address, img, palette, (x, y), flipx, True, semi)
             
             img._mm_offset = offset
             img._mm_hard = object_data["hard"] if "hard" in object_data else False

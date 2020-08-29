@@ -7,6 +7,9 @@ def hb(a):
          str = "0" + str
     return str
     
+def HB(a):
+    return hb(a).upper()
+    
 def json_list(list, map):
     str = "["
     is_first = True
@@ -28,3 +31,18 @@ def rotated(list, idx):
         newlist.append(list[j])
     return newlist
     
+def stat_out(file, *args):
+    first = True
+    for arg in args:
+        if not first:
+            file.write(" ")
+        else:
+            first = False
+        file.write(str(arg))
+    file.write("\n")
+    
+# clamps x to be an int in the range [a, b)
+# ("clamp half-open-integer")
+def clamp_hoi(x, a, b):
+    assert(a <= b - 1)
+    return int(max(a, min(x, b - 1)))

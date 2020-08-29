@@ -2,42 +2,102 @@
 
 import constants
 from util import *
+import os
 
 available = True
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageOps
 except ImportError:
     available = False
     
-def export_images(data):
+def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False):
+    for y in range(8):
+        l = data.read_byte(data.chr_to_rom(chr_address + y))
+        u = data.read_byte(data.chr_to_rom(chr_address + y + 8))
+        for x in range(8):
+            bl = (l >> (7 - x)) & 0x1
+            bu = (u >> (7 - x)) & 0x1
+            
+            col_idx = (bl << 1) | (bu)
+            col = palette[col_idx]
+            colrgb = constants.palette_rgb[col]
+            
+            img.putpixel((7 - x + offset[0] if flipx else x + offset[0], y + offset[1]), colrgb)
+    
+def produce_object_images(data):
+    object_images = []
+    for object_data in constants.object_data:
+        if "chr" in object_data:
+            chr = object_data["chr"]
+            offset = object_data["offset"] if "offset" in object_data else (0, 0)
+            height = 8 * len(chr)
+            width = 8 * len(chr[0])
+            img = Image.new('RGB', (width, height), color = 'black')
+            for i in range(len(chr)):
+                for j in range(len(chr[i])):
+                    chr_idx = chr[i][j]
+                    x = 8 * j
+                    y = 8 * i
+                    
+                    chr_address = 0x10 * (chr_idx & 0xff)
+                    
+                    is_sprite = chr_idx & 0x100 == 0
+                    if is_sprite:
+                        chr_address += 0x1000
+                    flipx = chr_idx & 0x200 != 0
+                    
+                    chr_to_img(data, chr_address, img, [0xf, 0x0, 0x10, 0x20], (x, y), flipx)
+            
+            img._mm_offset = offset
+            img._mm_hard = object_data["hard"] if "hard" in object_data else False
+            object_images.append(img)
+        else:
+            object_images.append(None)
+    
+    # make the list length 0xff to fit any possible object gid.        
+    while len(object_images) < 0x100:
+        object_images.append(None)
+    
+    return object_images
+    
+def produce_micro_tile_images(world, hard=False):
+    minitile_images = []
+    for palette_idx in range(4):
+        minitile_images_paletted = []
+        for i in range(0x100):
+            palette = world.get_med_tile_palette(i, hard)
+            img = Image.new('RGB', (8, 8), color = 'black')
+            if palette is not None:
+                for x in range(8):
+                    for y in range(8):
+                        col_idx = world.data.micro_tiles[i][x][y]
+                        rgb = constants.palette_rgb[palette[col_idx]]
+                        
+                        # hidden block effect
+                        if i in constants.hidden_micro_tiles and palette_idx == 1:
+                            if (x + y) % 2 == 1:
+                                rgb = constants.meta_colour
+                                
+                        img.putpixel((x, y), rgb)
+            minitile_images_paletted.append(img)
+        minitile_images.append(minitile_images_paletted)
+    return minitile_images
+    
+def export_images(data, path="."):
+    if not os.path.exists(path):
+        os.path.makedirs(path)
     for level in data.levels:
         for hard in [False, True]:
             outfile = "mm-" + str(level.world_idx + 1) + "-" + str(level.world_sublevel + 1) + ("h" if hard else "") + ".png"
             print("exporting " + outfile + " ...")
+            outfile = os.path.join(path, outfile)
             
             # create tiles per-palette per-level (could be optimized to per-world)
-            minitile_images = []
-            for palette_idx in range(4):
-                _palette_idx = palette_idx + (4 if hard else 0)
-                
-                # hard mode uses this weird reshuffling of palette indices
-                # although some palettes do not appear, all *are* loaded into ppu ram.
-                if _palette_idx == 6:
-                    _palette_idx = 4
-                if _palette_idx == 7 and level.world_idx == 0:
-                    _palette_idx = 6
-                    
-                palette = level.world.palettes[_palette_idx]
-                minitile_images_paletted = []
-                for i in range(0x100):
-                    img = Image.new('RGB', (8, 8), color = 'black')
-                    for x in range(8):
-                        for y in range(8):
-                            col_idx = data.micro_tiles[i][x][y]
-                            img.putpixel((x, y), constants.palette_rgb[palette[col_idx]])
-                    minitile_images_paletted.append(img)
-                minitile_images.append(minitile_images_paletted)
+            minitile_images = produce_micro_tile_images(level.world, hard)
+            
+            # create object data images
+            object_images = produce_object_images(data)
                 
             w = 256
             h = 32 * constants.macro_rows_per_level
@@ -49,9 +109,10 @@ def export_images(data):
             y = h
             
             for row in tile_rows:
-                x = 0
+                x = -16
                 y -= 16
                 for medtile_idx in row:
+                    x += 16
                     offsets = [(0, 0), (8, 0), (0, 8), (8, 8)]
                     medtile = level.world.get_med_tile(medtile_idx)
                     palette_idx = level.world.get_med_tile_palette_idx(medtile_idx)
@@ -59,26 +120,38 @@ def export_images(data):
                         continue
                     # draw subtiles
                     for i in range(4):
-                        minitile_idx = medtile[i]
+                        microtile_idx = level.world.get_micro_tile(medtile[i], hard)
+                        
                         offx = offsets[i][0]
                         offy = offsets[i][1]
                         _x = x + offx
                         _y = y + offy
-                        img.paste(minitile_images[palette_idx][minitile_idx], (_x, _y))
-                        
-                    x += 16
+                        img.paste(minitile_images[palette_idx][microtile_idx], (_x, _y))
                     
             # objects
             for obj in level.objects:
                 x = obj.x * 8 - 4
                 y = obj.y * 8
                 text = hb(obj.gid)
+                objimg = object_images[obj.gid] if obj.gid < len(object_images) else None
+                
                 if obj.flipx and obj.flipy:
                     text += "+"
                 elif obj.flipx:
                     text += "-"
                 elif obj.flipy:
                     text += "|"
-                draw.text((x, y), text, fill="white" if obj.name[0:4] != "unk-" else "red")
+                if objimg is None:
+                    draw.text((x, y), text, fill="white" if obj.name[0:4] != "unk-" else "red")
+                else:
+                    x += 4 - objimg.width//2 +  + objimg._mm_offset[0]
+                    y += 8 - objimg.height + objimg._mm_offset[1]
+                    if not objimg._mm_hard or hard:
+                        paste_image = objimg
+                        if obj.flipx:
+                            paste_image = ImageOps.mirror(paste_image)
+                        if obj.flipy:
+                            paste_image = ImageOps.flip(paste_image)
+                        img.paste(paste_image, (x, y))
             
             img.save(outfile)

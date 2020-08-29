@@ -99,12 +99,14 @@ class Gui:
                     promptfn = partial(promptfn, defaultextension=".txt")
         
         if path is None:
-            promptfn(title=title, multiple=False)
+            path = promptfn(title=title)
         
         result = self.fio_direct(path, type, save)
         
         if result and not save:
             self.refresh_all()
+        self.refresh_title()
+        self.refresh_label()
         return result
         
     # loads/saves rom/hack/image
@@ -123,7 +125,7 @@ class Gui:
                 return False
             
             # cannot load image
-            if type == "image" and save:
+            if type == "image" and not save:
                 return False
             
             if type == "rom":
@@ -136,20 +138,28 @@ class Gui:
                         self.filemenu.entryconfig(self.menu_base_rom, state=tk.DISABLED)
                         for m in self.menu_fio:
                             self.filemenu.entryconfig(m, state=tk.NORMAL)
+                        self.file[type] = path
                         return True
                     self.data = None # set data to none so we don't later think the data exists.
                     return False
             
             if type == "image" and save:
+                self.file[type] = path
                 return mmimage.export_images(self.data, path)
             
-            if type == "hack":
+            if type == "hack" and not save:
+                self.file[type] = path
                 return self.data.parse(path)
+            
+            if type == "hack" and save:
+                self.file[type] = path
+                return self.data.stat(path)
             
             # note: do not refresh anything directly
             # the caller is expected to call the refresh functions
             # this allows the caller to invoke several fio_direct commands before refreshing
-        except:
+        except Exception as e:
+            print(e)
             # catch any save/load error, and return false if one occurs.
             pass # fallthrough
         return False
@@ -349,8 +359,10 @@ class Gui:
     # self.data need not be set yet.
     def init(self):
         self.window = tk.Tk()
+        self.window.iconphoto(False, tk.PhotoImage(file=icon_path))
         
         self.window.bind("<Key>", self.on_keypress)
+        self.blank_image = ImageTk.PhotoImage(image=Image.new('RGB', (4, 4), color='black'))
         
         # menus
         menu = tk.Menu(self.window)
@@ -445,9 +457,9 @@ class Gui:
         self.object_canvas = object_canvas
         
         # canvas images (reused):
-        self.stage_micro_images = [[stage_canvas.create_image(x * micro_width, y * micro_height, image=None, anchor=tk.NW) for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
-        self.macro_micro_images = [[macro_canvas.create_image(x * micro_width, y * micro_height + (y // 4), image=None, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height)] for x in range(macro_width // micro_width)]
-        self.object_select_images = [object_canvas.create_image(objwidth / 2, objheight / 2 + objheight * y, image=None, anchor=tk.CENTER) for y in range(0x100)]
+        self.stage_micro_images = [[stage_canvas.create_image(x * micro_width, y * micro_height, image=self.blank_image, anchor=tk.NW) for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
+        self.macro_micro_images = [[macro_canvas.create_image(x * micro_width, y * micro_height + (y // 4), image=self.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height)] for x in range(macro_width // micro_width)]
+        self.object_select_images = [object_canvas.create_image(objwidth / 2, objheight / 2 + objheight * y, image=self.blank_image, anchor=tk.CENTER) for y in range(0x100)]
         
         # bottom label
         self.label = tk.Label(self.window)
@@ -548,7 +560,7 @@ class Gui:
         # clear images
         for x in range(macro_width // micro_width):
             for y in range(0x100 * macro_height // micro_height):
-                self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=None)
+                self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=self.blank_image)
                 
         if self.level is None:
             return
@@ -586,7 +598,7 @@ class Gui:
         
         # clear images
         for y in range(0x100):
-            self.object_canvas.itemconfig(self.object_select_images[y], image=None, state=tk.HIDDEN)
+            self.object_canvas.itemconfig(self.object_select_images[y], image=self.blank_image)
 
         # set scrollable region
         self.object_canvas.configure(scrollregion=(0, 0, macro_width, len(self.placable_objects) * (objheight)))
@@ -601,7 +613,7 @@ class Gui:
             self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth, line_y, fill="#888"))
             
             # set object
-            self.object_canvas.itemconfig(self.object_select_images[i], image=self.object_images[flip_idx][gid], state=tk.NORMAL)
+            self.object_canvas.itemconfig(self.object_select_images[i], image=self.object_images[flip_idx][gid])
         
     def refresh_selection_rect(self):
         # clear previous

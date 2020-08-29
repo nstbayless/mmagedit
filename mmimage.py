@@ -66,7 +66,7 @@ def produce_micro_tile_images(world, hard=False):
     for palette_idx in range(4):
         minitile_images_paletted = []
         for i in range(0x100):
-            palette = world.get_med_tile_palette(i, hard)
+            palette = world.palettes[palette_idx + (4 if hard else 0)]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
                 for x in range(8):
@@ -115,7 +115,7 @@ def export_images(data, path="."):
                     x += 16
                     offsets = [(0, 0), (8, 0), (0, 8), (8, 8)]
                     medtile = level.world.get_med_tile(medtile_idx)
-                    palette_idx = level.world.get_med_tile_palette_idx(medtile_idx)
+                    palette_idx = level.world.get_med_tile_palette_idx(medtile_idx, hard) % 4
                     if palette_idx is None:
                         continue
                     # draw subtiles
@@ -144,7 +144,7 @@ def export_images(data, path="."):
                 if objimg is None:
                     draw.text((x, y), text, fill="white" if obj.name[0:4] != "unk-" else "red")
                 else:
-                    x += 4 - objimg.width//2 +  + objimg._mm_offset[0]
+                    x += 4 - objimg.width//2 + objimg._mm_offset[0]
                     y += 8 - objimg.height + objimg._mm_offset[1]
                     if not objimg._mm_hard or hard:
                         paste_image = objimg

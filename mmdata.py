@@ -148,11 +148,11 @@ class Level:
         self.objects_length = None
         self.total_length = None
     
-    def get_name(hard=False):
-        str = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
+    def get_name(self, hard=False):
+        s = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
         if hard:
-            str += " (Hard)"
-        return str
+            s += " (Hard)"
+        return s
     
     def read(self):
         self.macro_rows = []
@@ -277,9 +277,9 @@ class Level:
         
     # constructs rows of medtiles, from bottom up.
     # dimensions should be YX, 64x16
-    def produce_med_tiles(self, hardmode=False, rows=range(constants.macro_rows_per_level)):
+    def produce_med_tiles(self, hardmode=False, orows=range(constants.macro_rows_per_level)):
         rows = []
-        for y in rows:
+        for y in orows:
             lmr = self.macro_rows[y]
             row = [[0] * 16, [0] * 16]
             for i in range(4):
@@ -358,7 +358,18 @@ class World:
             return None
     
         palette_idx = self.med_tile_palettes[idx]
+        return self.map_palette_idx(palette_idx, hard)
     
+    def get_med_tile_palette(self, med_tile_idx, hard=False):
+        palette_idx = self.get_med_tile_palette_idx(med_tile_idx, hard)
+        if palette_idx is None:
+            return None
+        return self.palettes[palette_idx]
+    
+    def get_palette(self, palette_idx, hard=False):
+        return self.palettes[self.map_palette_idx(palette_idx, hard)]
+        
+    def map_palette_idx(self, palette_idx, hard=False):
         if hard:
             palette_idx += 4
         
@@ -368,14 +379,7 @@ class World:
             palette_idx = 4
         if palette_idx == 7 and self.idx == 0:
             palette_idx = 6
-        
         return palette_idx
-    
-    def get_med_tile_palette(self, med_tile_idx, hard=False):
-        palette_idx = get_med_tile_palette_idx(med_tile_idx, hard)
-        if palette_idx is None:
-            return None
-        return self.palettes[palette_idx]
         
     def read(self):
         self.max_symmetry_idx = self.data.read_byte(self.data.ram_to_rom(constants.ram_world_mirror_index_table + self.idx))

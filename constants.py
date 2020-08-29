@@ -240,6 +240,9 @@ object_names = [
     ["pipe-C"],
 ]
 
+while len(object_names) < 0x100:
+    object_names.append([""])
+
 object_data = [
     # 0
     { "chr": [[0x000]] },
@@ -272,7 +275,7 @@ object_data = [
     { "chr":  [[0xa7, 0xa8], [0xb7, 0xb8], [0xa9, 0xaa]] },
     
     # a -- bone
-    { "chr":  [[0x1e], [0x21]] },
+    { "chr":  [[0x1e], [0x20]] },
     
     # b -- troll
     { "chr":  [[0x87, 0x88], [0x97, 0x98]] },

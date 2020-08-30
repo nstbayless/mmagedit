@@ -252,7 +252,10 @@ class Gui:
                 
                 # lazy, but this is one way to refresh everything.
                 self.select_stage(self.stage_idx, self.hard)
-        
+    
+    def about(self):
+        tkinter.messagebox.showinfo(constants.mmname, constants.mminfo)
+    
     # handles a kepyress event
     def on_keypress(self, event):
         shift = event.state & 1
@@ -467,6 +470,10 @@ class Gui:
         self.menu_view_patches = self.add_menu_command(viewmenu, "Patches", lambda: self.ctl(show_patches=not self.show_patches), "P")
         
         menu.add_cascade(label="View", menu=viewmenu)
+        
+        helpmenu = tk.Menu(menu, tearoff=0)
+        self.add_menu_command(helpmenu, "About", self.about, None)
+        menu.add_cascade(label="Help", menu=helpmenu)
         
         # containers
         main_frame = tk.Frame(self.window)
@@ -860,7 +867,7 @@ class Gui:
                         )
     
     def refresh_title(self):
-        str = "MMagEdit"
+        str = constants.mmname
         if self.file["hack"]:
             str += " - " + os.path.basename(self.file["hack"])
         if self.dirty:

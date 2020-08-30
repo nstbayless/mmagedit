@@ -3,11 +3,18 @@ from array import array
 from mmdata import MMData
 import mmimage
 import mmgui
+import constants
 
 def usage():
+    print(constants.mmname)
+    print()
     print("Usage:")
-    print("")
     print("  python3 mmedit.py base.nes [-i hack.txt] [-o hack.txt] [-e modified.nes] [--export-images]")
+    print("")
+    print("-i: open hack")
+    print("-o: save hack")
+    print("-e: export to rom")
+    print("--export-images: creates image sheet for levels")
 
 if "--help" in sys.argv or "-h" in sys.argv:
     usage()

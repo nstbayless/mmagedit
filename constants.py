@@ -1,10 +1,10 @@
 from util import *
 
-mmname = "MMagEdit V1.3"
+mmname = "MMagEdit V1.4"
 mminfo = """
 MMagEdit created by NaOH
 
-Version 1.3: 29 August 2020
+Version 1.3: 31 August 2020
 
 Special thanks to -7 (negativeseven) and Julius.
 
@@ -19,6 +19,13 @@ ram_world_macro_tiles_table = 0xaf10
 ram_mirror_pairs_table = 0xaf00
 ram_world_mirror_index_table = 0xaf0c
 ram_sprite_palette_table = 0xbd5f
+
+ram_music_table = 0xdaa3 # music for each level
+ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait command waits for.
+ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
+
+# space available
+ram_range_music = [0x8000, 0x860A]
 
 # ~ special mods ~
 ram_mod_bounce = 0xd5d7
@@ -46,6 +53,138 @@ meta_colour_str_b = "#c020e0"
 
 # hashes for base roms which will not warn on load
 base_hashes = ["1062df5838a11e0e17ed590bdc1095c6"]
+
+# music names
+songs = ["Mysterious", "Heroic", "Spooky", "Dreamy", "Evil", "Intro", "Fanfare", "Boss", "March"]
+
+mus_vchannel_names = ["Lead", "Counterpoint", "Triangle", "Noise", "SFX0", "SFX1"]
+
+
+# note: not actually proper opcodes
+note_opcode = {"name": "-", "doc": "Plays the given note with the given duration (in hex). '_' is a tie. '*' represents a portamento. Duration must be one of [1, 2, 3, 4, 6, 8, 10, 20], and the note must be _, *, or in the range 0-C inclusive"}
+
+music_opcodes = [
+    # note: opcodes 0-7 inclusive are actually interpreted as WAIT codes, but will execute
+    # if the wait-postfix code is 0xF.
+    
+    # 0
+    # sets the hold duration to 0?
+    {"name": "hold0", "doc": "unknown"},
+    
+    # 1
+    # sets the hold duration to 70?
+    {"name": "hold1", "doc": "unknown"}, 
+    
+    # 2
+    # sets hold duration to 80?
+    {"name": "hold2", "doc": "unknown"}, 
+    
+    # sets articulation to arg, and (for music only) zeroes $4ba and $4be.
+    {"name": "art", "argc": [1], "doc": "sets articulation"},
+    
+    # 4
+    {"name": "port", "argc": [1, 1], "doc": "First argument sets portamento. Second is unknown."},
+    
+    # 5
+    # $4Ca <- arg[0]
+    {"name": "harm", "argc": [1], "doc": "sets harmony mode, inducing square1 to follow the lead"},
+    
+    # 6
+    # jumps to the given label directly.
+    {"name": "jmp", "argc": ["abs"], "doc": "jumps to the given label"},
+    
+    # 7
+    # does nothing
+    {"name": "nop", "doc": "does nothing"},
+    
+    #8
+    # mus_dynamics <- arg[0]
+    {"name": "dyn", "argc":[1], "doc": "sets dynamics"},
+    
+    # 9 -- modulate key
+    # if arg[0:1] & 0 == 0:
+    #   key += arg[0:1] >> 1 ?
+    # else:
+    #   key -= arg[0:1] >> 1 ?
+    {"name": "mod", "argc": [2], "doc": "modulates by the given amount, causing notes played after this to be adjusted."},
+    
+    # A
+    # - if not in a subroutine, does nothing.
+    # - returns from subroutine
+    # - repeats subroutine if applicable
+    {"name": "rts", "doc": "returns from subroutine. Has no effect if not in a subroutine."},
+    
+    #B - subroutine with key offset
+    # sets $4B6 to 0 and,
+    # if arg[0] < 8:
+    #   key += arg[0]
+    # if arg[0] >= 8:
+    #   key += (arg[0] - 0x10)
+    # then mus_reta <- nibble pc
+    # then nibble pc -= arg[1:2]
+    #
+    # repeat count for subroutine is arg[3]
+    {"name": "sub", "argc":[1, "rels", 1], "doc": "executes the given subroutine, modulated by the first argument. The final argument is the number of repetitions. The subroutine must be before the current line by at most 0x100 nibbles (half-bytes)"},
+    
+    # C
+    # if arg is 0:
+    #   slide = (slide & fc)
+    # otherwise:
+    #   sets $4A2 to (arg >> 2), then ANDS the current slide value with 0x40, and then ORS it with (arg & 1 << 1 | arg & 2 >> 1)
+    #   that is, slide = (slide & 0x40) | ((arg & 1) << 1 | (arg & 2) >> 1)
+    {"name":"ctl", "argc": [1, 1], "doc": " Details are unknown."},
+    
+    # D -- subtract 0xC from current key.
+    {"name": "doct", "doc": "modulates down by an octave"},
+    
+    # E -- repeat
+    # if arg[0] >= mus_repeat_idx:
+    #    mus_repeat_idx++
+    #    nibble_pc -= arg[1:2]
+    # else:
+    #    mus_repeat_idx = 0
+    {"name": "rep", "argc":[1, "rels"], "doc": "repeats from the given label the given number of times (plus 1). The label must be before the current line by at most 0x100 nibbles (half-bytes)"},
+    
+    # F - orchestrate
+    # sets all $4C6 for triangle, counterpoint, and lead to the given args
+    {"name": "orch", "argc":[1, 1, 1], "doc": "orchestrates triangle, counteropint, and lead respectively. Details unknown."},
+]
+
+# wait commands (0x0-0x7 inclusive) are followed by a second "postfix" opcode byte.
+
+# all "DONE_" postfix codes have this behaviour in common:
+# if music:
+#     zeroes $4ba and mus_note_timer
+# slide = slide & 0xBF
+# ... then a bunch more craziness depending on the channel ...
+#   plays the code value as a note (0-C) added to of $496 (mus_key)
+#   seems to set the music pitch ($48a, $48b) to their correct new value. 
+# then returns.
+
+mus_wait_postfix_opcodes = [
+    {"name": "DONE_0"},
+    {"name": "DONE_1"},
+    {"name": "DONE_2"},
+    {"name": "DONE_3"},
+    {"name": "DONE_4"},
+    {"name": "DONE_5"},
+    {"name": "DONE_6"},
+    {"name": "DONE_7"},
+    {"name": "DONE_8"},
+    {"name": "DONE_9"},
+    {"name": "DONE_A"},
+    {"name": "DONE_B"},
+    {"name": "DONE_C"},
+    
+    #D
+    {"name":"TIE"}, # simply finishes executing opcodes for this frame. Is this hold..?
+    
+    #E
+    {"name":"SLIDE"}, # sets the slide value to 40 and then finishes.
+    
+    #F
+    {"name":"EXEC_PREV"}, # executes the prior wait opcode as a standard opcode
+]
 
 # palettes used by objects in the game during a level
 sprite_palettes = [
@@ -275,7 +414,7 @@ object_data = [
     { "chr": [[0x000]] },
     
     # 1 -- boss grim
-    { "palette": 3, "chr": [[0x70, 0x71, 0x271, 0x270], [0x80, 0x74, 0x75, 0x280], [0x77, 0x78, 0x76, 0x277], [0x82, 0x83, 0x84, 0x85]], "offset": (0, 8) },
+    { "palette": 3, "chr": [[0x70, 0x71, 0x271, 0x270], [0x80, 0x74, 0x274, 0x280], [0x77, 0x78, 0x278, 0x277], [0x82, 0x83, 0x84, 0x85]], "offset": (0, 8) },
     
     # 2 -- boss thor
     { "palette": 1, "chr": [[0x40, 0x41, 0x241, 0x240], [0x50, 0x51, 0x251, 0x250], [0x42, 0x43, 0x243, 0x242], [0x52, 0x53, 0x253, 0x252], [0x45, 0x55, 0x255, 0x245]], "offset": (0, 16)},
@@ -302,7 +441,7 @@ object_data = [
     { "palette": 3, "chr":  [[0xa7, 0xa8], [0xb7, 0xb8], [0xa9, 0xaa]] },
     
     # a -- bone
-    { "palette": 2, "palette": 1, "chr":  [[0x1e], [0x20]] },
+    { "palette": 2, "chr":  [[0x1e], [0x20]] },
     
     # b -- troll
     { "palette": 1, "chr":  [[0x87, 0x88], [0x97, 0x98]] },

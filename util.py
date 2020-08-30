@@ -9,9 +9,12 @@ def hb(a):
 
 def hw(a):
     str = hex(a)[2:]
-    if (len(str) < 4):
+    while (len(str) < 4):
          str = "0" + str
     return str
+    
+def HX(a):
+    return hx(a).upper()
     
 def HB(a):
     return hb(a).upper()

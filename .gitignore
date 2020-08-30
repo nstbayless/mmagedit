@@ -2,3 +2,6 @@ __pycache__/
 *.nes
 *hack.txt
 mm-*.png
+*.deb
+*.nl
+*.ips

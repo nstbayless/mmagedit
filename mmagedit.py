@@ -9,7 +9,7 @@ def usage():
     print(constants.mmname)
     print()
     print("Usage:")
-    print("  python3 mmedit.py base.nes [-i hack.txt] [-o hack.txt] [-e modified.nes] [--export-images]")
+    print("  python3 mmagedit.py base.nes [-i hack.txt] [-o hack.txt] [-e modified.nes] [--export-images]")
     print("")
     print("-i: open hack")
     print("-o: save hack")

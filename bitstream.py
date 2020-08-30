@@ -3,6 +3,10 @@ class BitStream:
         self.bin = bin
         self.offset = offset
         self.bitoffset = 0
+        
+    def skip_bits(self, n):
+        for i in range(n):
+            self.read_bit()
     
     def read_bit(self):
         byte = self.bin[self.offset] & (1 << (7 - self.bitoffset))
@@ -28,6 +32,10 @@ class BitStream:
         if self.bitoffset >= 8:
             self.bitoffset = 0
             self.offset += 1
+            
+    def get_nibble_offset(self, fr=0):
+        assert(self.bitoffset % 4 == 0)
+        return 2 * (self.offset - fr) + (1 if self.bitoffset >= 4 else 0)
     
     def write_bits(self, data, n):
         for i in range(n):

@@ -126,6 +126,8 @@ def export_images(data, path="."):
             
             y = h
             
+            dangerous_tiles = [[False for y in range(constants.macro_rows_per_level * 4)] for x in range(0x20)]
+            
             for row in tile_rows:
                 x = -16
                 y -= 16
@@ -144,7 +146,11 @@ def export_images(data, path="."):
                         offy = offsets[i][1]
                         _x = x + offx
                         _y = y + offy
-                        img.paste(minitile_images[palette_idx][microtile_idx], (_x, _y))
+                        
+                        if (microtile_idx in constants.dangerous_micro_tiles):
+                            dangerous_tiles[_x // 8][_y // 8] = True
+                        else:
+                            img.paste(minitile_images[palette_idx][microtile_idx], (_x, _y))
                     
             # objects
             for obj in level.objects:
@@ -164,7 +170,7 @@ def export_images(data, path="."):
                 else:
                     x += 4 - objimg.width//2 + objimg._mm_offset[0]
                     y += 8 - objimg.height + objimg._mm_offset[1]
-                    if not objimg._mm_hard or hard:
+                    if not objimg._mm_hard or dangerous_tiles[obj.x][obj.y]:
                         paste_image = objimg
                         if obj.flipx:
                             paste_image = ImageOps.mirror(paste_image)

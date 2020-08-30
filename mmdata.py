@@ -160,6 +160,9 @@ class Level:
         self.macro_rows = []
         self.objects = []
         
+        # get music index
+        self.music_idx = self.data.read_byte(self.data.ram_to_rom(constants.ram_music_table + self.level_idx))
+        
         # get ram start address
         self.ram = self.data.read_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table))
         
@@ -248,6 +251,9 @@ class Level:
             if ps.length_bytes() + os.length_bytes() > self.total_length:
                 self.data.errors += ["Size limit exceeded: " + self.get_name()]
                 return False
+        
+        # write music index
+        #self.data.write_byte(self.data.ram_to_rom(constants.ram_music_table + self.level_idx), self.music_idx)
         
         # write level ram offset
         self.data.write_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table), self.ram)
@@ -520,6 +526,211 @@ class World:
         
         return True
 
+class MusicLabel:
+    def __init__(self, name, addr):
+        self.name = name
+        self.addr = addr
+
+class MusicOp:
+    def __init__(self, op, args=None):
+        self.op = op # string
+        self.args = [] if args == None else args # array of strings
+        self.argtypes = [None] * len(self.args)
+    
+    def get_duration_idx(self, music):
+        assert(self.op == constants.note_opcode["name"])
+        duration = int(self.args[1], 16)
+        for i in range(0x8):
+            if music.data.read_byte(music.data.ram_to_rom(constants.ram_music_duration_table) + i) == duration:
+                return i
+        assert(False)
+        return 0
+    
+    def get_nibbles(self, music, address):
+        nibbles = []
+        if self.op == constants.note_opcode["name"]:
+            nibbles.append(self.get_duration_idx(music))
+            # duration
+            type = self.args[0]
+            if type == "_":
+                nibbles.append(0xd)
+            elif type == "*":
+                nibbles.append(0xe)
+            else:
+                nibbles.append(int(type, 16))
+            return nibbles
+        else:
+            for opdata in constants.music_opcodes:
+                if opdata["name"] == self.op:
+                    opc = constants.music_opcodes.index(opdata)
+                    nibbles.append(opc)
+                    
+                    # opcodes in the range 0-8 must be followed by 0xF, or else
+                    # they are interpreted as notes.
+                    if opc < 8:
+                        nibbles.append(0xF)
+                    
+                    # write args
+                    for i in range(len(self.args)):
+                        arg = self.args[i]
+                        argtype = self.argtypes[i]
+                        if argtype == 1:
+                            nibbles.append(int(arg, 16))
+                        if argtype == 2:
+                            nibbles.append((int(arg, 16) & 0xf0) >> 4)
+                            nibbles.append(int(arg, 16) & 0x0f)
+                        if argtype == "abs":
+                            if address is None:
+                                nibbles += [None, None, None]
+                            else:
+                                addr = music.resolve_address(arg)
+                                nibbles.append(addr & 0x00f)
+                                nibbles.append((addr & 0x0f0) >> 4)
+                                nibbles.append((addr & 0xf00) >> 8)
+                        if argtype == "rels":
+                            if address is None:
+                                nibbles += [None, None]
+                            else:
+                                addr = address + len(nibbles) + 2 - music.resolve_address(arg)
+                                assert(addr in range(0x100))
+                                nibbles.append(addr & 0x0f)
+                                nibbles.append((addr & 0xf0) >> 4)
+                    
+                    return nibbles
+            
+            # opcode not found
+            assert(False)
+            return []
+
+class Music:
+    def __init__(self, data):
+        self.data = data
+        self.songs = constants.songs
+        self.song_tempos = [0] * len(self.songs)
+        self.song_channel_entries = [["" for i in range(4)] for j in range(len(self.songs))]
+        self.label_to_addr = dict()
+        self.code = []
+        self.code_start = 0x8000
+        
+    def resolve_address(self, arg):
+        if arg in self.label_to_addr:
+            return self.label_to_addr[arg].addr
+        if arg[0] == "$":
+            return int(arg[1:], 16)
+        assert(False)
+        return 0
+    
+    # TODO: optimize this with a datastructure..?
+    def get_labels(self, addr):
+        labels = []
+        for labelstr, label in self.label_to_addr.items():
+            if label.addr == addr:
+                labels.append(label)
+        return labels
+    
+    def read(self):
+        rom_music_start = self.data.ram_to_rom(constants.ram_range_music[0])
+        bs = BitStream(self.data.bin, rom_music_start)
+        for idx in range(len(self.songs)):
+            # tempo
+            self.song_tempos[idx] = bs.read_bits(4)
+            
+            # track entry labels
+            entry_pcs = [0] * 4
+            for i in range(4):
+                entry_pcs[3 - i] = 0
+                for j in range(3):
+                    entry_pcs[3 - i] >>= 4
+                    entry_pcs[3 - i] |= bs.read_bits(4) << 8
+            
+            # create a label for this
+            for i in range(4):
+                labelstr = "entry_" + self.songs[idx] + "_" + constants.mus_vchannel_names[i]
+                self.song_channel_entries[idx][i] = labelstr
+                self.label_to_addr[labelstr] = MusicLabel(labelstr, entry_pcs[i])
+        
+        self.code = []
+        self.code_start = bs.get_nibble_offset(rom_music_start)
+        
+        # read opcodes
+        while bs.offset < self.data.ram_to_rom(constants.ram_range_music[1]):
+            opc = bs.read_bits(4)
+            opdata = constants.music_opcodes[opc]
+            if opc < 8:
+                postfix = bs.read_bits(4)
+                if postfix != 0xF:
+                    # play / hold a note.
+                    duration = self.data.read_byte(self.data.ram_to_rom(constants.ram_music_duration_table) + opc)
+                    name = constants.note_opcode["name"]
+                    arg = HX(postfix)
+                    if postfix == 0xd:
+                        arg = "_" # tie?
+                    if postfix == 0xe:
+                        arg = "*"
+                    self.code.append(MusicOp(constants.note_opcode["name"], [arg, HX(duration)]))
+                    # process next opcode
+                    continue
+                else:
+                    # treat opc as a standard opcode in the 0-7 inclusive range.
+                    pass
+            
+            # standard opcode
+            op = MusicOp(opdata["name"])
+            if "argc" in opdata:
+                for argtype in opdata["argc"]:
+                    op.argtypes.append(argtype)
+                    if type(argtype) == type(0):
+                        # a number -- read this many nibbles
+                        n = bs.read_bits(4 * argtype)
+                        op.args.append(HX(n))
+                        continue
+                    addr = bs.get_nibble_offset(rom_music_start)
+                    labelname = "label"
+                    if argtype == "abs":
+                        for j in range(3):
+                            addr >>= 4
+                            addr |= bs.read_bits(4) << 8
+                        addr &= 0xffffff
+                    elif argtype == "rels":
+                        labelname = op.op.lower()[:3]
+                        a = bs.read_bits(4)
+                        a |= bs.read_bits(4) << 4
+                        addr += 2 # due to the nibbles read.
+                        addr -= a
+                    
+                    if addr / 2 + constants.ram_range_music[0] < constants.ram_range_music[1]:
+                        labelname += HX(addr)
+                        if labelname not in self.label_to_addr:
+                            self.label_to_addr[labelname] = MusicLabel(labelname, addr)
+                        op.args.append(labelname)
+                    else:
+                        op.args.append("$" + HW(addr)[1:])
+                        
+            self.code.append(op)
+    
+    def commit(self):
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_music[0]))
+        
+        for idx in range(len(self.songs)):
+            # tempo
+            bs.write_bits(self.song_tempos[idx], 4)
+            
+            # address of vchannel entry
+            for i in reversed(range(4)):
+                addr = self.resolve_address(self.song_channel_entries[idx][i])
+                for j in range(3):
+                    bs.write_bits(addr >> (j * 4), 4)
+        
+        # code
+        for op in self.code:
+            addr = bs.get_nibble_offset(self.data.ram_to_rom(constants.ram_range_music[0]))
+            for nibble in op.get_nibbles(self, addr):
+                # bounds check
+                assert(bs.offset < self.data.ram_to_rom(constants.ram_range_music[1]))
+                bs.write_bits(nibble, 4)
+        
+        return True
+
 class MMData:
     # convert ram address to rom address
     def ram_to_rom(self, address):
@@ -528,11 +739,26 @@ class MMData:
     def chr_to_rom(self, address):
         return 0x10 + 0x8000 + address
         
+    def read_nibble(self, addr, offset):
+        b = self.bin[addr + (offset // 2)]
+        if offset % 2 == 1:
+            return self.bin[addr + (offset // 2)] & 0xf
+        else:
+            return self.bin[addr + (offset // 2)] >> 4
+        
     def read_byte(self, addr):
         return int(self.bin[addr])
         
     def read_word(self, addr):
         return int(self.bin[addr]) + int(self.bin[addr + 1] * 0x100)    
+        
+    def write_nibble(self, addr, offset, val):
+        val = clamp_hoi(val, 0, 0x10)
+        b = self.bin[addr + (offset // 2)]
+        if offset % 2 == 0:
+            self.bin[addr + (offset // 2)] = (b & 0x0f) | (val << 4)
+        else:
+            self.bin[addr + (offset // 2)] = (b & 0xf0) | val
         
     def write_byte(self, addr, b):
         self.bin[addr] = b
@@ -549,7 +775,8 @@ class MMData:
     def read(self, file):
         self.errors = []
         with open(file, "rb") as f:
-            self.bin = bytearray(f.read())
+            self.orgbin = f.read()
+            self.bin = bytearray(self.orgbin)
             
             # check length
             if len(self.bin) < 0xa010:
@@ -640,7 +867,11 @@ class MMData:
                     )
                 )
                 self.levels[-1].read()
-        
+            
+            # read music data
+            self.music = Music(self)
+            self.music.read()
+                
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
         return False
@@ -682,6 +913,10 @@ class MMData:
             # write level data
             if not level.commit():
                 return False
+                
+        # write music
+        if not self.music.commit():
+            return False
                 
         # patches over
         if self.mods["no_bounce"]:
@@ -761,6 +996,21 @@ class MMData:
             out('  "":""}') # FIXME: a nasty hack to make the comma logic easier...
             out("}")
             out()
+            
+            # write music headers
+            music = self.music
+            for song_idx in range(len(music.songs)):
+                out("-- song " + HX(song_idx) + " --")
+                out()
+                out("name " + self.music.songs[song_idx])
+                out("tempo " + HB(music.song_tempos[song_idx]))
+                out()
+                for i in range(4):
+                    estr = "entry " + constants.mus_vchannel_names[i] + " "
+                    while len(estr) < 0x13:
+                        estr += " "
+                    out(estr + music.song_channel_entries[song_idx][i])
+                out()
             
             # global tile data
             
@@ -844,6 +1094,12 @@ class MMData:
                 else:
                     out("# size", HB(calculated_length))
                 out()
+                
+                out("# Level music")
+                for i in range(len(self.music.songs)):
+                    out("# " + HX(i) + " - \"" + self.music.songs[i] + "\"")
+                out("song " + HB(level.music_idx))
+                out()
                     
                 out("# 32x32 macro-tile rows (from the top/end of the level to bottom/start).")
                 out("# Each row is 256x32 pixels.")
@@ -879,6 +1135,63 @@ class MMData:
                 
                 out()
             
+            # music data
+            out("-- music --")
+            out()
+            
+            out("# Sound commands are encoded in an assembly-like language.")
+            out("# ")
+            out("# Lines ending with a ':' are a label. Labels do not do anything on their own,")
+            out("# but other commands can refer to them")
+            out("# commands are encoded as an opcode followed by a sequence of arguments.")
+            out("# If a label starts with some number of '>' tokens, that means the label is offset")
+            out("# into the folling command by the given number of nibbles (half-bytes)")
+            out("# ")
+            out("# ';' denotes a a comment, and is used to show how the commands are expressed in hex.")
+            out("# Anything following a ';' token has no effect.")
+            out("# ")
+            out("# The following opcode are recognized:")
+            out("# ")
+            for opcode in [constants.note_opcode] + constants.music_opcodes:
+                out("#   " + opcode["name"])
+                out("#     " + opcode["doc"])
+                out("#")
+                
+            out("# There are six virtual channels (v-channels): \"Lead\", \"Counterpoint\", \"Triangle\", \"Noise\", \"SFX0\", and \"SFX1\".")
+            out("# The first four are musical channels, whereas the last two are for sound effects.")
+            out("# Although Lead and Counterpoint are for square0 and square1 respectively, they are treated differently by some opcodes.")
+            out("# ")
+            out("# A song definition comprises a tempo and one entry label for each of the four musical v-channels.")
+            
+            addr = music.code_start # address in nibble-offset
+            for op in music.code:
+                # check for labels
+                nl = True
+                nibbles = op.get_nibbles(music, addr)
+                oaddr = addr
+                for nib_idx in range(len(nibbles)):
+                    labels = music.get_labels(addr)
+                    for label in labels:
+                        if nl:
+                            out()
+                            nl = False
+                        out(">" * nib_idx + label.name + ":")
+                    addr += 1
+                                
+                s = "  "
+                s += op.op + " "
+                if op.op != constants.note_opcode["name"]:
+                    while(len(s) < 0xb):
+                        s += " "
+                for arg in op.args:
+                    s += arg + " "
+                
+                while len(s) < 0x20:
+                    s += " "
+                s += "; " + HW(oaddr)[1:] + ": " + "".join([HX(nibble) for nibble in nibbles])
+                out(s)
+            out()
+                
             return True
         finally:
             if file is not None:
@@ -899,6 +1212,9 @@ class MMData:
             parsing_globals_complete = True
             level_complete = None
             world = None
+            song_idx = None
+            music = None
+            music_nibble = 0
             
             for line in f.readlines():
                 if "#" in line:
@@ -908,9 +1224,14 @@ class MMData:
                 tokens = line.split()
                 if len(tokens) > 0:
                     directive = tokens[0]
-                    if directive == "--":
+                    if directive == "--" and len(tokens) >= 3:
+                        music = None
+                        world = None
+                        level = None
+                        song_idx = None
+                        
                         # configuration
-                        if len(tokens) >= 3 and tokens[1] == "config":
+                        if tokens[1] == "config":
                             parsing_globals = True
                             parsing_globals_complete = False
                             globalstr = ""
@@ -918,14 +1239,23 @@ class MMData:
                         else:
                             parsing_globals = False
                         
-                        if len(tokens) >= 3 and tokens[1] == "global":
+                        if tokens[1] == "global":
                             world = None
                             
-                        if len(tokens) >= 3 and tokens[1] == "world":
+                        if tokens[1] == "world":
                             world = self.worlds[int(tokens[2], 16) - 1]
                         
+                        if tokens[1] == "song":
+                            song_idx = int(tokens[2], 16)
+                            
+                        if tokens[1] == "music":
+                            music = self.music
+                            music.label_to_addr = dict()
+                            music.code = []
+                            music_nibble = music.code_start
+                        
                         # start level
-                        if len(tokens) >= 3 and tokens[1] == "level":
+                        if tokens[1] == "level":
                             level_idx = int(tokens[2], 16)
                             assert(level_idx < constants.level_count)
                             level_complete = level
@@ -936,11 +1266,45 @@ class MMData:
                             row = constants.macro_rows_per_level - 1
                             obji = 0
                             
+                    # music code is different
+                    elif music is not None:
+                        if tokens[0].endswith(":"):
+                            # label
+                            label = tokens[0][:-1]
+                            
+                            # count nibble-offsets (>)
+                            offset = 0
+                            while label.startswith(">"):
+                                label = label[1:]
+                                offset += 1
+                                
+                            assert(len(label) > 0)
+                            music.label_to_addr[label] = MusicLabel(label, music_nibble + offset)
+                        else:
+                            # opcode
+                            opname = tokens[0]
+                            op = MusicOp(opname)
+                            op.args = tokens[1:]
+                            if opname != constants.note_opcode["name"]:
+                                for opcode in constants.music_opcodes:
+                                    if opcode["name"] == opname:
+                                        if "argc" in opcode:
+                                            op.argtypes = opcode["argc"] + [] # copy the list (paranoia)
+                                        break
+                            music_nibble += len(op.get_nibbles(music, None))
+                            music.code.append(op)
+                        
+                        # next line
+                        continue
+                            
                     if directive == "ram":
                         level.ram = int(tokens[1], 16)
                     
                     if directive == "size":
                         level.total_length = int(tokens[1], 16)
+                        
+                    if directive == "song":
+                        level.music_idx = int(tokens[1], 16)
                     
                     # palette data
                     if directive[0] == "P":
@@ -1042,6 +1406,17 @@ class MMData:
                         obj.compressed = compressible
                         
                         level.objects.append(obj)
+                    
+                    # song directives
+                    if directive == "name" and song_idx is not None:
+                        self.music.songs[song_idx] = tokens[1]
+                        
+                    if directive == "tempo" and song_idx is not None:
+                        self.music.song_tempos[song_idx] = int(tokens[1], 16)
+                        
+                    if directive == "entry" and song_idx is not None:
+                        vchannel = constants.mus_vchannel_names.index(tokens[1])
+                        self.music.song_channel_entries[song_idx][vchannel] = tokens[2]
                 
                 if level_complete is not None:
                     level_complete = None

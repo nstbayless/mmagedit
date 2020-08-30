@@ -4,7 +4,7 @@ mmname = "MMagEdit V1.2"
 mminfo = """
 MMagEdit created by NaOH
 
-Version 1.2: August 2020
+Version 1.2: 29 August 2020
 
 Special thanks to -7 (negativeseven) and Julius.
 
@@ -19,6 +19,12 @@ ram_world_macro_tiles_table = 0xaf10
 ram_mirror_pairs_table = 0xaf00
 ram_world_mirror_index_table = 0xaf0c
 ram_sprite_palette_table = 0xbd5f
+
+# ~ special mods ~
+ram_mod_bounce = 0xd5d7
+ram_mod_bounce_replacement = [0x00]
+ram_mod_no_auto_scroll = [0x8d15, 0x8d91]
+ram_mod_no_auto_scroll_replacement = [[0x00, 0x44], [0xF0, 0x09, 0xE0, 0x0F, 0x90, 0x05]]
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4
@@ -352,7 +358,7 @@ object_data = [
     { },
     
     # 21 -- spawn
-    { "palette": 1, "chr":  [[0x16]] },
+    { "palette": 0, "chr":  [[0x16]] },
     
     { },
     { },
@@ -365,7 +371,7 @@ object_data = [
     { },
     
     # 28 -- torch
-    { "palette": 2, "chr":  [[0x6e]] },
+    { "palette": 1, "chr":  [[0x6e]] },
     
     { },
     { },

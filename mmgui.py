@@ -193,10 +193,9 @@ class Gui:
             # the caller is expected to call the refresh functions
             # this allows the caller to invoke several fio_direct commands before refreshing
         except Exception as e:
+            # catch any save/load error, and return false if one occurs.
             print(e)
             tkinter.messagebox.showerror("Internal Error", "An internal error occurred during the I/O process:\n\n" + str(e))
-            # catch any save/load error, and return false if one occurs.
-            pass # fallthrough
         return False
         
     def refresh_all(self):

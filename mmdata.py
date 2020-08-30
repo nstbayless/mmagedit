@@ -541,11 +541,23 @@ class MMData:
         self.write_byte(addr,     w & 0x00ff)
         self.write_byte(addr + 1, (w & 0xff00) >> 8)
     
+    def write_patch(self, rom, bytes):
+        for b in bytes:
+            self.write_byte(rom, b)
+            rom += 1
+    
     def read(self, file):
         self.errors = []
         with open(file, "rb") as f:
-            hasher = hashlib.md5()
             self.bin = bytearray(f.read())
+            
+            # check length
+            if len(self.bin) < 0xa010:
+                self.errors += ["ROM \"" + file + "\" is too small. Is it a valid ROM?"]
+                return False
+            
+            # check hash
+            hasher = hashlib.md5()
             hasher.update(self.bin)
             hashval = str(hasher.hexdigest())
             if hashval not in constants.base_hashes:
@@ -563,6 +575,11 @@ class MMData:
             self.med_tiles = [] # array of [tl, tr, bl, br]
             self.worlds = []
             self.mirror_pairs = []
+            
+            # read special mods
+            self.mods = dict()
+            self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
+            self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
             
             # read spawnable objects list
             for i in range(0x20):
@@ -665,6 +682,20 @@ class MMData:
             # write level data
             if not level.commit():
                 return False
+                
+        # patches over
+        if self.mods["no_bounce"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_bounce),
+                constants.ram_mod_bounce_replacement
+            )
+        if self.mods["no_auto_scroll"]:
+            for i in range(2):
+                self.write_patch(
+                    self.ram_to_rom(constants.ram_mod_no_auto_scroll[i]),
+                    constants.ram_mod_no_auto_scroll_replacement[i]
+                )
+        
         return True
         
     def write(self, file):
@@ -717,7 +748,17 @@ class MMData:
             out('  "spawnable-ext":', self.stat_spawnstr(self.spawnable_objects[0x10:0x20]) + ",")
             out()
             out('  # these med-tiles will be replaced with the given med-tiles when mirrored, and vice versa')
-            out('  "mirror-pairs":', json_list(self.mirror_pairs, lambda i : '"' + hb(i) + '"'))
+            out('  "mirror-pairs":', json_list(self.mirror_pairs, lambda i : '"' + hb(i) + '"') + ",")
+            out()
+            out('  # some special mods that can be applied')
+            out('  "mods": {')
+            for mod in self.mods:
+                if mod != "":
+                    if self.mods[mod]:
+                        out('    "' + mod + '": true,')
+                    else:
+                        out('    "' + mod + '": false,')
+            out('  "":""}') # FIXME: a nasty hack to make the comma logic easier...
             out("}")
             out()
             
@@ -1015,6 +1056,9 @@ class MMData:
                     self.mirror_pairs = []
                     for pair in config["mirror-pairs"]:
                         self.mirror_pairs.append([int(i, 16) for i in pair])
+                    if "mods" in config:
+                        for mod in config["mods"]:
+                            self.mods[mod] = config["mods"][mod]
                     parsing_globals_complete = True
             return True
         return False

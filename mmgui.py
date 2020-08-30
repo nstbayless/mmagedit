@@ -45,12 +45,24 @@ objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str
 resource_dir = os.path.dirname(os.path.realpath(__file__))
 icon_path = os.path.join(resource_dir, "icon.png")
 
+# an undoable action
+class GuiAction:
+    def __init__(self, **kwargs):
+        self.type = ""
+        self.refresh = []
+        self.level_idx = None
+        self.hard = None
+        for name, value in kwargs.items():
+            setattr(self, name, value)
+
 class Gui:
     def __init__(self):
         self.data = None
         self.mouse_button_actions = ["place", "seam", "remove", "seam"] # left, middle, right, shift
         self.file = {"hack": None, "rom": None, "image": None}
         self.dirty = False
+        self.undo_buffer = []
+        self.redo_buffer = []
         self.show_lines = True
         self.show_patches = True
         self.show_objects = True
@@ -251,6 +263,7 @@ class Gui:
                 
                 # lazy, but this is one way to refresh everything.
                 self.select_stage(self.stage_idx, self.hard)
+                self.clear_undo_buffers()
     
     def about(self):
         tkinter.messagebox.showinfo(constants.mmname, constants.mminfo)
@@ -263,6 +276,10 @@ class Gui:
             if acc is None:
                 continue
             acc = acc.lower()
+            if ctrl and "ctrl+" not in acc:
+                continue
+            if shift and "shift+" not in acc:
+                continue
             if acc.startswith("ctrl+"):
                 if not ctrl:
                     continue
@@ -289,6 +306,87 @@ class Gui:
     def get_event_y(self, event, canvas, height):
         return event.y + canvas.yview()[0] * height
         
+    def clear_undo_buffers(self):
+        self.undo_buffer = []
+        self.redo_buffer = []
+        self.editmenu.entryconfig(self.menu_edit_undo, state=tk.DISABLED)
+        self.editmenu.entryconfig(self.menu_edit_redo, state=tk.DISABLED)
+        self.refresh_label()
+        self.refresh_title()
+        
+    def apply_action(self, action, undo=False):
+        if self.data is None:
+            return
+        
+        if action.level_idx is not None:
+            # switch to the stage this action was/is applied to
+            # (we only do this so as not to confuse the user -- these lines could be commented out.)
+            if self.level.level_idx != action.level_idx or self.hard != action.hard:
+                self.select_stage(action.level_idx, action.hard)
+        else:
+            # record stage and hardmode so that if this is undone the user will return to here.
+            action.level_idx = self.level.level_idx
+            action.hard = self.hard
+        
+        # for convenience
+        level = self.level
+        
+        # add/remove action to/from undo buffer
+        if undo:
+            self.undo_buffer.remove(action)
+            self.redo_buffer.append(action)
+        else:
+            if len(self.redo_buffer) > 0:
+                if self.redo_buffer[-1] == action:
+                    self.redo_buffer.remove(action)
+                else:
+                    self.redo_buffer = []
+            self.undo_buffer.append(action)
+        
+        # update redo/undo button disabled/enabled
+        self.editmenu.entryconfig(self.menu_edit_undo, state=tk.DISABLED if len(self.undo_buffer) == 0 else tk.NORMAL)
+        self.editmenu.entryconfig(self.menu_edit_redo, state=tk.DISABLED if len(self.redo_buffer) == 0 else tk.NORMAL)
+        
+        if action.type == "tile":
+            tile = action.prev_tile if undo else action.tile
+            macro_row = level.macro_rows[action.macro_row_idx]
+            macro_row.macro_tiles[action.macro_idx] = tile
+        if action.type == "seam":
+            seam = action.prev_seam if undo else action.seam
+            macro_row = level.macro_rows[action.macro_row_idx]
+            macro_row.seam = seam
+        if action.type == "object":
+            obj = action.object
+            if undo != action.remove:
+                level.objects.remove(obj)
+            else:
+                level.objects.append(obj)
+                
+            # when editing objects, they should become visible if they aren't already.
+            self.show_objects = True
+        if action.type == "patch":
+            patch = action.patch
+            if undo != action.remove:
+                level.hardmode_patches.remove(patch)
+            else:
+                level.hardmode_patches.append(patch)
+            
+        if "row" in action.refresh:
+            self.refresh_row_tiles(action.macro_row_idx)
+            self.refresh_row_lines(action.macro_row_idx)
+            # needed for the weird "normal-mode grinder" effect
+            self.refresh_objects()
+        elif "objects" in action.refresh:
+            self.refresh_objects()
+        if "patches" in action.refresh:
+            self.refresh_patch_rects()
+            
+        # we've made a change.
+        self.dirty = True
+        
+        self.refresh_label()
+        self.refresh_title()
+        
     def on_stage_click(self, button, event):
         if not self.level:
             return
@@ -302,8 +400,11 @@ class Gui:
         x = event.x
         
         # object placement
+        place_duplicates = False
         if self.object_select_gid is not None:
             place_duplicates = shift
+            if shift: # FIXME this is kinda gross, as actions should be set by mouse+shift only...
+                action = "place"
             objx = clamp_hoi(x / micro_width, 0, level_width // micro_width)
             objy = clamp_hoi(y / micro_height, 0, level_height // micro_height)
             # remove an existing object at the given location if applicable
@@ -311,8 +412,11 @@ class Gui:
                 for obj in level.objects:
                     object_data = constants.object_data[obj.gid]
                     if obj.x == objx and obj.y == objy:
-                        level.objects.remove(obj)
-                        self.dirty = True
+                        self.apply_action(GuiAction(
+                            type="object", refresh=["objects"],
+                            remove=True,
+                            object=obj
+                        ))
                         break
                 
             if action == "place":
@@ -323,14 +427,17 @@ class Gui:
                 obj.flipy = self.flipy
                 obj.gid = self.object_select_gid
                 obj.name = constants.object_names[obj.gid][0]
-                level.objects.append(obj)
-                self.dirty = True
-                self.show_objects = True
+                
+                self.apply_action(GuiAction(
+                    type="object", refresh=["objects"],
+                    remove=False,
+                    object=obj
+                ))
             
             self.refresh_objects()
         
         # tile adjustment
-        if self.macro_tile_select_id is not None or action == "seam":
+        if self.macro_tile_select_id is not None or (action == "seam" and not place_duplicates):
             macro_row_idx = clamp_hoi(constants.macro_rows_per_level - int(y / macro_height) - 1, 0, constants.macro_rows_per_level)
             macro_row = level.macro_rows[macro_row_idx]
             seam_x = macro_row.seam * med_width
@@ -346,8 +453,12 @@ class Gui:
                 if action == "place" or action == "remove":
                     for patch in level.hardmode_patches:
                         if patch.x == macro_idx and patch.y == macro_row_idx:
-                            level.hardmode_patches.remove(patch)
-                            self.dirty = True
+                            self.apply_action(GuiAction(
+                                type="patch", refresh=["row", "patches"],
+                                remove=True,
+                                macro_row_idx=macro_row_idx,
+                                patch=patch
+                            ))
                             break
                 
                 # add a patch
@@ -356,28 +467,39 @@ class Gui:
                     patch.i = self.macro_tile_select_id - 0x2f
                     patch.x = macro_idx
                     patch.y = macro_row_idx
-                    level.hardmode_patches.append(patch)
-                    self.dirty = True
+                    self.apply_action(GuiAction(
+                        type="patch", refresh=["row", "patches"],
+                        remove=False,
+                        macro_row_idx=macro_row_idx,
+                        patch=patch
+                    ))
                 
                 self.refresh_patch_rects()
             else:
                 # set macro tile
                 if action == "place":
-                    macro_row.macro_tiles[macro_idx] = self.macro_tile_select_id
-                    self.dirty = True
+                    self.apply_action(GuiAction(
+                        type="tile", refresh=["row"],
+                        macro_row_idx=macro_row_idx,
+                        macro_idx=macro_idx,
+                        tile=self.macro_tile_select_id,
+                        prev_tile=macro_row.macro_tiles[macro_idx]
+                    ))
                 elif action == "remove":
-                    macro_row.macro_tiles[macro_idx] = 0
-                    self.dirty = True
+                    self.apply_action(GuiAction(
+                        type="tile", refresh=["row"],
+                        macro_row_idx=macro_row_idx,
+                        macro_idx=macro_idx,
+                        tile=0,
+                        prev_tile=macro_row.macro_tiles[macro_idx]
+                    ))
                 elif action == "seam":
-                    macro_row.seam = clamp_hoi(x / med_width, 0, level_width // med_width)
-                    self.dirty = True
-            
-            self.refresh_row_tiles(macro_row_idx)
-            self.refresh_row_lines(macro_row_idx)
-            # needed for the weird "normal-mode grinder" effect
-            self.refresh_objects()
-        self.refresh_label()
-        self.refresh_title()
+                    self.apply_action(GuiAction(
+                        type="seam", refresh=["row"],
+                        macro_row_idx=macro_row_idx,
+                        prev_seam=macro_row.seam,
+                        seam=clamp_hoi(x / med_width, 0, level_width // med_width)
+                    ))
         
     def on_macro_click(self, event):
         if len(self.placable_tiles) == 0:
@@ -439,6 +561,10 @@ class Gui:
         menu.add_cascade(label="File", menu=filemenu)
         
         editmenu = tk.Menu(menu, tearoff=0)
+        self.editmenu = editmenu
+        self.menu_edit_undo = self.add_menu_command(editmenu, "Undo", lambda: self.apply_action(self.undo_buffer[-1], True) if len(self.undo_buffer) > 0 else 0, "Ctrl+Z")
+        self.menu_edit_redo = self.add_menu_command(editmenu, "Redo", lambda: self.apply_action(self.redo_buffer[-1]) if len(self.redo_buffer) > 0 else 0, "Ctrl+Y")
+        editmenu.add_separator()
         self.add_menu_command(editmenu, "Flip Object X", lambda: self.ctl(flipx=not self.flipx), "X")
         self.add_menu_command(editmenu, "Flip Object Y", lambda: self.ctl(flipy=not self.flipy), "Y")
         editmenu.add_separator()
@@ -524,8 +650,10 @@ class Gui:
         self.label.pack(side=tk.BOTTOM, fill=tk.X)
         
         self.window.config(menu=menu)
-        self.refresh_title()
-        self.refresh_label()
+        
+        # we do this to refreshes menus, label, title.
+        # (the undo buffer will definitely be clear at this point already regardless.)
+        self.clear_undo_buffers()
     
     # this is quite expensive... progress bar? coroutine?
     def refresh_chr(self):

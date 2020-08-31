@@ -75,7 +75,7 @@ class ObjectStream:
         if (obj.compressible()):
             self.entries.append( [1, 0] + self.as_bits(int((obj.x - 1) / 2), 4) + self.as_bits(obj.get_i(), 4) )
         else:
-            self.entries.append( [0, 1] + [1 if obj.flipx else 0] + [1 if obj.flipy else 0] + self.as_bits(obj.x, 5) + self.as_bits(obj.get_i(), 5) )
+            self.entries.append( [0, 1] + [1 if obj.flipy else 0] + [1 if obj.flipx else 0] + self.as_bits(obj.x, 5) + self.as_bits(obj.get_i(), 5) )
     
     def finalize(self):
         assert(not self.complete)
@@ -979,6 +979,8 @@ class MMData:
                 out = functools.partial(stat_out, file)
             out("# Micro Mages Hack File")
             out()
+            out("format " + str(constants.mmfmt))
+            out()
             out("-- config --")
             out()
             #config
@@ -1006,21 +1008,6 @@ class MMData:
             out('  "":""}') # FIXME: a nasty hack to make the comma logic easier...
             out("}")
             out()
-            
-            # write music headers
-            music = self.music
-            for song_idx in range(len(music.songs)):
-                out("-- song " + HX(song_idx) + " --")
-                out()
-                out("name " + self.music.songs[song_idx])
-                out("tempo " + HB(music.song_tempos[song_idx]))
-                out()
-                for i in range(4):
-                    estr = "entry " + constants.mus_vchannel_names[i] + " "
-                    while len(estr) < 0x13:
-                        estr += " "
-                    out(estr + music.song_channel_entries[song_idx][i])
-                out()
             
             # global tile data
             
@@ -1143,6 +1130,21 @@ class MMData:
                         pads = "*"
                     out("-", obj.name + " " * (10 - len(obj.name)), pads, "x" + hb(obj.x), "y" + hb(obj.y), flags)
                 
+                out()
+            
+            # write music headers
+            music = self.music
+            for song_idx in range(len(music.songs)):
+                out("-- song " + HX(song_idx) + " --")
+                out()
+                out("name " + self.music.songs[song_idx])
+                out("tempo " + HB(music.song_tempos[song_idx]))
+                out()
+                for i in range(4):
+                    estr = "entry " + constants.mus_vchannel_names[i] + " "
+                    while len(estr) < 0x13:
+                        estr += " "
+                    out(estr + music.song_channel_entries[song_idx][i])
                 out()
             
             # music data
@@ -1306,7 +1308,7 @@ class MMData:
                         
                         # next line
                         continue
-                            
+                    
                     if directive == "ram":
                         level.ram = int(tokens[1], 16)
                     
@@ -1416,6 +1418,22 @@ class MMData:
                         obj.compressed = compressible
                         
                         level.objects.append(obj)
+                    
+                    if directive == "format" and len(tokens) >= 2:
+                        if tokens[1].isdigit():
+                            fmt = int(tokens[1])
+                        else:
+                            # forked versions of MMagEdit should use a non-numeric character to 
+                            # identify their version number. Or something.
+                            self.errors += ["Hack does not appear to be created with MMagEdit. It cannot be opened with this tool."]
+                            return False
+                        if fmt > constants.mmfmt:
+                            self.errors += ["Hack uses a more recent version of MMagEdit. An update is required."]
+                            return False
+                        if fmt < constants.mmfmt:
+                            # this is a warning, not an error.
+                            self.errors += ["Hack uses an older version of MMagEdit. Please be wary of errors or artifacts caused by updating."]
+                            
                     
                     # song directives
                     if directive == "name" and song_idx is not None:

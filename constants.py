@@ -1,10 +1,11 @@
 from util import *
 
 mmname = "MMagEdit V1.4"
+mmfmt = 202008311218
 mminfo = """
 MMagEdit created by NaOH
 
-Version 1.3: 31 August 2020
+Version 1.4: 31 August 2020
 
 Special thanks to -7 (negativeseven) and Julius.
 

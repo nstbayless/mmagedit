@@ -11,6 +11,7 @@ available = True
 try:
     from PIL import Image, ImageDraw, ImageOps, ImageTk
     import tkinter as tk
+    from tkinter import ttk
     import tkinter.filedialog, tkinter.messagebox
 except ImportError:
     available = False
@@ -42,6 +43,8 @@ selcol = constants.meta_colour_str
 patchcol = constants.meta_colour_str
 objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str_b}
 
+zoom_levels = [1]
+
 resource_dir = os.path.dirname(os.path.realpath(__file__))
 icon_path = os.path.join(resource_dir, "icon.png")
 
@@ -55,9 +58,170 @@ class GuiAction:
         for name, value in kwargs.items():
             setattr(self, name, value)
 
+# 32x32 macro-tile editor
+class GuiMacroEdit:
+    def __init__(self, core):
+        self.core = core
+        self.window = tk.Toplevel(core.window)
+        self.window.title("Macro-Tile Editor")
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.v_world_idx = tk.StringVar()
+        self.v_world_idx.set("1")
+        self.v_macro_tile_idx = tk.StringVar()
+        self.v_macro_tile_idx.set("0D") # a reasonable default tile to edit
+        self.v_hard = tk.BooleanVar()
+        self.v_hard.set(False)
+        self.world_idx = 0
+        self.macro_tile_idx = 0xD
+        self.closed = False
+        self.select_canvas = None
+        self.elts_med_select = []
+        self.init()
+        
+        self.v_world_idx.trace("w", callback=self.on_idx_change)
+        self.v_macro_tile_idx.trace("w", callback=self.on_idx_change)
+        self.v_hard.trace("w", callback=self.on_idx_change)
+        self.handling = False
+        
+    def on_close(self):
+        self.closed = True
+        self.window.destroy()
+        self.core.subwindows.pop(type(self))
+        
+    def on_idx_change(self, var, unk, mode):
+        if self.handling:
+            return
+        self.handling = True
+        if mode == 'w':
+            self.hard = self.v_hard.get()
+            # world index
+            try:
+                val = self.v_world_idx.get()
+                self.world_idx = clamp_hoi(int(val, 16) - 1, 0, len(self.core.data.worlds))
+                if HX(self.world_idx) != val:
+                    self.v_world_idx.set(HX(self.world_idx + 1))
+            except:
+                self.v_world_idx.set("")
+            
+            # macro tile idx    
+            try:
+                maxtile = len(self.core.data.worlds[self.world_idx].macro_tiles) + constants.global_macro_tiles_count
+                val = self.v_macro_tile_idx.get()
+                self.macro_tile_idx = clamp_hoi(int(val, 16), 0, maxtile)
+                if HX(self.macro_tile_idx) != val:
+                    self.v_macro_tile_idx.set(HX(self.macro_tile_idx))
+            except:
+                self.v_macro_tile_idx.set("")
+                pass
+        self.refresh()
+        self.handling = False
+        
+    def init(self):
+        topbar = tk.Frame(self.window)
+        mainframe = tk.Frame(self.window)
+        
+        label = ttk.Label(topbar, text="World: ")
+        label.grid(column=0, row=0)
+        
+        entry = ttk.Entry(topbar, width=2, textvariable = self.v_world_idx)
+        entry.grid(column=1, row=0)
+        
+        label = ttk.Label(topbar, text="Macro Tile ID: ")
+        label.grid(column=2, row=0)
+        
+        entry = ttk.Entry(topbar, width=2, textvariable = self.v_macro_tile_idx)
+        entry.grid(column=3, row=0)
+        
+        topbar.pack(fill=tk.X)
+        mainframe.pack(fill=tk.BOTH, expand=True)
+        
+        self.med_tile_select_width = 4
+        height=224
+        
+        self.select_canvas = tk.Canvas(mainframe, width = (med_width + 1) * self.med_tile_select_width, height=height, bg="black")
+        self.med_micro_images = [[self.select_canvas.create_image(x * micro_width + (x // 2), y * micro_height + (y // 2), image=self.core.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height // self.med_tile_select_width)] for x in range(self.med_tile_select_width * 4)]
+        self.core.attach_scrollbar(self.select_canvas, mainframe)
+        self.select_canvas.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
+        
+        self.place_canvas = tk.Canvas(mainframe, width = macro_width, height=macro_height, bg="black")
+        self.place_micro_images = [[self.place_canvas.create_image(x * micro_width, y * micro_height, image=self.core.blank_image, anchor=tk.NW) for y in range(8)] for x in range(8)]
+        self.place_canvas.pack()
+    
+    def refresh(self):
+        self.core.delete_elements(self.select_canvas, self.elts_med_select)
+        self.elts_med_select = []
+        
+        if self.select_canvas is None:
+            return
+        world = self.core.data.worlds[self.world_idx]
+        zoom = 0
+        
+        # set scrollable region
+        self.select_canvas.configure(
+            scrollregion=(
+                0, 0,
+                (med_width + 1) * self.med_tile_select_width - 1,
+                ((len(world.med_tiles) + constants.global_med_tiles_count + self.med_tile_select_width - 1) // self.med_tile_select_width) * (med_height + 1) - 1
+            )
+        )
+        
+        # populate
+        macro_tile = world.get_macro_tile(self.macro_tile_idx)
+        for i in range(4):
+            med_tile_idx = macro_tile[i]
+            med_tile = world.get_med_tile(med_tile_idx)
+            palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
+            for j in range(4):
+                micro_tile_idx = med_tile[j]
+                x = (i % 2) * 2 + (j % 2)
+                y = (i >= 2) * 2 + (j >= 2)
+                
+                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
+                self.place_canvas.itemconfig(self.place_micro_images[x][y], image=img)
+        
+        for med_sel_idx in range(len(world.med_tiles) + constants.global_med_tiles_count):
+            med_y = (med_sel_idx // self.med_tile_select_width)
+            med_x = (med_sel_idx % self.med_tile_select_width)
+            line_y = med_y * (med_height + 1) + med_height
+            line_x = (med_x) * (med_width + 1)
+            
+            rounded_sel_idx = med_sel_idx - (med_sel_idx % self.med_tile_select_width)
+            divide = (rounded_sel_idx + self.med_tile_select_width == constants.global_med_tiles_count)
+            # special symmetry line
+            if rounded_sel_idx == 0x1c:
+                divide = True
+            if rounded_sel_idx == world.max_symmetry_idx:
+                divide = True
+            
+            # add line
+            self.elts_med_select.append(self.select_canvas.create_line(line_x, line_y, line_x + med_width + 1, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
+            self.elts_med_select.append(self.select_canvas.create_line(line_x, line_y - med_height, line_x, line_y + 1, fill=linecol))
+            
+            # set images
+            med_tile_idx = med_sel_idx
+            med_tile = world.get_med_tile(med_tile_idx)
+            palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
+            for i in range(4):
+                micro_tile_idx = world.get_micro_tile(med_tile[i], self.hard)
+                x = i % 2 + med_x * 2
+                y = i // 2 + med_y * 2
+                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
+                self.select_canvas.itemconfig(self.med_micro_images[x][y], image=img)
+    
+    def ctl(self, kwargs):
+        if "macro_tile_idx" in kwargs:
+            self.v_macro_tile_idx.set(HB(kwargs["macro_tile_idx"]))
+        if "world_idx" in kwargs:
+            self.v_world_idx.set(HX(kwargs["world_idx"]))
+        if "hard" in kwargs:
+            self.v_hard.set(kwargs["hard"])
+        pass
+
+# main window and gui data
 class Gui:
     def __init__(self):
         self.data = None
+        self.subwindows = dict()
         self.mouse_button_actions = ["place", "seam", "remove", "seam"] # left, middle, right, shift
         self.file = {"hack": None, "rom": None, "image": None, "ips": None}
         self.dirty = False
@@ -75,6 +239,7 @@ class Gui:
         self.level = None
         self.stage_idx = 0
         self.hard = False
+        self.zoom = 0
         self.flipx = False
         self.flipy = False
         
@@ -514,8 +679,22 @@ class Gui:
                         prev_seam=macro_row.seam,
                         seam=clamp_hoi(x / med_width, 0, level_width // med_width)
                     ))
+    
+    def subwindowctl(self, type, **kwargs):
+        # check if subwindow has closed
+        if type in self.subwindows:
+            if self.subwindows[type].closed:
+                self.subwindows.pop(type)
         
-    def on_macro_click(self, event):
+        # open new subwindow
+        if type not in self.subwindows:
+            self.subwindows[type] = type(self)
+            
+        # ctl it
+        self.subwindows[type].ctl(kwargs)
+        pass
+    
+    def on_macro_click(self, edit, event):
         if len(self.placable_tiles) == 0:
             return
         h = ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1)
@@ -524,10 +703,12 @@ class Gui:
         idx = clamp_hoi(int(x // (macro_width + 1)) + int(y / (macro_height + 1)) * self.macro_tile_select_width, 0, len(self.placable_tiles))
         self.macro_tile_select_id = self.placable_tiles[idx]
         self.object_select_gid = None
+        if edit:
+            self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx, macro_tile_idx=self.macro_tile_select_id)
         self.refresh_selection_rect()
         self.refresh_label()
         
-    def on_object_click(self, event):
+    def on_object_click(self, edit, event):
         if len(self.placable_objects) == 0:
             return
         y = self.get_event_y(event, self.object_canvas, len(self.placable_objects) * (macro_height + 1))
@@ -614,6 +795,11 @@ class Gui:
         
         menu.add_cascade(label="View", menu=viewmenu)
         
+        windowmenu = tk.Menu(menu, tearoff=0)
+        self.windowmenu = windowmenu
+        self.add_menu_command(windowmenu, "Macro Tile Editor", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), None)
+        menu.add_cascade(label="Window", menu=windowmenu)
+        
         helpmenu = tk.Menu(menu, tearoff=0)
         self.add_menu_command(helpmenu, "About", self.about, None)
         menu.add_cascade(label="Help", menu=helpmenu)
@@ -645,12 +831,16 @@ class Gui:
         macro_canvas = tk.Canvas(selector_macro_frame, width=macro_width * self.macro_tile_select_width, height=screenheight, bg="black")
         self.attach_scrollbar(macro_canvas, selector_macro_frame)
         macro_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
-        macro_canvas.bind("<Button-1>", partial(self.on_macro_click))
+        macro_canvas.bind("<Button-1>", partial(self.on_macro_click, False))
+        macro_canvas.bind("<Button-3>", partial(self.on_macro_click, True))
+        macro_canvas.bind("<Double-Button-1>", partial(self.on_macro_click, True))
         
         object_canvas = tk.Canvas(selector_objects_frame, width=objwidth, height=screenheight, bg="black")
         self.attach_scrollbar(object_canvas, selector_objects_frame)
         object_canvas.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
-        object_canvas.bind("<Button-1>", partial(self.on_object_click))
+        object_canvas.bind("<Button-1>", partial(self.on_object_click, False))
+        object_canvas.bind("<Button-3>", partial(self.on_object_click, True))
+        object_canvas.bind("<Double-Button-1>", partial(self.on_object_click, True))
         
         # private access
         self.stage_canvas = stage_canvas
@@ -698,14 +888,16 @@ class Gui:
         
         # micro-tile images
         # list [world][palette_idx][id]
-        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
+        self.micro_images = [[[[None for zoom in range(len(zoom_levels))] for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
         for world_idx in range(len(self.data.worlds)):
             world = self.data.worlds[world_idx]
             images = [mmimage.produce_micro_tile_images(world, hard) for hard in [False, True]]
             for palette_idx in range(len(world.palettes)):
                 for id in range(0x100):
                     img = images[palette_idx // 4][palette_idx % 4][id]
-                    self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=img)
+                    for zoom in range(len(zoom_levels)):
+                        imgzoom = ImageOps.fit(img, (img.width * zoom_levels[zoom], img.height * zoom_levels[zoom]))
+                        self.micro_images[world_idx][palette_idx][id][zoom] = ImageTk.PhotoImage(image=imgzoom)
     
     def select_stage(self, stage_idx, hard=False):
         if self.data is None:
@@ -803,7 +995,7 @@ class Gui:
                     x = (i % 2) * 2 + (j % 2) + macro_x * 4
                     y = (i // 2) * 2 + (j // 2) + macro_y * 4
                     palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
-                    img = self.micro_images[world.idx][palette_idx][micro_tile_idx]
+                    img = self.micro_images[world.idx][palette_idx][micro_tile_idx][self.zoom]
                     self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=img)
                     
     
@@ -933,7 +1125,7 @@ class Gui:
                         micro_tile_idx = level.world.get_micro_tile(med_tile[i], self.hard)
                         x = med_tile_col_idx * 2 + (i % 2)
                         y = micro_y + (1 - med_tile_row_idx) * 2 + (i // 2)
-                        img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx]
+                        img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx][self.zoom]
                         self.stage_micro_dangerous[x][y] = micro_tile_idx in constants.dangerous_micro_tiles
                         self.stage_canvas.itemconfig(self.stage_micro_images[x][y], image=img)
         

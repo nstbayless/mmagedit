@@ -11,7 +11,7 @@ try:
 except ImportError:
     available = False
     
-def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, sprite=False, semi=False):
+def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
     for y in range(8):
         l = data.read_byte(data.chr_to_rom(chr_address + y))
         u = data.read_byte(data.chr_to_rom(chr_address + y + 8))
@@ -31,7 +31,7 @@ def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, spri
                 elif semi:
                     colrgb = (colrgb[0], colrgb[1], min(0xff, colrgb[2] + 0x40), 0x50)
             
-            img.putpixel((7 - x + offset[0] if flipx else x + offset[0], y + offset[1]), colrgb)
+            img.putpixel((7 - x + offset[0] if flipx else x + offset[0], (7 - y if flipy else y) + offset[1]), colrgb)
     
 def produce_object_images(data, semi=False):
     object_images = []
@@ -59,8 +59,9 @@ def produce_object_images(data, semi=False):
                     if is_sprite:
                         chr_address += 0x1000
                     flipx = chr_idx & 0x200 != 0
+                    flipy = chr_idx & 0x400 != 0
                     
-                    chr_to_img(data, chr_address, img, palette, (x, y), flipx, True, semi)
+                    chr_to_img(data, chr_address, img, palette, (x, y), flipx, flipy, True, semi)
             
             img._mm_offset = offset
             img._mm_hard = object_data["hard"] if "hard" in object_data else False
@@ -88,7 +89,7 @@ def produce_micro_tile_images(world, hard=False):
                         rgb = constants.palette_rgb[palette[col_idx]]
                         
                         # hidden block effect
-                        if i in constants.hidden_micro_tiles and palette_idx == 1:
+                        if i in constants.hidden_micro_tiles and palette_idx in world.hidden_tile_palettes():
                             if (x + y) % 2 == 1:
                                 rgb = constants.hidden_colour
                         

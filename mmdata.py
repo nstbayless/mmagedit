@@ -407,7 +407,15 @@ class World:
         if palette_idx == 7 and self.idx == 0:
             palette_idx = 6
         return palette_idx
-        
+    
+    def hidden_tile_palettes(self, hard=False):
+        # these palettes should cause the hidden tiles to be rendered
+        # specially (for the user of the editor's benefit)
+        if self.idx == 3:
+            return [3]
+        else:
+            return [1]
+    
     def read(self):
         self.max_symmetry_idx = self.data.read_byte(self.data.ram_to_rom(constants.ram_world_mirror_index_table + self.idx))
         data_ptr = self.data.read_word(self.data.ram_to_rom(constants.ram_world_macro_tiles_table + self.idx * 2))

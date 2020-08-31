@@ -9,11 +9,12 @@ def usage():
     print(constants.mmname)
     print()
     print("Usage:")
-    print("  python3 mmagedit.py base.nes [-i hack.txt] [-o hack.txt] [-e modified.nes] [--export-images]")
+    print("  python3 mmagedit.py base.nes [-i hack.txt] [-o hack.txt] [-e modified.nes] [-p patch.ips] [--export-images]")
     print("")
     print("-i: open hack")
     print("-o: save hack")
     print("-e: export to rom")
+    print("-p: export to ips patch")
     print("--export-images: creates image sheet for levels")
 
 if "--help" in sys.argv or "-h" in sys.argv:
@@ -23,6 +24,7 @@ if "--help" in sys.argv or "-h" in sys.argv:
 outfile=""
 infile=""
 exportnes=""
+outpatch=""
 gui = True
 
 expimage = False
@@ -37,6 +39,10 @@ if "-o" in sys.argv[2:-1]:
 if "-e" in sys.argv[2:-1]:
     gui = False
     exportnes = sys.argv[sys.argv.index("-e") + 1]
+    
+if "-p" in sys.argv[2:-1]:
+    gui = False
+    outpatch = sys.argv[sys.argv.index("-p") + 1]
     
 if "--export-images" in sys.argv[2:]:
     gui = False
@@ -89,6 +95,9 @@ if filepath is not None:
 
     if exportnes != "":
         mmdata.write(exportnes)
+        
+    if outpatch != "":
+        mmdata.write_ips(outpatch)
 
     if expimage:
         if not mmimage.available:

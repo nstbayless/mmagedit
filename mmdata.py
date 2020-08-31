@@ -4,6 +4,7 @@ import constants
 import json
 import functools
 import hashlib
+import ips
 
 class PatchStream:
     def __init__(self):
@@ -942,6 +943,15 @@ class MMData:
             return True
         self.errors += ["Failed to open file \"" + file + "\" for writing."]
         return False
+        
+    def write_ips(self, file):
+        self.errors = []
+        if not self.commit():
+            return False
+        rval = ips.create_patch(self.orgbin, self.bin, file)
+        if not rval:
+            self.errors += ["Failed to export patch."]
+        return rval
     
     def __init__(self):
         self.bin = None

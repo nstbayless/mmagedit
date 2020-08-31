@@ -59,7 +59,7 @@ class Gui:
     def __init__(self):
         self.data = None
         self.mouse_button_actions = ["place", "seam", "remove", "seam"] # left, middle, right, shift
-        self.file = {"hack": None, "rom": None, "image": None}
+        self.file = {"hack": None, "rom": None, "image": None, "ips": None}
         self.dirty = False
         self.undo_buffer = []
         self.redo_buffer = []
@@ -113,10 +113,12 @@ class Gui:
             if type == "image":
                 promptfn = partial(tkinter.filedialog.askdirectory, mustexist=True)
                 title = "select destination directory for images"
-                if type == "rom":
-                    promptfn = partial(promptfn, defaultextension=".nes")
-                if type == "hack":
-                    promptfn = partial(promptfn, defaultextension=".txt")
+            if type == "rom":
+                promptfn = partial(promptfn, defaultextension=".nes")
+            if type == "hack":
+                promptfn = partial(promptfn, defaultextension=".txt")
+            if type == "ips":
+                promptfn = partial(promptfn, defaultextension=".ips")
         
         if path is None:
             path = promptfn(title=title)
@@ -162,6 +164,10 @@ class Gui:
             # cannot load image
             if type == "image" and not save:
                 return False
+                
+            # cannot load ips
+            if type == "ips" and not save:
+                return False
             
             if type == "rom":
                 if save:
@@ -185,7 +191,15 @@ class Gui:
             
             if type == "image" and save:
                 self.file[type] = path
-                return mmimage.export_images(self.data, path)
+                rval = mmimage.export_images(self.data, path)
+                self.errorbox(rval)
+                return rval
+                
+            if type == "ips" and save:
+                self.file[type] = path
+                rval = self.data.write_ips(path)
+                self.errorbox(rval)
+                return rval
             
             if type == "hack" and not save:
                 self.dirty = False
@@ -547,8 +561,12 @@ class Gui:
         filemenu.add_separator()
         self.menu_fio += [
             self.add_menu_command(filemenu, "Save Hack", partial(self.fio_prompt, "hack", True, True), "Ctrl+S"),
-            self.add_menu_command(filemenu, "Save Hack As...", partial(self.fio_prompt, "hack", True), "Ctrl+Shift+S"),
+            self.add_menu_command(filemenu, "Save Hack As...", partial(self.fio_prompt, "hack", True), "Ctrl+Shift+S")
+        ]
+        filemenu.add_separator()
+        self.menu_fio += [
             self.add_menu_command(filemenu, "Export Patched ROM...", partial(self.fio_prompt, "rom", True), "Ctrl+E"),
+            self.add_menu_command(filemenu, "Export IPS Patch...", partial(self.fio_prompt, "ips", True), "Ctrl+P"),
             self.add_menu_command(filemenu, "Export Image Sheet...", partial(self.fio_prompt, "image", True), "Ctrl+J")
         ]
         

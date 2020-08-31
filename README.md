@@ -38,10 +38,11 @@ python3 mmagedit.py [base.nes] [args...]
 -i hack.txt: applies hack.txt to model
 -o hack.txt: saves model to hack.txt
 -e modified.nes: exports model to ROM
+-p patch.ips: exports model to IPS patch
 --export-images: exports model as image sheet (one for each stage normal/hard)
 ```
 
-At least one of `-o`, `-e`, or `--export-images` must
+At least one of `-o`, `-e`, `-p`, or `--export-images` must
 be used to suppress the GUI.
 
 ### Examples

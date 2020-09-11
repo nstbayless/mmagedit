@@ -8,8 +8,9 @@ available = True
 
 try:
     from PIL import Image, ImageDraw, ImageOps
-except ImportError:
+except ImportError as e:
     available = False
+    raise e
     
 def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
     for y in range(8):
@@ -123,7 +124,7 @@ def export_images(data, path="."):
             img = Image.new('RGB', (w, h), color = 'black')
             draw = ImageDraw.Draw(img)
             
-            tile_rows = level.produce_med_tiles(hard)
+            tile_rows, macro_tile_idxs = level.produce_med_tiles(hard)
             
             y = h
             

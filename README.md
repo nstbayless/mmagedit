@@ -1,9 +1,12 @@
  # MMagEdit
+ 
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/nstbayless/mmagedit?svg=true)](https://ci.appveyor.com/project/nstbayless/mmagedit)
+ 
 *A cross-platform ROM editor for [Micro Mages](http://morphcat.de/micromages/).*
  
 This utility can edit levels, worlds, and tile information for Micro Mages (by [Morphcat games](http://morphcat.de/)). Made with Python3, `Pillow`, and `tkinter`. Has both a GUI and CLI.
 
-**Windows**: TBA.
+**Windows**: [Download](https://ci.appveyor.com/api/projects/nstbayless/mmagedit/artifacts/mmagedit.zip).
 
 **Linux**: See "Launching (Ubuntu)" below.
 

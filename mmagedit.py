@@ -1,8 +1,12 @@
 import sys
 from array import array
 from mmdata import MMData
-import mmimage
-import mmgui
+try:
+    import mmimage
+    import mmgui
+except ImportError as e:
+    pass
+    
 import constants
 
 def usage():
@@ -15,11 +19,22 @@ def usage():
     print("-o: save hack")
     print("-e: export to rom")
     print("-p: export to ips patch")
+    print("--deps: check dependencies")
     print("--export-images: creates image sheet for levels")
 
 if "--help" in sys.argv or "-h" in sys.argv:
     usage()
     sys.exit()
+    
+if "--deps" in sys.argv:
+    if not mmimage.available:
+        print("Not available: image")
+        sys.exit(1)
+    elif not mmgui.available:
+        print("Not available: gui")
+        sys.exit(1)
+    print("All modules available.")
+    sys.exit(0)
 
 outfile=""
 infile=""

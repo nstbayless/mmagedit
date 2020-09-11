@@ -1,3 +1,5 @@
+import math
+
 def hx(a):
     return hex(a)[2:]
     
@@ -34,7 +36,10 @@ def json_list(list, map):
             str += map(l)
         is_first = False
     return str + "]"
-    
+
+def ceil_to(x, to=1):
+    return to * math.ceil(x / to)
+
 def rotated(list, idx):
     idx = ((idx % len(list)) + len(list)) % len(list)
     newlist = []

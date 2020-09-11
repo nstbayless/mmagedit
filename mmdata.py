@@ -303,10 +303,11 @@ class Level:
     def get_macro_patch_tile(self, patch_i):
         return 0x2f + patch_i
         
-    # constructs rows of medtiles, from bottom up.
+    # constructs rows of medtiles (and macrotiles) from bottom up.
     # dimensions should be YX, 64x16
     def produce_med_tiles(self, hardmode=False, orows=range(constants.macro_rows_per_level)):
         rows = []
+        macro_tile_idxs = []
         for y in orows:
             lmr = self.macro_rows[y]
             row = [[0] * 16, [0] * 16]
@@ -317,6 +318,7 @@ class Level:
                         if y == patch.y:
                             if i == patch.x:
                                 macro_tile_idx = self.get_macro_patch_tile(patch.i)
+                macro_tile_idxs.append(macro_tile_idx)
                 macro_tile = self.world.get_macro_tile(macro_tile_idx)
                 for j in range(2):
                     row[j][i * 2] = macro_tile[0 + 2 * j]
@@ -330,7 +332,7 @@ class Level:
             rows.append(row[1])
             rows.append(row[0])
             
-        return rows
+        return rows, macro_tile_idxs
 
 class World:
     def __init__(self, data, idx):
@@ -375,6 +377,7 @@ class World:
             return [0, 0, 0, 0]
             
     def get_micro_tile(self, idx, hard=False):
+        # world 2's special ice topping
         if self.idx == 1 and hard:
             if idx in range(0x12, 0x18):
                 return 0x10
@@ -811,6 +814,7 @@ class MMData:
             self.med_tiles = [] # array of [tl, tr, bl, br]
             self.worlds = []
             self.mirror_pairs = []
+            self.chest_objects = []
             
             # read special mods
             self.mods = dict()
@@ -825,6 +829,15 @@ class MMData:
             for i in range(constants.mirror_pairs_count):
                 pair = [self.read_byte(self.ram_to_rom(constants.ram_mirror_pairs_table) + j * constants.mirror_pairs_count + i) for j in range(2)]
                 self.mirror_pairs.append(pair)
+            
+            # read chest item table
+            for i in range(constants.ram_chest_table_length):
+                self.chest_objects.append(self.read_byte(self.ram_to_rom(constants.ram_chest_table + i)))
+                
+            # read object-specific data
+            for cfg in self.object_config:
+                if cfg is not None:
+                    cfg.read()
                 
             # read micro-tile chr (not stored in format; only for visualization)
             # FIXME: don't do this; mmimage should read from chr rom directly. It has a function for that already.
@@ -897,6 +910,15 @@ class MMData:
             for j in range(2):
                 self.write_byte(self.ram_to_rom(constants.ram_mirror_pairs_table) + i + constants.mirror_pairs_count * j, self.mirror_pairs[i][j])
         
+        # write chest table
+        for i in range(min(constants.ram_chest_table, len(self.chest_objects))):
+            self.write_byte(self.ram_to_rom(constants.ram_chest_table + i), self.chest_objects[i])
+        
+        # write object-specific data
+        for cfg in self.object_config:
+            if cfg is not None:
+                cfg.commit()
+        
         # write global med-tile types (how 16x16 tiles can be composed of 8x8 tiles)
         med_corner_ptrs = [0, 0, 0, 0]
         for i in range(4):
@@ -934,7 +956,7 @@ class MMData:
                 constants.ram_mod_bounce_replacement
             )
         if self.mods["no_auto_scroll"]:
-            for i in range(2):
+            for i in range(len(constants.ram_mod_no_auto_scroll)):
                 self.write_patch(
                     self.ram_to_rom(constants.ram_mod_no_auto_scroll[i]),
                     constants.ram_mod_no_auto_scroll_replacement[i]
@@ -964,6 +986,10 @@ class MMData:
     def __init__(self):
         self.bin = None
         self.errors = []
+        self.object_config = [
+            constants.object_data[gid]["config"](self, gid) if "config" in constants.object_data[gid] else None
+            for gid in range(len(constants.object_data))
+        ]
         pass
         
     def get_object_name(self, gid):
@@ -987,6 +1013,9 @@ class MMData:
                 out = functools.partial(stat_out, file)
             out("# Micro Mages Hack File")
             out()
+            out("# This file can be opened using MMagEdit, available here:")
+            out("#", constants.mmrepo)
+            out()
             out("format " + str(constants.mmfmt))
             out()
             out("-- config --")
@@ -1002,6 +1031,11 @@ class MMData:
             out('  # Length must be exactly 16.')
             out('  "spawnable-ext":', self.stat_spawnstr(self.spawnable_objects[0x10:0x20]) + ",")
             out()
+            out('  # objects which can be spawned from a chest (looked up randomly).')
+            out('  # the final element of this list can only be spawned on multiplayer.')
+            out('  # Length must be exactly 13.')
+            out('  "chest-objects":', self.stat_spawnstr(self.chest_objects) + ",")
+            out()
             out('  # these med-tiles will be replaced with the given med-tiles when mirrored, and vice versa')
             out('  "mirror-pairs":', json_list(self.mirror_pairs, lambda i : '"' + hb(i) + '"') + ",")
             out()
@@ -1016,6 +1050,15 @@ class MMData:
             out('  "":""}') # FIXME: a nasty hack to make the comma logic easier...
             out("}")
             out()
+            
+            # config data
+            for gid in range(len(self.object_config)):
+                cfg = self.object_config[gid]
+                if cfg is not None:
+                    out("-- object", HX(gid), "--")
+                    out("#", constants.object_names[gid][0])
+                    out()
+                    cfg.stat(out)
             
             # global tile data
             
@@ -1235,6 +1278,7 @@ class MMData:
             song_idx = None
             music = None
             music_nibble = 0
+            cfg = None
             
             for line in f.readlines():
                 if "#" in line:
@@ -1249,6 +1293,7 @@ class MMData:
                         world = None
                         level = None
                         song_idx = None
+                        cfg = None
                         
                         # configuration
                         if tokens[1] == "config":
@@ -1258,6 +1303,9 @@ class MMData:
                             continue
                         else:
                             parsing_globals = False
+                        
+                        if tokens[1] == "object":
+                            cfg = self.object_config[int(tokens[2], 16)]
                         
                         if tokens[1] == "global":
                             world = None
@@ -1285,6 +1333,13 @@ class MMData:
                             level.hardmode_patches = []
                             row = constants.macro_rows_per_level - 1
                             obji = 0
+                    
+                    # object config is different
+                    elif cfg is not None:
+                        cfg.parse(tokens)
+                        
+                        # next line
+                        continue
                             
                     # music code is different
                     elif music is not None:
@@ -1464,6 +1519,7 @@ class MMData:
                     assert(len(config["spawnable"]) == 0x10)
                     assert(len(config["spawnable-ext"]) == 0x10)
                     self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
+                    self.chest_objects = [constants.object_names_to_gid[name] for name in config["chest-objects"]]
                     self.mirror_pairs = []
                     for pair in config["mirror-pairs"]:
                         self.mirror_pairs.append([int(i, 16) for i in pair])

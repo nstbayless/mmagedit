@@ -5,6 +5,7 @@ import os
 import mmimage
 import mmdata
 from functools import partial
+import math
 
 available = True
 
@@ -13,12 +14,9 @@ try:
     import tkinter as tk
     from tkinter import ttk
     import tkinter.filedialog, tkinter.messagebox
-except ImportError:
+except ImportError as e:
     available = False
-   
-if not mmimage.available:
-    available = False
-
+    raise e
 
 macro_width = 32
 macro_height = 32
@@ -48,6 +46,195 @@ zoom_levels = [1]
 resource_dir = os.path.dirname(os.path.realpath(__file__))
 icon_path = os.path.join(resource_dir, "icon.png")
 
+
+# a component based on a grid of micro-tiles
+class GuiMicroGrid(tk.Canvas):
+    def __init__(self, parent, core, **kwargs):
+        self.w = 0
+        self.h = 0
+        self.core = core
+        self.data = core.data
+        self.micro_images = []
+        self.clear_elts = []
+        self.divides = []
+        self.chunkdim = None
+        self.click_cb = None
+        self.selection_idx = None
+        self.maxh = 0
+        
+        if "dims" in kwargs:
+            dims = kwargs.pop("dims")
+            self.w = dims[0]
+            self.h = dims[1]
+        
+        if "chunkdim" in kwargs:
+            self.chunkdim = kwargs.pop("chunkdim")
+            
+        if "cb" in kwargs:
+            self.click_cb = kwargs.pop("cb")
+        
+        if "bg" not in kwargs:
+            kwargs["bg"] = "black"
+        
+        scroll = True
+        if "scroll" in kwargs:
+            scroll = kwargs.pop("scroll")
+            
+        tk.Canvas.__init__(self, parent, **kwargs)
+        self.calcdims()
+        
+        if scroll:
+            self.core.attach_scrollbar(self, parent)
+        
+        self.bind("<Button-1>", partial(self.on_click_gui, False))
+        self.bind("<Button-3>", partial(self.on_click_gui, True))
+        self.bind("<Double-Button-1>", partial(self.on_click_gui, True))
+        
+    def on_click_gui(self, edit, event):
+        if self.click_cb is not None:
+            chunkdim = (1, 1) if self.chunkdim is None else self.chunkdim
+            y = int(self.core.get_event_y(event, self, self.scroll_height))
+            x = clamp_hoi(event.x, 0, self.scroll_width)
+            
+            # convert to microtile coordinates
+            if self.chunkdim is not None:
+                x -= (x // micro_width) // self.chunkdim[0]
+                y -= (y // micro_width) // self.chunkdim[1]
+            x //= micro_width
+            y //= micro_height
+            
+            # convert to chunkdim coordinates
+            x //= chunkdim[0]
+            y //= chunkdim[1]
+            
+            idx = x + y * (self.w // chunkdim[0])
+            self.click_cb(int(idx), edit)
+    
+    def configure(self, **kwargs):
+        if "dims" in kwargs:
+            dims = kwargs.pop("dims")
+            self.w = dims[0]
+            self.h = dims[1]
+        tk.Canvas.configure(self, **kwargs)
+        self.calcdims()
+        
+    def calcdims(self):
+        w = micro_width * self.w
+        h = micro_height * self.h
+        
+        if self.chunkdim is not None:
+            w += self.w // self.chunkdim[0] - 1
+            h += self.h // self.chunkdim[1] - 1
+        
+        tk.Canvas.configure(
+            self,
+            width=int(w),
+            scrollregion=(0, 0, int(w), int(h))
+        )
+        
+        # add micro-images
+        while len(self.micro_images) < w:
+            self.micro_images.append([])
+        x = 0
+        for col in self.micro_images:
+            while len(col) < h:
+                y = len(col)
+                xp = x * micro_width
+                yp = y * micro_height
+                if self.chunkdim is not None:
+                    xp += x // self.chunkdim[0]
+                    yp += y // self.chunkdim[1]
+                col.append(self.create_image(xp, yp, image=self.core.blank_image, anchor=tk.NW))
+            x += 1
+        
+        self.scroll_width = w
+        self.scroll_height = h
+    
+    def set_tile_image(self, x, y, img):
+        if x < self.w and y < self.h:
+            self.maxh = max(self.maxh, y + 1)
+            self.itemconfig(self.micro_images[x][y], image=img)
+        
+    def clear_from(self, index):
+        chunkdim = self.chunkdim if self.chunkdim is not None else (1, 1)
+        for x in range(self.w):
+            for y in range(self.maxh):
+                idx = (x // chunkdim[0]) + (y // chunkdim[1]) * (self.w // chunkdim[0])
+                if idx < index:
+                    continue
+                self.itemconfig(self.micro_images[x][y], image=self.core.blank_image)
+    
+    def refresh(self):
+        self.core.delete_elements(self, self.clear_elts)
+        self.clear_elts = []
+        
+        self.calcdims()
+        pw = self.scroll_width
+        ph = self.scroll_height
+        
+        # lines
+        if self.chunkdim is not None:
+            for x in range(self.w // self.chunkdim[0]):
+                px = (x + 1) * micro_width * self.chunkdim[0] + x
+                self.clear_elts.append(
+                    self.create_line(px, 0, px, ph, fill=linecol)
+                )
+                for y in range(self.h // self.chunkdim[1]):
+                    py = (y + 1) * micro_height * self.chunkdim[1] + y
+                    self.clear_elts.append(
+                        self.create_line(0, py, pw, py, fill=linecol)
+                    )
+            
+        chunkdim = self.chunkdim if self.chunkdim is not None else (1, 1)
+        
+        # lines
+        divargs = {"width": 2, "fill": divcol}
+        for divide in self.divides:
+            x = chunkdim[0] * (divide % (self.w // chunkdim[0]))
+            y = chunkdim[1] * (divide // (self.w // chunkdim[0]))
+            
+            px = x * micro_width
+            py = y * micro_height
+            
+            divpy = py + micro_height * chunkdim[1]
+            if self.chunkdim is not None:
+                px += x // chunkdim[0]
+                py += y // chunkdim[1]
+                divpy += 1 + y // chunkdim[1]
+            
+            if x != 0:
+                # sigmoid division
+                self.clear_elts.append(
+                    self.create_line(0, divpy, px, divpy, **divargs)
+                )
+                self.clear_elts.append(
+                    self.create_line(px, divpy + 1, px, py - 1, **divargs)
+                )
+            self.clear_elts.append(
+                self.create_line(px, py, pw, py, **divargs)
+            )
+        
+        # selection rect
+        if self.selection_idx is not None:
+            x = (self.selection_idx % (self.w // chunkdim[0])) * chunkdim[0]
+            y = (self.selection_idx // (self.w // chunkdim[0])) * chunkdim[1]
+            px = x * micro_width
+            py = y * micro_height
+            if self.chunkdim is not None:
+                px += x // chunkdim[0]
+                py += y // chunkdim[1]
+            rect_margin = 1
+            self.clear_elts.append(
+                self.create_rectangle(
+                    px + rect_margin,
+                    py + rect_margin,
+                    px + micro_width * chunkdim[0] - rect_margin, 
+                    py + micro_height * chunkdim[1] - rect_margin,
+                    width=2,
+                    outline=selcol
+                )
+            )
+
 # an undoable action
 class GuiAction:
     def __init__(self, **kwargs):
@@ -55,8 +242,208 @@ class GuiAction:
         self.refresh = []
         self.level_idx = None
         self.hard = None
+        self.context = None
         for name, value in kwargs.items():
             setattr(self, name, value)
+
+# 16x16 macro-tile editor
+class GuiMedEdit:
+    def __init__(self, core):
+        self.core = core
+        self.window = tk.Toplevel(core.window)
+        self.window.title("Med-Tile Editor")
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.window.bind("<Key>", self.core.on_keypress)
+        self.v_world_idx = tk.StringVar()
+        self.v_world_idx.set("1")
+        self.v_med_tile_idx = tk.StringVar()
+        self.v_med_tile_idx.set("28") # a reasonable default tile to edit
+        self.v_hard = tk.BooleanVar()
+        self.v_hard.set(False)
+        self.v_palette_idx = tk.IntVar(0, name="palette_idx")
+        self.world_idx = 0
+        self.med_tile_idx = 0xD
+        self.closed = False
+        self.select_canvas = None
+        self.elts_micro_select = []
+        self.init()
+        
+        self.v_world_idx.trace("w", callback=self.on_idx_change)
+        self.v_med_tile_idx.trace("w", callback=self.on_idx_change)
+        self.v_hard.trace("w", callback=self.on_idx_change)
+        self.v_palette_idx.trace("w", callback=self.on_idx_change)
+        self.handling = False
+        
+    def on_close(self):
+        self.closed = True
+        self.window.destroy()
+        self.core.subwindows.pop(type(self))
+        
+    def on_idx_change(self, var, unk, mode):
+        if self.handling:
+            return
+        self.handling = True
+        if mode == 'w':
+            self.hard = self.v_hard.get()
+            # world index
+            try:
+                val = self.v_world_idx.get()
+                self.world_idx = clamp_hoi(int(val, 16) - 1, 0, len(self.core.data.worlds))
+                if HX(self.world_idx) != val:
+                    self.v_world_idx.set(HX(self.world_idx + 1))
+            except:
+                self.v_world_idx.set("")
+            
+            # med tile idx    
+            try:
+                maxtile = len(self.core.data.worlds[self.world_idx].med_tiles) + constants.global_med_tiles_count
+                val = self.v_med_tile_idx.get()
+                self.med_tile_idx = clamp_hoi(int(val, 16), 0, maxtile)
+                if HX(self.med_tile_idx) != val:
+                    self.v_med_tile_idx.set(HX(self.med_tile_idx))
+            except:
+                self.v_med_tile_idx.set("")
+                pass
+            
+            if var == "palette_idx":
+                self.core.apply_action(GuiAction(
+                    type="med-palette", refresh=["med"],
+                    context=GuiMedEdit,
+                    world_idx=self.world_idx,
+                    med_tile_idx=self.med_tile_idx,
+                    palette_idx=self.v_palette_idx.get(),
+                    prev_palette_idx=self.core.data.worlds[self.world_idx].med_tile_palettes[self.med_tile_idx]
+                ))
+            else:
+                self.v_palette_idx.set(self.core.data.worlds[self.world_idx].med_tile_palettes[self.med_tile_idx])
+        self.refresh()
+        self.handling = False
+        
+    def init(self):
+        topbar = tk.Frame(self.window)
+        mainframe = tk.Frame(self.window)
+        
+        label = ttk.Label(topbar, text="World: ")
+        label.grid(column=0, row=0)
+        
+        entry = ttk.Entry(topbar, width=2, textvariable = self.v_world_idx)
+        entry.grid(column=1, row=0)
+        
+        label = ttk.Label(topbar, text="Med Tile ID: ")
+        label.grid(column=2, row=0)
+        
+        entry = ttk.Entry(topbar, width=2, textvariable = self.v_med_tile_idx)
+        entry.grid(column=3, row=0)
+        
+        label = ttk.Label(topbar, text="Hard: ")
+        label.grid(column=0, row=1)
+        
+        entry = ttk.Checkbutton(topbar, variable=self.v_hard)
+        entry.grid(column=1, row=1)
+        
+        topbar.pack(fill=tk.X)
+        mainframe.pack(fill=tk.BOTH, expand=True)
+        
+        self.med_tile_select_width = 4
+        height=224
+        
+        self.select_canvas = GuiMicroGrid(mainframe, self.core, height=256, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False)
+        self.select_canvas.pack(side=tk.RIGHT)
+        
+        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=med_height, dims=(med_width // micro_width, med_height // micro_height), scroll=False, cb=self.on_place_click)
+        self.place_canvas.pack()
+        
+        self.info_label = ttk.Label(mainframe)
+        self.info_label.pack()
+        
+        for palette_idx in range(4):
+            radio = tk.Radiobutton(mainframe, text="Palette " + str(palette_idx + 1), value=palette_idx, variable=self.v_palette_idx)
+            radio.pack()
+        
+    def refresh(self):
+        self.core.delete_elements(self.select_canvas, self.elts_micro_select)
+        self.elts_med_select = []
+        
+        if self.select_canvas is None:
+            return
+        world = self.core.data.worlds[self.world_idx]
+        zoom_idx = 0
+        
+        palette_idx = world.get_med_tile_palette_idx(self.med_tile_idx, self.hard)
+        
+        # populate
+        med_tile = world.get_med_tile(self.med_tile_idx)
+        for j in range(4):
+            micro_tile_idx = med_tile[j]
+            x = (j % 2)
+            y = (j >= 2)
+            
+            # tile
+            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom_idx]
+            self.place_canvas.set_tile_image(x, y, img)
+        
+        self.select_canvas.configure(dims=(16, 16))
+        count = 16 * 16
+        for micro_tile_idx in range(count):
+            x = (micro_tile_idx % 16)
+            y = (micro_tile_idx // 16)
+            
+            # set images
+            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom_idx]
+            self.select_canvas.set_tile_image(x, y, img)
+        self.select_canvas.refresh()
+        
+        # set label
+        labelstr = ""
+        if self.med_tile_idx < constants.global_med_tiles_count:
+            labelstr = "Global"
+        else:
+            labelstr = "World " + str(self.world_idx + 1)
+        if self.med_tile_idx < 0x1e:
+            labelstr += "; hardcoded symmetry"
+        if self.med_tile_idx >= world.max_symmetry_idx:
+            labelstr += "; self-symmetric"
+        self.info_label.configure(text=labelstr, anchor=tk.NW)
+    
+    def ctl(self, kwargs):
+        if "med_tile_idx" in kwargs:
+            self.v_med_tile_idx.set(HB(kwargs["med_tile_idx"]))
+        if "world_idx" in kwargs:
+            self.v_world_idx.set(HX(kwargs["world_idx"] + 1))
+        if "hard" in kwargs:
+            self.v_hard.set(kwargs["hard"])
+        if "refresh" in kwargs and kwargs["refresh"]:
+            self.refresh()
+    
+    def on_place_click(self, idx, edit):
+        world = self.core.data.worlds[self.world_idx]
+        if edit or self.select_canvas.selection_idx is not None:
+            w = 2
+            x = (idx % w)
+            y = (idx // w)
+            
+            x = clamp_hoi(x, 0, 2)
+            y = clamp_hoi(y, 0, 2)
+            
+            i = clamp_hoi(x + 2 * y, 0, 4)
+            
+            med_tile = world.get_med_tile(self.med_tile_idx)
+            self.core.apply_action(GuiAction(
+                type="med", refresh=["med"],
+                context=GuiMedEdit,
+                world_idx=self.world_idx,
+                med_tile_idx=self.med_tile_idx,
+                med_tile_sub=i,
+                micro_tile_idx=0 if edit else self.select_canvas.selection_idx,
+                prev_micro_tile_idx=med_tile[i]
+            ))
+    
+    def on_select_click(self, idx, edit):
+        world = self.core.data.worlds[self.world_idx]
+        if idx < 256:
+            self.select_canvas.selection_idx = idx
+        self.select_canvas.refresh()
+        pass
 
 # 32x32 macro-tile editor
 class GuiMacroEdit:
@@ -65,6 +452,7 @@ class GuiMacroEdit:
         self.window = tk.Toplevel(core.window)
         self.window.title("Macro-Tile Editor")
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.window.bind("<Key>", self.core.on_keypress)
         self.v_world_idx = tk.StringVar()
         self.v_world_idx.set("1")
         self.v_macro_tile_idx = tk.StringVar()
@@ -132,20 +520,26 @@ class GuiMacroEdit:
         entry = ttk.Entry(topbar, width=2, textvariable = self.v_macro_tile_idx)
         entry.grid(column=3, row=0)
         
+        label = ttk.Label(topbar, text="Hard: ")
+        label.grid(column=0, row=1)
+        
+        entry = ttk.Checkbutton(topbar, variable=self.v_hard)
+        entry.grid(column=1, row=1)
+        
         topbar.pack(fill=tk.X)
         mainframe.pack(fill=tk.BOTH, expand=True)
         
         self.med_tile_select_width = 4
         height=224
         
-        self.select_canvas = tk.Canvas(mainframe, width = (med_width + 1) * self.med_tile_select_width, height=height, bg="black")
-        self.med_micro_images = [[self.select_canvas.create_image(x * micro_width + (x // 2), y * micro_height + (y // 2), image=self.core.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height // self.med_tile_select_width)] for x in range(self.med_tile_select_width * 4)]
-        self.core.attach_scrollbar(self.select_canvas, mainframe)
+        self.select_canvas = GuiMicroGrid(mainframe, self.core, height=height, chunkdim=(2, 2), cb=self.on_select_click)
         self.select_canvas.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
         
-        self.place_canvas = tk.Canvas(mainframe, width = macro_width, height=macro_height, bg="black")
-        self.place_micro_images = [[self.place_canvas.create_image(x * micro_width, y * micro_height, image=self.core.blank_image, anchor=tk.NW) for y in range(8)] for x in range(8)]
+        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=macro_height, dims=(macro_width // micro_width * 2, macro_height // micro_height), scroll=False, cb=self.on_place_click)
         self.place_canvas.pack()
+        
+        self.info_label = ttk.Label(mainframe)
+        self.info_label.pack()
     
     def refresh(self):
         self.core.delete_elements(self.select_canvas, self.elts_med_select)
@@ -156,46 +550,39 @@ class GuiMacroEdit:
         world = self.core.data.worlds[self.world_idx]
         zoom = 0
         
-        # set scrollable region
-        self.select_canvas.configure(
-            scrollregion=(
-                0, 0,
-                (med_width + 1) * self.med_tile_select_width - 1,
-                ((len(world.med_tiles) + constants.global_med_tiles_count + self.med_tile_select_width - 1) // self.med_tile_select_width) * (med_height + 1) - 1
-            )
-        )
-        
         # populate
         macro_tile = world.get_macro_tile(self.macro_tile_idx)
         for i in range(4):
             med_tile_idx = macro_tile[i]
+            mirror_tile_idx = world.mirror_tile(med_tile_idx)
             med_tile = world.get_med_tile(med_tile_idx)
+            mirror_tile = world.get_med_tile(mirror_tile_idx)
             palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
+            mirror_palette_idx = world.get_med_tile_palette_idx(mirror_tile_idx, self.hard)
             for j in range(4):
                 micro_tile_idx = med_tile[j]
+                mirror_micro_tile_idx = mirror_tile[j]
                 x = (i % 2) * 2 + (j % 2)
                 y = (i >= 2) * 2 + (j >= 2)
                 
+                mirrorx = 4 + ((i + 1) % 2) * 2 + (j % 2)
+                
+                # tile
                 img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
-                self.place_canvas.itemconfig(self.place_micro_images[x][y], image=img)
+                self.place_canvas.set_tile_image(x, y, img)
+                
+                # mirror tile
+                img = self.core.micro_images[world.idx][mirror_palette_idx][mirror_micro_tile_idx][zoom]
+                self.place_canvas.set_tile_image(mirrorx, y, img)
         
-        for med_sel_idx in range(len(world.med_tiles) + constants.global_med_tiles_count):
+        self.select_canvas.divides = [constants.global_med_tiles_count, 0x1e, world.max_symmetry_idx]
+        count = len(world.med_tiles) + constants.global_med_tiles_count
+        self.select_canvas.configure(dims=(4 * med_width // micro_width, ceil_to((count / (4)) * med_height // micro_height, med_height // micro_height)))
+        for med_sel_idx in range(count):
             med_y = (med_sel_idx // self.med_tile_select_width)
             med_x = (med_sel_idx % self.med_tile_select_width)
-            line_y = med_y * (med_height + 1) + med_height
-            line_x = (med_x) * (med_width + 1)
             
             rounded_sel_idx = med_sel_idx - (med_sel_idx % self.med_tile_select_width)
-            divide = (rounded_sel_idx + self.med_tile_select_width == constants.global_med_tiles_count)
-            # special symmetry line
-            if rounded_sel_idx == 0x1c:
-                divide = True
-            if rounded_sel_idx == world.max_symmetry_idx:
-                divide = True
-            
-            # add line
-            self.elts_med_select.append(self.select_canvas.create_line(line_x, line_y, line_x + med_width + 1, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
-            self.elts_med_select.append(self.select_canvas.create_line(line_x, line_y - med_height, line_x, line_y + 1, fill=linecol))
             
             # set images
             med_tile_idx = med_sel_idx
@@ -206,15 +593,62 @@ class GuiMacroEdit:
                 x = i % 2 + med_x * 2
                 y = i // 2 + med_y * 2
                 img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
-                self.select_canvas.itemconfig(self.med_micro_images[x][y], image=img)
+                self.select_canvas.set_tile_image(x, y, img)
+        self.select_canvas.refresh()
+        
+        # set label
+        labelstr = ""
+        if self.macro_tile_idx < constants.global_macro_tiles_count:
+            labelstr = "Global"
+        else:
+            labelstr = "World " + str(self.world_idx + 1)
+        self.info_label.configure(text=labelstr, anchor=tk.NW)
     
     def ctl(self, kwargs):
         if "macro_tile_idx" in kwargs:
             self.v_macro_tile_idx.set(HB(kwargs["macro_tile_idx"]))
         if "world_idx" in kwargs:
-            self.v_world_idx.set(HX(kwargs["world_idx"]))
+            self.v_world_idx.set(HX(kwargs["world_idx"] + 1))
         if "hard" in kwargs:
             self.v_hard.set(kwargs["hard"])
+        if "refresh" in kwargs and kwargs["refresh"]:
+            self.refresh()
+    
+    def on_place_click(self, idx, edit):
+        world = self.core.data.worlds[self.world_idx]
+        if edit or self.select_canvas.selection_idx is not None:
+            w = macro_width // micro_width * 2
+            x = (idx % w) // 2
+            y = (idx // w) // 2
+            
+            # mirror
+            if x >= macro_width // med_width:
+                x = macro_width // med_width * 2 - x - 1
+            
+            x = clamp_hoi(x, 0, macro_width // med_width)
+            y = clamp_hoi(y, 0, macro_height // med_height)
+            
+            i = x + 2 * y
+            
+            macro_tile = world.get_macro_tile(self.macro_tile_idx)
+            self.core.apply_action(GuiAction(
+                type="macro", refresh=["macro"],
+                context=GuiMacroEdit,
+                world_idx=self.world_idx,
+                macro_tile_idx=self.macro_tile_idx,
+                macro_tile_sub=i,
+                med_tile_idx=0 if edit else self.select_canvas.selection_idx,
+                prev_med_tile_idx=macro_tile[i]
+            ))
+    
+    def on_select_click(self, idx, edit):
+        world = self.core.data.worlds[self.world_idx]
+        if idx < len(world.med_tiles) + constants.global_med_tiles_count:
+            if edit:
+                self.core.subwindowctl(GuiMedEdit, world_idx=self.world_idx, med_tile_idx=self.select_canvas.selection_idx)
+            else:
+                self.select_canvas.selection_idx = idx
+        self.select_canvas.refresh()
         pass
 
 # main window and gui data
@@ -247,13 +681,11 @@ class Gui:
         self.macro_tile_select_width = 4
         
         # clearable elts
-        self.elts_macro_select = []
         self.elts_object_select = []
         self.elts_stage_horizontal_lines = []
         self.elts_row_lines = [[] for i in range(constants.macro_rows_per_level)]
         self.elts_objects = []
         self.elts_patch_rects = []
-        self.elt_macro_select_rect = None
         self.elt_object_select_rect = None
         self.init()
         
@@ -395,9 +827,14 @@ class Gui:
         
     def soft_quit(self):
         if self.dirty and self.data is not None:
-            if not self.fio_prompt("hack", True):
-                # user aborted save -- don't quit.
+            response = tkinter.messagebox.askyesnocancel("Save before Quitting?", "Unsaved changes have been made. Do you want to save before quitting?")
+            if response is None:
+                # cancel
                 return
+            elif response:
+                if not self.fio_prompt("hack", True):
+                    # user aborted save -- don't quit.
+                    return
         self.window.quit()
     
     def attach_scrollbar(self, canvas, frame):
@@ -497,15 +934,20 @@ class Gui:
         if self.data is None:
             return
         
-        if action.level_idx is not None:
-            # switch to the stage this action was/is applied to
-            # (we only do this so as not to confuse the user -- these lines could be commented out.)
-            if self.level.level_idx != action.level_idx or self.hard != action.hard:
-                self.select_stage(action.level_idx, action.hard)
-        else:
-            # record stage and hardmode so that if this is undone the user will return to here.
-            action.level_idx = self.level.level_idx
-            action.hard = self.hard
+        if action.context is None:
+            if action.level_idx is not None:
+                # switch to the stage this action was/is applied to
+                # (we only do this so as not to confuse the user -- these lines could be commented out.)
+                if self.level.level_idx != action.level_idx or self.hard != action.hard:
+                    self.select_stage(action.level_idx, action.hard)
+            else:
+                # record stage and hardmode so that if this is undone the user will return to here.
+                action.level_idx = self.level.level_idx
+                action.hard = self.hard
+        elif action.context == GuiMacroEdit:
+            self.subwindowctl(GuiMacroEdit, world_idx=action.world_idx, macro_tile_idx=action.macro_tile_idx)
+        elif action.context == GuiMedEdit:
+            self.subwindowctl(GuiMedEdit, world_idx=action.world_idx, med_tile_idx=action.med_tile_idx)
         
         # for convenience
         level = self.level
@@ -549,6 +991,17 @@ class Gui:
                 level.hardmode_patches.remove(patch)
             else:
                 level.hardmode_patches.append(patch)
+        if action.type == "macro":
+            world = self.data.worlds[action.world_idx]
+            macro_tile = world.get_macro_tile(action.macro_tile_idx)
+            macro_tile[action.macro_tile_sub] = action.prev_med_tile_idx if undo else action.med_tile_idx
+        if action.type == "med":
+            world = self.data.worlds[action.world_idx]
+            med_tile = world.get_med_tile(action.med_tile_idx)
+            med_tile[action.med_tile_sub] = action.prev_micro_tile_idx if undo else action.micro_tile_idx
+        if action.type == "med-palette":
+            world = self.data.worlds[action.world_idx]
+            world.med_tile_palettes[action.med_tile_idx] = action.prev_palette_idx if undo else action.palette_idx
             
         if "row" in action.refresh:
             self.refresh_row_tiles(action.macro_row_idx)
@@ -559,6 +1012,17 @@ class Gui:
             self.refresh_objects()
         if "patches" in action.refresh:
             self.refresh_patch_rects()
+        if "macro" in action.refresh:
+            self.subwindowctl(GuiMacroEdit, refresh=True, open=False)
+            self.refresh_on_macro_tile_update(action.macro_tile_idx)
+            self.refresh_title()
+            self.refresh_label() # just in case
+        if "med" in action.refresh:
+            self.subwindowctl(GuiMacroEdit, refresh=True, open=False)
+            self.subwindowctl(GuiMedEdit, refresh=True, open=False)
+            self.refresh_on_med_tile_update(action.med_tile_idx)
+            self.refresh_title()
+            self.refresh_label() # just in case
             
         # we've made a change.
         self.dirty = True
@@ -688,25 +1152,26 @@ class Gui:
         
         # open new subwindow
         if type not in self.subwindows:
+            if "open" in kwargs and not kwargs["open"]:
+                # ...unless "open" is false
+                return
             self.subwindows[type] = type(self)
-            
+        
+        if "open" in kwargs:
+            kwargs.pop("open")
+        
         # ctl it
         self.subwindows[type].ctl(kwargs)
         pass
     
-    def on_macro_click(self, edit, event):
-        if len(self.placable_tiles) == 0:
-            return
-        h = ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1)
-        y = self.get_event_y(event, self.macro_canvas, h)
-        x = clamp_hoi(event.x, 0, (macro_width + 1) * self.macro_tile_select_width)
-        idx = clamp_hoi(int(x // (macro_width + 1)) + int(y / (macro_height + 1)) * self.macro_tile_select_width, 0, len(self.placable_tiles))
-        self.macro_tile_select_id = self.placable_tiles[idx]
-        self.object_select_gid = None
-        if edit:
-            self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx, macro_tile_idx=self.macro_tile_select_id)
-        self.refresh_selection_rect()
-        self.refresh_label()
+    def on_macro_click(self, idx, edit):
+        if idx < len(self.placable_tiles):
+            self.macro_tile_select_id = self.placable_tiles[idx]
+            self.object_select_gid = None
+            if edit:
+                self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx, macro_tile_idx=self.macro_tile_select_id)
+            self.refresh_selection_rect()
+            self.refresh_label()
         
     def on_object_click(self, edit, event):
         if len(self.placable_objects) == 0:
@@ -727,10 +1192,12 @@ class Gui:
     # self.data need not be set yet.
     def init(self):
         self.window = tk.Tk()
-        self.window.iconphoto(True, tk.PhotoImage(file=icon_path))
+        if os.path.exists(icon_path):
+            self.window.iconphoto(True, tk.PhotoImage(file=icon_path))
+        self.window.protocol("WM_DELETE_WINDOW", self.soft_quit)
         
         self.window.bind("<Key>", self.on_keypress)
-        self.blank_image = ImageTk.PhotoImage(image=Image.new('RGB', (4, 4), color='black'))
+        self.blank_image = ImageTk.PhotoImage(image=Image.new('RGB', (8, 8), color='black'))
         
         # menus
         menu = tk.Menu(self.window)
@@ -797,7 +1264,8 @@ class Gui:
         
         windowmenu = tk.Menu(menu, tearoff=0)
         self.windowmenu = windowmenu
-        self.add_menu_command(windowmenu, "Macro Tile Editor", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), None)
+        self.add_menu_command(windowmenu, "Macro Tile Editor", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
+        self.add_menu_command(windowmenu, "Med Tile Editor", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
         menu.add_cascade(label="Window", menu=windowmenu)
         
         helpmenu = tk.Menu(menu, tearoff=0)
@@ -828,12 +1296,9 @@ class Gui:
         stage_canvas.bind("<Button-2>", partial(self.on_stage_click, 2))
         stage_canvas.bind("<Button-3>", partial(self.on_stage_click, 3))
         
-        macro_canvas = tk.Canvas(selector_macro_frame, width=macro_width * self.macro_tile_select_width, height=screenheight, bg="black")
-        self.attach_scrollbar(macro_canvas, selector_macro_frame)
+        macro_canvas = GuiMicroGrid(selector_macro_frame, self, w=macro_width // micro_width * self.macro_tile_select_width, height=screenheight, chunkdim=(macro_width // micro_width, macro_height // micro_height), cb=self.on_macro_click)
+        macro_canvas.divides = [constants.global_macro_tiles_count]
         macro_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
-        macro_canvas.bind("<Button-1>", partial(self.on_macro_click, False))
-        macro_canvas.bind("<Button-3>", partial(self.on_macro_click, True))
-        macro_canvas.bind("<Double-Button-1>", partial(self.on_macro_click, True))
         
         object_canvas = tk.Canvas(selector_objects_frame, width=objwidth, height=screenheight, bg="black")
         self.attach_scrollbar(object_canvas, selector_objects_frame)
@@ -849,8 +1314,7 @@ class Gui:
         
         # canvas images (reused):
         self.stage_micro_dangerous = [[False for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
-        self.stage_micro_images = [[stage_canvas.create_image(x * micro_width, y * micro_height, image=self.blank_image, anchor=tk.NW) for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
-        self.macro_micro_images = [[macro_canvas.create_image(x * micro_width + (x // 4), y * micro_height + (y // 4), image=self.blank_image, anchor=tk.NW) for y in range(0x100 * macro_height // micro_height // self.macro_tile_select_width)] for x in range(self.macro_tile_select_width * 4)]
+        self.stage_micro_images = [[None for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
         self.object_select_images = [object_canvas.create_image(objwidth / 2, objheight / 2 + objheight * y, image=self.blank_image, anchor=tk.CENTER) for y in range(0x100)]
         
         # bottom label
@@ -938,16 +1402,26 @@ class Gui:
         self.refresh_selection_rect()
         
         # refresh the stage view
-        self.refresh_horizontal_lines()
         for i in range(constants.macro_rows_per_level):
-            self.refresh_row_lines(i)
             self.refresh_row_tiles(i)
+            self.refresh_row_lines(i)
+        self.refresh_horizontal_lines()
         self.refresh_objects()
         self.refresh_patch_rects()
         
         # refresh related data
         self.refresh_title()
         self.refresh_label()
+        
+    def refresh_on_macro_tile_update(self, macro_tile_idx):
+        for i in range(constants.macro_rows_per_level):
+            self.refresh_row_tiles(i, macro_tile_idx=macro_tile_idx)
+        self.refresh_tile_select()
+    
+    def refresh_on_med_tile_update(self, macro_tile_idx):
+        for i in range(constants.macro_rows_per_level):
+            self.refresh_row_tiles(i, med_tile_idx=macro_tile_idx)
+        self.refresh_tile_select()
     
     def delete_elements(self, canvas, elements):
         for element in elements:
@@ -955,35 +1429,24 @@ class Gui:
                 canvas.delete(element)
     
     def refresh_tile_select(self):
-        self.delete_elements(self.macro_canvas, self.elts_macro_select)
-        self.elts_macro_select = []
-        
-        # clear images
-        for x in range(self.macro_tile_select_width * macro_width // micro_width):
-            for y in range(0x100 * macro_height // micro_height // self.macro_tile_select_width):
-                self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=self.blank_image)
+        self.macro_canvas.configure(dims=(
+            self.macro_tile_select_width * macro_width // micro_width,
+            ceil_to((len(self.placable_tiles) * macro_height // micro_height) / self.macro_tile_select_width, macro_height // micro_height)
+        ))
+        self.macro_canvas.refresh()
                 
         if self.level is None:
             return
             
         world = self.level.world
         
-        # set scrollable region
-        self.macro_canvas.configure(scrollregion=(0, 0, (macro_width + 1) * self.macro_tile_select_width - 1, ((len(self.placable_tiles) + self.macro_tile_select_width - 1) // self.macro_tile_select_width) * (macro_height + 1) - 1))
+        clear_coords = [(x, y) for x in range(self.macro_canvas.w) for y in range(self.macro_canvas.h)]
         
         # populate
         for macro_sel_idx in range(len(self.placable_tiles)):
             macro_idx = self.placable_tiles[macro_sel_idx]
             macro_y = (macro_sel_idx // self.macro_tile_select_width)
             macro_x = (macro_sel_idx % self.macro_tile_select_width)
-            line_y = macro_y * (macro_height + 1) + macro_height
-            line_x = (macro_x) * (macro_width + 1)
-            
-            divide = (macro_sel_idx - (macro_sel_idx % self.macro_tile_select_width) + self.macro_tile_select_width == constants.global_macro_tiles_count)
-            
-            # add line
-            self.elts_macro_select.append(self.macro_canvas.create_line(line_x, line_y, line_x + macro_width, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
-            self.elts_macro_select.append(self.macro_canvas.create_line(line_x + macro_width, line_y - macro_height, line_x + macro_width, line_y + 1, fill=linecol))
             
             # set images
             macro_tile = world.get_macro_tile(macro_idx)
@@ -996,9 +1459,15 @@ class Gui:
                     y = (i // 2) * 2 + (j // 2) + macro_y * 4
                     palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
                     img = self.micro_images[world.idx][palette_idx][micro_tile_idx][self.zoom]
-                    self.macro_canvas.itemconfig(self.macro_micro_images[x][y], image=img)
+                    self.macro_canvas.set_tile_image(x, y, img)
+                    if (x, y) in clear_coords:
+                        clear_coords.remove((x, y))
+        self.macro_canvas.clear_from(len(self.placable_tiles))
+        
+        for clear_coord in clear_coords:
+            self.macro_canvas.set_tile_image(clear_coord[0], clear_coord[1], self.blank_image)
+            
                     
-    
     def refresh_object_select(self):
         self.delete_elements(self.object_canvas, self.elts_object_select)
         self.elts_object_select = []
@@ -1026,12 +1495,16 @@ class Gui:
         
     def refresh_selection_rect(self):
         # clear previous
-        if self.elt_macro_select_rect is not None:
-            self.macro_canvas.delete(self.elt_macro_select_rect)
         if self.elt_object_select_rect is not None:
             self.object_canvas.delete(self.elt_object_select_rect)
-        self.elt_macro_select_rect = None
         self.elt_object_select_rect = None
+        
+        # macro canvas handles its own selection rect
+        if self.macro_tile_select_id is not None:
+            self.macro_canvas.selection_idx = self.placable_tiles.index(self.macro_tile_select_id)
+        else:
+            self.macro_canvas.selection_idx = None
+        self.macro_canvas.refresh()
         
         # rectangle properties
         rect_colstr = selcol
@@ -1044,17 +1517,6 @@ class Gui:
             y = i * objheight
             self.elt_object_select_rect = self.object_canvas.create_rectangle(
                 rect_margin, y + rect_margin, objwidth - rect_margin, y + objheight - rect_margin,
-                width=rect_width,
-                outline=rect_colstr
-             )
-             
-        # place the selection rect (if tile selected)
-        if self.macro_tile_select_id is not None:
-            i = self.placable_tiles.index(self.macro_tile_select_id)
-            y = (i // self.macro_tile_select_width) * (macro_height + 1)
-            x = (i % self.macro_tile_select_width) * (macro_width + 1)
-            self.elt_macro_select_rect = self.macro_canvas.create_rectangle(
-                x + rect_margin, y + rect_margin, x + macro_width - rect_margin, y + macro_height - rect_margin,
                 width=rect_width,
                 outline=rect_colstr
              )
@@ -1109,16 +1571,23 @@ class Gui:
                     self.stage_canvas.create_line(seam_x, y, seam_x, y + macro_height, fill=seamcol)
                 )
         
-    def refresh_row_tiles(self, row_idx):
+    def refresh_row_tiles(self, row_idx, **kwargs):
+        macro_tile_idx_filter = kwargs["macro_tile_idx"] if "macro_tile_idx" in kwargs else None
+        med_tile_idx_filter = kwargs["med_tile_idx"] if "med_tile_idx" in kwargs else None
         level = self.level
         if level is not None:
             micro_y = (constants.macro_rows_per_level - row_idx - 1) * (macro_height // micro_height)
-            med_tile_rows = level.produce_med_tiles(self.hard, range(row_idx, row_idx + 1))
-            
+            med_tile_rows, macro_tile_idxs = level.produce_med_tiles(self.hard, range(row_idx, row_idx + 1))
+            if macro_tile_idx_filter is not None and macro_tile_idx_filter not in macro_tile_idxs:
+                # skip row if row does not contain the filter macro tile
+                return
             for med_tile_row_idx in range(2):
                 med_tile_row = med_tile_rows[med_tile_row_idx]
                 for med_tile_col_idx in range(len(med_tile_row)):
                     med_tile_idx = med_tile_row[med_tile_col_idx]
+                    if med_tile_idx_filter is not None and med_tile_idx != med_tile_idx_filter:
+                        # skip med tile if it is not the filter med tile
+                        continue
                     med_tile = level.world.get_med_tile(med_tile_idx)
                     palette_idx = level.world.get_med_tile_palette_idx(med_tile_idx, self.hard)
                     for i in range(4):
@@ -1127,7 +1596,12 @@ class Gui:
                         y = micro_y + (1 - med_tile_row_idx) * 2 + (i // 2)
                         img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx][self.zoom]
                         self.stage_micro_dangerous[x][y] = micro_tile_idx in constants.dangerous_micro_tiles
-                        self.stage_canvas.itemconfig(self.stage_micro_images[x][y], image=img)
+                        if self.stage_micro_images[x][y] is None:
+                            self.stage_micro_images[x][y] = self.stage_canvas.create_image(
+                                x * micro_width, y * micro_height, image=img, anchor=tk.NW
+                            )
+                        else:
+                            self.stage_canvas.itemconfig(self.stage_micro_images[x][y], image=img)
         
     def refresh_objects(self):
         # clear previous

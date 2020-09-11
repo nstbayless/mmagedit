@@ -1,11 +1,12 @@
 from util import *
 
-mmname = "MMagEdit V1.4"
-mmfmt = 202008311218
+mmname = "MMagEdit V1.5"
+mmrepo = "https://github.com/nstbayless/mmagedit"
+mmfmt = 202009091825
 mminfo = """
 MMagEdit created by NaOH
 
-Version 1.4: 31 August 2020
+Version 1.5: 09 September 2020
 
 Special thanks to -7 (negativeseven) and Julius.
 
@@ -20,19 +21,27 @@ ram_world_macro_tiles_table = 0xaf10
 ram_mirror_pairs_table = 0xaf00
 ram_world_mirror_index_table = 0xaf0c
 ram_sprite_palette_table = 0xbd5f
+ram_chest_table = 0xC45B
+ram_chest_table_length = 0xD
+
+ram_object_hp_table = 0xBD9A # first entry is likely omitted.
+ram_object_hp_table_length = 0x19 # speculative
 
 ram_music_table = 0xdaa3 # music for each level
 ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait command waits for.
 ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
 
+ram_title_screen = 0xc5a4
+
 # space available
 ram_range_music = [0x8000, 0x860A]
+ram_range_levels = [0xdaec, 0xe6c3]
 
 # ~ special mods ~
 ram_mod_bounce = 0xd5d7
 ram_mod_bounce_replacement = [0x00]
-ram_mod_no_auto_scroll = [0x8d15, 0x8d91]
-ram_mod_no_auto_scroll_replacement = [[0x00, 0x44], [0xF0, 0x09, 0xE0, 0x0F, 0x90, 0x05]]
+ram_mod_no_auto_scroll = [0x8d81]
+ram_mod_no_auto_scroll_replacement = [[0xA5, 0xD0, 0x88, 0xF0, 0x05, 0xD9, 0x15, 0x8D, 0x90, 0x0F, 0xE0, 0x0F, 0x90, 0x0D, 0xA5, 0xD0, 0xF0, 0x09, 0xC6, 0xD0, 0xF0, 0x05, 0xC6, 0xD0, 0x60, 0xE6, 0xD0, 0x60]]
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4
@@ -195,7 +204,7 @@ sprite_palettes = [
     [0xf, 0x19, 0x29, 0x20]
 ]
 
-# in rgb format
+# this is the basic NES palette (rgb format)
 palette = [
     0x7C7C7C,
     0x0000FC,
@@ -283,7 +292,7 @@ object_names = [
     ["beer", "barrel-thrower", "beer-bros"],
     
     # 6
-    [""], # ??
+    ["boss-final", "boss-5"], # eye boss, but in s pace.
     
     # 7
     ["goat"],
@@ -310,13 +319,13 @@ object_names = [
     ["skeleton", "skel"],
     
     # f
-    ["i-0"], # diamond item?
+    ["i-gem-blue"], # blue diamond
     
     # 10
     ["p-barrel"], # projectile
     
     # 11
-    [""], # star that disappears?
+    ["i-warp"], # swaps player positions
     
     # 12
     ["bat"], # resting bat
@@ -328,13 +337,13 @@ object_names = [
     ["goblin", "gbln"],
     
     # 15
-    ["i-1"], # diamond item?
+    ["i-gem-green"], # green diamond item
     
     # 16
     ["abat", "active-bat"],
     
     # 17
-    ["i-2"], # points orb?
+    ["i-orb"], # points orb
     
     # 18
     ["eye", "ball", "eyeball"],
@@ -367,8 +376,10 @@ object_names = [
     ["spawn", "mage", "player"],
     
     # 22
-    [""],
-    [""],
+    ["fx-destroyable-block-explosion"],
+    
+    # 23
+    ["fx-explosion"],
     
     # 24
     ["boss-staff", "boss-knight-staff", "boss-3-staff"],
@@ -383,10 +394,18 @@ object_names = [
     
     # 29
     [""],
-    [""],
-    [""],
-    [""],
-    [""],
+    
+    # 2A
+    ["i-heart"], # 1-up
+    
+    # 2B
+    ["i-fairy"],
+    
+    # 2C
+    ["eye-inv"], # invincible eye
+    
+    # 2D
+    ["dog"], # yes
     
     # 2e
     ["pipe-A"],
@@ -405,6 +424,30 @@ object_names = [
     
     # 33
     ["pipe-C"],
+    
+    # 34
+    ["p-bone"], # bone projectile
+    
+    # 35
+    [""],
+    
+    # 36
+    ["relic"],
+    
+    # 37
+    [""],
+    
+    # 38
+    ["p-fork"],
+    
+    # 39
+    [""],
+    
+    # 3A
+    [""],
+    
+    # 3B
+    ["p-bubble"]
 ]
 
 while len(object_names) < 0x100:
@@ -552,3 +595,13 @@ for names in object_names:
     
 for i in range(0x100):
     object_names_to_gid["unk-" + hb(i)] = i
+    
+# set object config
+import objects.cfg_hp, objects.obj_0E
+
+# first 0x19 objects have hitpoints
+for i in range(1, 0x19):
+    object_data[i]["config"] = objects.cfg_hp.ConfigHP
+
+# skeleton has special config known
+object_data[0xE]["config"] = objects.obj_0E.Config0E

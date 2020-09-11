@@ -1,12 +1,12 @@
 from util import *
 
-mmname = "MMagEdit V1.5"
+mmname = "MMagEdit V1.6"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009091825
+mmfmt = 202009111710
 mminfo = """
 MMagEdit created by NaOH
 
-Version 1.5: 09 September 2020
+Version 1.6: 11 September 2020
 
 Special thanks to -7 (negativeseven) and Julius.
 
@@ -203,6 +203,10 @@ sprite_palettes = [
     [0xf, 0x1c, 0x2c, 0x20],
     [0xf, 0x19, 0x29, 0x20]
 ]
+
+greyscale_palette = [0x0f, 0x0, 0x10, 0x20] # a simple grayscale palette
+bg_palette = [0x0f, 0x0c, 0x1c, 0x20]
+sprite_palette = [0xf, 0x08, 0x26, 0x20]
 
 # this is the basic NES palette (rgb format)
 palette = [

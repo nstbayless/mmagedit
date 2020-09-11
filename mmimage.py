@@ -33,7 +33,17 @@ def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flip
                     colrgb = (colrgb[0], colrgb[1], min(0xff, colrgb[2] + 0x40), 0x50)
             
             img.putpixel((7 - x + offset[0] if flipx else x + offset[0], (7 - y if flipy else y) + offset[1]), colrgb)
-    
+
+def produce_chr_sheet(data):
+    img = Image.new('RGB', (256, 128))
+    for b in range(2):
+        palette = [constants.bg_palette, constants.sprite_palette][b]
+        for y in range(16):
+            for x in range(16):
+                address = x * 0x10 + y * 0x100 + b * 0x1000
+                chr_to_img(data, address, img, palette, (x * 0x8 + b * 0x80, y * 0x8))
+    return img
+
 def produce_object_images(data, semi=False):
     object_images = []
     for object_data in constants.object_data:
@@ -44,7 +54,7 @@ def produce_object_images(data, semi=False):
             width = 8 * len(chr[0])
             img = Image.new('RGBA', (width, height))
             
-            palette = [0x0f, 0x0, 0x10, 0x20] # a simple grayscale palette
+            palette = constants.greyscale_palette
             if "palette" in object_data:
                 palette = constants.sprite_palettes[object_data["palette"]]
             
@@ -107,6 +117,16 @@ def produce_micro_tile_images(world, hard=False):
 def export_images(data, path="."):
     if not os.path.exists(path):
         os.path.makedirs(path)
+    
+    # export chr
+    outfile = "mm-chr.png"
+    print("exporting", outfile)
+    outfile = os.path.join(path, outfile)
+    chr_image = produce_chr_sheet(data)
+    chr_image.save(outfile)
+
+
+    # export levels
     for level in data.levels:
         for hard in [False, True]:
             outfile = "mm-" + str(level.world_idx + 1) + "-" + str(level.world_sublevel + 1) + ("h" if hard else "") + ".png"

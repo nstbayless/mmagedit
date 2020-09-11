@@ -41,7 +41,7 @@ selcol = constants.meta_colour_str
 patchcol = constants.meta_colour_str
 objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str_b}
 
-zoom_levels = [1]
+zoom_levels = [2]
 
 resource_dir = os.path.dirname(os.path.realpath(__file__))
 icon_path = os.path.join(resource_dir, "icon.png")
@@ -90,6 +90,10 @@ class GuiMicroGrid(tk.Canvas):
         self.bind("<Button-3>", partial(self.on_click_gui, True))
         self.bind("<Double-Button-1>", partial(self.on_click_gui, True))
         
+    def refresh_zoom(self):
+        self.micro_images = []
+        self.refresh()
+        
     def on_click_gui(self, edit, event):
         if self.click_cb is not None:
             chunkdim = (1, 1) if self.chunkdim is None else self.chunkdim
@@ -98,10 +102,10 @@ class GuiMicroGrid(tk.Canvas):
             
             # convert to microtile coordinates
             if self.chunkdim is not None:
-                x -= (x // micro_width) // self.chunkdim[0]
-                y -= (y // micro_width) // self.chunkdim[1]
-            x //= micro_width
-            y //= micro_height
+                x -= (x // (micro_width * self.core.zoom())) // self.chunkdim[0]
+                y -= (y // (micro_width * self.core.zoom())) // self.chunkdim[1]
+            x //= micro_width * self.core.zoom()
+            y //= micro_height * self.core.zoom()
             
             # convert to chunkdim coordinates
             x //= chunkdim[0]
@@ -119,8 +123,8 @@ class GuiMicroGrid(tk.Canvas):
         self.calcdims()
         
     def calcdims(self):
-        w = micro_width * self.w
-        h = micro_height * self.h
+        w = micro_width * self.w * self.core.zoom()
+        h = micro_height * self.h * self.core.zoom()
         
         if self.chunkdim is not None:
             w += self.w // self.chunkdim[0] - 1
@@ -139,8 +143,8 @@ class GuiMicroGrid(tk.Canvas):
         for col in self.micro_images:
             while len(col) < h:
                 y = len(col)
-                xp = x * micro_width
-                yp = y * micro_height
+                xp = x * micro_width * self.core.zoom()
+                yp = y * micro_height * self.core.zoom()
                 if self.chunkdim is not None:
                     xp += x // self.chunkdim[0]
                     yp += y // self.chunkdim[1]
@@ -175,12 +179,12 @@ class GuiMicroGrid(tk.Canvas):
         # lines
         if self.chunkdim is not None:
             for x in range(self.w // self.chunkdim[0]):
-                px = (x + 1) * micro_width * self.chunkdim[0] + x
+                px = (x + 1) * micro_width * self.chunkdim[0] * self.core.zoom() + x
                 self.clear_elts.append(
                     self.create_line(px, 0, px, ph, fill=linecol)
                 )
                 for y in range(self.h // self.chunkdim[1]):
-                    py = (y + 1) * micro_height * self.chunkdim[1] + y
+                    py = (y + 1) * micro_height * self.chunkdim[1] * self.core.zoom() + y
                     self.clear_elts.append(
                         self.create_line(0, py, pw, py, fill=linecol)
                     )
@@ -193,10 +197,10 @@ class GuiMicroGrid(tk.Canvas):
             x = chunkdim[0] * (divide % (self.w // chunkdim[0]))
             y = chunkdim[1] * (divide // (self.w // chunkdim[0]))
             
-            px = x * micro_width
-            py = y * micro_height
+            px = x * micro_width * self.core.zoom()
+            py = y * micro_height * self.core.zoom()
             
-            divpy = py + micro_height * chunkdim[1]
+            divpy = py + micro_height * chunkdim[1] * self.core.zoom()
             if self.chunkdim is not None:
                 px += x // chunkdim[0]
                 py += y // chunkdim[1]
@@ -218,8 +222,8 @@ class GuiMicroGrid(tk.Canvas):
         if self.selection_idx is not None:
             x = (self.selection_idx % (self.w // chunkdim[0])) * chunkdim[0]
             y = (self.selection_idx // (self.w // chunkdim[0])) * chunkdim[1]
-            px = x * micro_width
-            py = y * micro_height
+            px = x * micro_width * self.core.zoom()
+            py = y * micro_height * self.core.zoom()
             if self.chunkdim is not None:
                 px += x // chunkdim[0]
                 py += y // chunkdim[1]
@@ -228,8 +232,8 @@ class GuiMicroGrid(tk.Canvas):
                 self.create_rectangle(
                     px + rect_margin,
                     py + rect_margin,
-                    px + micro_width * chunkdim[0] - rect_margin, 
-                    py + micro_height * chunkdim[1] - rect_margin,
+                    px + micro_width * chunkdim[0] * self.core.zoom() - rect_margin, 
+                    py + micro_height * chunkdim[1] * self.core.zoom() - rect_margin,
                     width=2,
                     outline=selcol
                 )
@@ -350,7 +354,7 @@ class GuiMedEdit:
         self.select_canvas = GuiMicroGrid(mainframe, self.core, height=256, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False)
         self.select_canvas.pack(side=tk.RIGHT)
         
-        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=med_height, dims=(med_width // micro_width, med_height // micro_height), scroll=False, cb=self.on_place_click)
+        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=med_height * self.core.zoom(), dims=(med_width // micro_width, med_height // micro_height), scroll=False, cb=self.on_place_click)
         self.place_canvas.pack()
         
         self.info_label = ttk.Label(mainframe)
@@ -367,7 +371,6 @@ class GuiMedEdit:
         if self.select_canvas is None:
             return
         world = self.core.data.worlds[self.world_idx]
-        zoom_idx = 0
         
         palette_idx = world.get_med_tile_palette_idx(self.med_tile_idx, self.hard)
         
@@ -379,7 +382,7 @@ class GuiMedEdit:
             y = (j >= 2)
             
             # tile
-            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom_idx]
+            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
             self.place_canvas.set_tile_image(x, y, img)
         
         self.select_canvas.configure(dims=(16, 16))
@@ -389,7 +392,7 @@ class GuiMedEdit:
             y = (micro_tile_idx // 16)
             
             # set images
-            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom_idx]
+            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
             self.select_canvas.set_tile_image(x, y, img)
         self.select_canvas.refresh()
         
@@ -535,7 +538,7 @@ class GuiMacroEdit:
         self.select_canvas = GuiMicroGrid(mainframe, self.core, height=height, chunkdim=(2, 2), cb=self.on_select_click)
         self.select_canvas.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
         
-        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=macro_height, dims=(macro_width // micro_width * 2, macro_height // micro_height), scroll=False, cb=self.on_place_click)
+        self.place_canvas = GuiMicroGrid(mainframe, self.core, height=macro_height * self.core.zoom(), dims=(macro_width // micro_width * 2, macro_height // micro_height), scroll=False, cb=self.on_place_click)
         self.place_canvas.pack()
         
         self.info_label = ttk.Label(mainframe)
@@ -568,11 +571,11 @@ class GuiMacroEdit:
                 mirrorx = 4 + ((i + 1) % 2) * 2 + (j % 2)
                 
                 # tile
-                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
+                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
                 self.place_canvas.set_tile_image(x, y, img)
                 
                 # mirror tile
-                img = self.core.micro_images[world.idx][mirror_palette_idx][mirror_micro_tile_idx][zoom]
+                img = self.core.micro_images[world.idx][mirror_palette_idx][mirror_micro_tile_idx]
                 self.place_canvas.set_tile_image(mirrorx, y, img)
         
         self.select_canvas.divides = [constants.global_med_tiles_count, 0x1e, world.max_symmetry_idx]
@@ -592,7 +595,7 @@ class GuiMacroEdit:
                 micro_tile_idx = world.get_micro_tile(med_tile[i], self.hard)
                 x = i % 2 + med_x * 2
                 y = i // 2 + med_y * 2
-                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx][zoom]
+                img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
                 self.select_canvas.set_tile_image(x, y, img)
         self.select_canvas.refresh()
         
@@ -665,6 +668,7 @@ class Gui:
         self.show_patches = True
         self.show_objects = True
         self.show_crosshairs = True
+        self.show_mirror = True
         self.placable_objects = []
         self.placable_tiles = []
         self.menu_commands = dict()
@@ -673,9 +677,9 @@ class Gui:
         self.level = None
         self.stage_idx = 0
         self.hard = False
-        self.zoom = 0
         self.flipx = False
         self.flipy = False
+        self.zoom_idx = 0
         
         # preferences
         self.macro_tile_select_width = 4
@@ -688,6 +692,9 @@ class Gui:
         self.elts_patch_rects = []
         self.elt_object_select_rect = None
         self.init()
+    
+    def zoom(self):
+        return int(max(0, self.zoom_idx) + 1)
         
     # perform fileio, possibly ask for prompt (if auto is True, may not ask.)
     def fio_prompt(self, type, save=False, auto=False):
@@ -700,9 +707,9 @@ class Gui:
         title = "select " + type
         if type == "rom":
             if save:
-                title = "select base ROM"
-            else:
                 title = "export to ROM"
+            else:
+                title = "select base ROM"
             promptfn = partial(promptfn, filetypes=[("NES Rom", ".nes")])
         if type == "hack":
             promptfn = partial(promptfn, filetypes=[("MMagEdit Hack", ".txt")])
@@ -821,6 +828,27 @@ class Gui:
             tkinter.messagebox.showerror("Internal Error", "An internal error occurred during the I/O process:\n\n" + str(e))
         return False
         
+    def set_zoom(self, zoom_idx):
+        
+        if zoom_idx == self.zoom_idx:
+            return
+        
+        # close subwindows
+        while len(self.subwindows) > 0:
+            for subwindow in self.subwindows:
+                self.subwindows[subwindow].on_close()
+                # FIXME: weird control flow. No need for the nested loop.
+                break
+            
+        self.zoom_idx = zoom_idx
+        self.stage_micro_images = [[None for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
+        self.stage_mirror_cover_images = [[None for x in range(level_width // med_width)] for y in range(level_height // macro_height)]
+        self.object_select_images = [None for y in range(0x100)]
+        self.stage_canvas.configure(width=screenwidth * self.zoom(), scrollregion=(0, 0, level_width * self.zoom(), level_height * self.zoom()))
+        self.object_canvas.configure(width=objwidth * self.zoom())
+        self.macro_canvas.refresh_zoom()
+        self.refresh_all()
+        
     def refresh_all(self):
         self.refresh_chr()
         self.select_stage(0)
@@ -861,6 +889,14 @@ class Gui:
             for i in range(constants.macro_rows_per_level):
                 self.refresh_row_lines(i)
             self.refresh_horizontal_lines()
+            if self.show_crosshairs and self.show_lines:
+                self.refresh_objects() # necessary to prevent crosshairs from falling behind grid
+        if "show_mirror" in kw:
+            self.show_mirror = kw["show_mirror"]
+            for i in range(constants.macro_rows_per_level):
+                self.refresh_row_lines(i)
+            if self.show_crosshairs and self.show_lines:
+                self.refresh_objects() # necessary to prevent crosshairs from falling behind grid
         if "show_patches" in kw and self.hard:
             self.show_patches = kw["show_patches"]
             self.refresh_patch_rects()
@@ -1039,8 +1075,8 @@ class Gui:
         shift = event.state & 5 != 0 # actually checks ctrl and shift
         action = self.mouse_button_actions[3 if shift else button - 1]
         
-        y = self.get_event_y(event, self.stage_canvas, level_height)
-        x = event.x
+        y = self.get_event_y(event, self.stage_canvas, level_height * self.zoom()) / self.zoom()
+        x = event.x / self.zoom()
         
         # object placement
         place_duplicates = False
@@ -1176,7 +1212,7 @@ class Gui:
     def on_object_click(self, edit, event):
         if len(self.placable_objects) == 0:
             return
-        y = self.get_event_y(event, self.object_canvas, len(self.placable_objects) * (macro_height + 1))
+        y = self.get_event_y(event, self.object_canvas, len(self.placable_objects) * (objheight * self.zoom())) / self.zoom()
         idx = clamp_hoi(y / (objheight), 0, len(self.placable_objects))
         self.macro_tile_select_id = None
         self.object_select_gid = self.placable_objects[idx]
@@ -1197,7 +1233,7 @@ class Gui:
         self.window.protocol("WM_DELETE_WINDOW", self.soft_quit)
         
         self.window.bind("<Key>", self.on_keypress)
-        self.blank_image = ImageTk.PhotoImage(image=Image.new('RGB', (8, 8), color='black'))
+        self.blank_image = ImageTk.PhotoImage(image=Image.new('RGBA', (8, 8), color=(0, 0, 0, 0)))
         
         # menus
         menu = tk.Menu(self.window)
@@ -1259,6 +1295,12 @@ class Gui:
         self.menu_view_crosshairs = self.add_menu_command(viewmenu, "Object Crosshairs", lambda: self.ctl(show_crosshairs=not self.show_crosshairs), "C")
         self.add_menu_command(viewmenu, "Grid", lambda: self.ctl(show_lines=not self.show_lines), "G")
         self.menu_view_patches = self.add_menu_command(viewmenu, "Patches", lambda: self.ctl(show_patches=not self.show_patches), "P")
+        self.add_menu_command(viewmenu, "Mirror Shading", lambda: self.ctl(show_mirror=not self.show_mirror), "F")
+        
+        viewmenu.add_separator()
+        self.add_menu_command(viewmenu, "Zoom 1x", lambda: self.set_zoom(0), "Ctrl+1")
+        self.add_menu_command(viewmenu, "Zoom 2x", lambda: self.set_zoom(1), "Ctrl+2")
+        self.add_menu_command(viewmenu, "Zoom 3x", lambda: self.set_zoom(2), "Ctrl+3")
         
         menu.add_cascade(label="View", menu=viewmenu)
         
@@ -1289,7 +1331,7 @@ class Gui:
         selector_objects_frame.pack(side = tk.RIGHT, fill=tk.Y, expand=True)
         
         # canvases
-        stage_canvas = tk.Canvas(stage_frame, width=screenwidth, height=screenheight, scrollregion=(0, 0, level_width, level_height), bg="black")
+        stage_canvas = tk.Canvas(stage_frame, width=screenwidth * self.zoom(), height=screenheight, scrollregion=(0, 0, level_width * self.zoom(), level_height * self.zoom()), bg="black")
         self.attach_scrollbar(stage_canvas, stage_frame)
         stage_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
         stage_canvas.bind("<Button-1>", partial(self.on_stage_click, 1))
@@ -1315,7 +1357,8 @@ class Gui:
         # canvas images (reused):
         self.stage_micro_dangerous = [[False for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
         self.stage_micro_images = [[None for y in range(level_height // micro_height)] for x in range(level_width // micro_width)]
-        self.object_select_images = [object_canvas.create_image(objwidth / 2, objheight / 2 + objheight * y, image=self.blank_image, anchor=tk.CENTER) for y in range(0x100)]
+        self.stage_mirror_cover_images = [[None for x in range(level_width // med_width)] for y in range(level_height // macro_height)]
+        self.object_select_images = [None for y in range(0x100)]
         
         # bottom label
         self.label = tk.Label(self.window)
@@ -1330,6 +1373,10 @@ class Gui:
     # this is quite expensive... progress bar? coroutine?
     def refresh_chr(self):
         assert(self.data)
+        
+        # image for covering mirrored side
+        self.mirror_cover_image = Image.new('RGBA', (med_width * self.zoom(), macro_height * self.zoom()), color=(0xa0, 0xa0, 0xa0, 0xc0))
+        self.mirror_cover_image = ImageTk.PhotoImage(image=self.mirror_cover_image)
         
         # object images
         # list [flip][gid]
@@ -1348,20 +1395,21 @@ class Gui:
                         img = ImageOps.mirror(img)
                     if flipy:
                         img = ImageOps.flip(img)
+                    if self.zoom() != 1:
+                        img = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()))
                     self.object_images[j][i] = ImageTk.PhotoImage(image=img)
         
         # micro-tile images
         # list [world][palette_idx][id]
-        self.micro_images = [[[[None for zoom in range(len(zoom_levels))] for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
+        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
         for world_idx in range(len(self.data.worlds)):
             world = self.data.worlds[world_idx]
             images = [mmimage.produce_micro_tile_images(world, hard) for hard in [False, True]]
             for palette_idx in range(len(world.palettes)):
                 for id in range(0x100):
                     img = images[palette_idx // 4][palette_idx % 4][id]
-                    for zoom in range(len(zoom_levels)):
-                        imgzoom = ImageOps.fit(img, (img.width * zoom_levels[zoom], img.height * zoom_levels[zoom]))
-                        self.micro_images[world_idx][palette_idx][id][zoom] = ImageTk.PhotoImage(image=imgzoom)
+                    imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()))
+                    self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=imgzoom)
     
     def select_stage(self, stage_idx, hard=False):
         if self.data is None:
@@ -1458,7 +1506,7 @@ class Gui:
                     x = (i % 2) * 2 + (j % 2) + macro_x * 4
                     y = (i // 2) * 2 + (j // 2) + macro_y * 4
                     palette_idx = world.get_med_tile_palette_idx(med_tile_idx, self.hard)
-                    img = self.micro_images[world.idx][palette_idx][micro_tile_idx][self.zoom]
+                    img = self.micro_images[world.idx][palette_idx][micro_tile_idx]
                     self.macro_canvas.set_tile_image(x, y, img)
                     if (x, y) in clear_coords:
                         clear_coords.remove((x, y))
@@ -1466,7 +1514,6 @@ class Gui:
         
         for clear_coord in clear_coords:
             self.macro_canvas.set_tile_image(clear_coord[0], clear_coord[1], self.blank_image)
-            
                     
     def refresh_object_select(self):
         self.delete_elements(self.object_canvas, self.elts_object_select)
@@ -1474,21 +1521,24 @@ class Gui:
         
         # clear images
         for y in range(0x100):
-            self.object_canvas.itemconfig(self.object_select_images[y], image=self.blank_image)
+            if self.object_select_images[y] is None:
+                self.object_select_images[y] = self.object_canvas.create_image(objwidth / 2 * self.zoom(), objheight / 2 * self.zoom() + objheight * y * self.zoom(), image=self.blank_image, anchor=tk.CENTER)
+            else:
+                self.object_canvas.itemconfig(self.object_select_images[y], image=self.blank_image)
 
         # set scrollable region
-        self.object_canvas.configure(scrollregion=(0, 0, objwidth, len(self.placable_objects) * objheight - 1))
+        self.object_canvas.configure(scrollregion=(0, 0, objwidth * self.zoom(), len(self.placable_objects) * objheight * self.zoom() - self.zoom()))
 
         flip_idx = (2 if self.flipy else 0) + (1 if self.flipx else 0)
 
         for i in range(len(self.placable_objects)):
             gid = self.placable_objects[i]
-            line_y = i * objheight + objheight
+            line_y = (i * objheight + objheight) * self.zoom()
             
             divide = i == 0xf
             
             # place line
-            self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth, line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
+            self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth * self.zoom(), line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
             
             # set object
             self.object_canvas.itemconfig(self.object_select_images[i], image=self.object_images[flip_idx][gid])
@@ -1508,15 +1558,15 @@ class Gui:
         
         # rectangle properties
         rect_colstr = selcol
-        rect_margin = 2
+        rect_margin = 2 * self.zoom()
         rect_width = 2
         
         # place the selection rect (if object selected)
         if self.object_select_gid is not None:
             i = self.placable_objects.index(self.object_select_gid)
-            y = i * objheight
+            y = i * objheight * self.zoom()
             self.elt_object_select_rect = self.object_canvas.create_rectangle(
-                rect_margin, y + rect_margin, objwidth - rect_margin, y + objheight - rect_margin,
+                rect_margin, y + rect_margin, objwidth * self.zoom() - rect_margin, y + objheight * self.zoom() - rect_margin,
                 width=rect_width,
                 outline=rect_colstr
              )
@@ -1531,18 +1581,19 @@ class Gui:
                 y = i if top else level_height - i - 1
                 self.elts_stage_horizontal_lines.append(
                     self.stage_canvas.create_line(
-                        0, y, level_width, y,
-                        fill="black"
+                        0, y * self.zoom(), level_width * self.zoom(), y * self.zoom(),
+                        fill="black",
+                        width=self.zoom()
                     )
                 )
         
         # horizontal grid lines
         if self.show_lines:
             for i in range(constants.macro_rows_per_level - 1):
-                y = level_height - macro_height * (i + 1)
+                y = (level_height - macro_height * (i + 1)) * self.zoom()
                 self.elts_stage_horizontal_lines.append(
                     self.stage_canvas.create_line(
-                        0, y, level_width, y,
+                        0, y, level_width * self.zoom(), y,
                         fill=gridcol
                     )
                 )
@@ -1551,24 +1602,44 @@ class Gui:
         self.delete_elements(self.stage_canvas, self.elts_row_lines[row_idx])
         self.elts_row_lines[row_idx] = []
         
-        if self.show_lines and self.level is not None:
-            y = level_height - macro_height * row_idx - macro_height
+        if self.level is not None:
+            y = (level_height - macro_height * row_idx - macro_height) * self.zoom()
             macro_row = self.level.macro_rows[row_idx]
             seam = macro_row.seam
-            seam_x = med_width * seam
+            seam_x = (med_width * seam) * self.zoom()
+            
+            # place mirror over-images
+            mirror_cover_row = self.stage_mirror_cover_images[row_idx]
+            for i in range(len(mirror_cover_row)):
+                if mirror_cover_row[i] is None:
+                    mirror_cover_row[i] = self.stage_canvas.create_image(
+                        i * self.zoom() * med_width,
+                        y,
+                        image=self.blank_image,
+                        anchor=tk.NW
+                    )
+                if (i - seam + (level_width // med_width)) % (level_width // med_width) >= (level_width // med_width // 2) and self.show_mirror:
+                    self.stage_canvas.itemconfig(mirror_cover_row[i], image=self.mirror_cover_image)
+                else:
+                    self.stage_canvas.itemconfig(mirror_cover_row[i], image=self.blank_image)
+            
+            if not self.show_lines:
+                return
             
             # place thin vertical lines
             for i in range(level_width // macro_width):
-                x = (2 * i + (seam % 2)) * med_width
-                if x < level_width and x != seam_x:
+                x = (2 * i + (seam % 2)) * med_width * self.zoom()
+                if x < level_width * self.zoom() and x != seam_x:
                     self.elts_row_lines[row_idx].append(
-                        self.stage_canvas.create_line(x, y, x, y + macro_height, fill=gridcol)
+                        self.stage_canvas.create_line(
+                            x, y, x, y + macro_height * self.zoom(), fill=gridcol
+                        )
                     )
             
             # place seam
             if seam != 0:
                 self.elts_row_lines[row_idx].append(
-                    self.stage_canvas.create_line(seam_x, y, seam_x, y + macro_height, fill=seamcol)
+                    self.stage_canvas.create_line(seam_x, y, seam_x, y + macro_height * self.zoom(), fill=seamcol, width=self.zoom())
                 )
         
     def refresh_row_tiles(self, row_idx, **kwargs):
@@ -1594,11 +1665,11 @@ class Gui:
                         micro_tile_idx = level.world.get_micro_tile(med_tile[i], self.hard)
                         x = med_tile_col_idx * 2 + (i % 2)
                         y = micro_y + (1 - med_tile_row_idx) * 2 + (i // 2)
-                        img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx][self.zoom]
+                        img = self.micro_images[level.world_idx][palette_idx][micro_tile_idx]
                         self.stage_micro_dangerous[x][y] = micro_tile_idx in constants.dangerous_micro_tiles
                         if self.stage_micro_images[x][y] is None:
                             self.stage_micro_images[x][y] = self.stage_canvas.create_image(
-                                x * micro_width, y * micro_height, image=img, anchor=tk.NW
+                                x * micro_width * self.zoom(), y * micro_height * self.zoom(), image=img, anchor=tk.NW
                             )
                         else:
                             self.stage_canvas.itemconfig(self.stage_micro_images[x][y], image=img)
@@ -1624,12 +1695,12 @@ class Gui:
                 img = self.object_images[flip_idx][obj.gid]
 
                 offset = obj_data["offset"] if "offset" in obj_data else (0, 0)
-                offset = (offset[0] - (img.width() // 2), offset[1] + 8 - (img.height()))
+                offset = (offset[0] * self.zoom() - (img.width() // 2), offset[1] * self.zoom() + 8 * self.zoom() - (img.height()))
                 
                 # add image
                 self.elts_objects.append(
                     self.stage_canvas.create_image(
-                        obj.x * micro_width + offset[0], obj.y * micro_height + offset[1],
+                        obj.x * micro_width * self.zoom() + offset[0], obj.y * micro_height * self.zoom() + offset[1],
                         image=img,
                         anchor=tk.NW
                     )
@@ -1639,10 +1710,10 @@ class Gui:
                     continue
                 
                 # add crosshairs
-                x = obj.x * micro_width
-                y = obj.y * micro_height
+                x = obj.x * micro_width * self.zoom()
+                y = obj.y * micro_height * self.zoom()
                 colstr = objcrosscol[obj.compressible()]
-                r = 3 # radius
+                r = 3 * self.zoom() # radius
                 
                 self.elts_objects.append(
                     self.stage_canvas.create_line(
@@ -1659,8 +1730,6 @@ class Gui:
         self.delete_elements(self.stage_canvas, self.elts_patch_rects)
         self.elts_patch_rects = []
         
-        margin = 4
-        
         if self.hard and self.show_patches and self.level is not None:
             for patch in self.level.hardmode_patches:
                 macro_row = self.level.macro_rows[patch.y]
@@ -1670,9 +1739,12 @@ class Gui:
                         y = (constants.macro_rows_per_level -  patch.y - 1) * macro_height
                         x = (((7 - patch.x) if mirror else patch.x) * 2 + seam) * med_width
                         x += level_width * loop
+                        x *= self.zoom()
+                        y *= self.zoom()
+                        margin = 4 * self.zoom()
                         self.elts_patch_rects.append(
                             self.stage_canvas.create_rectangle(
-                                x + margin, y + margin, x + macro_width - margin, y + macro_height - margin,
+                                x + margin, y + margin, x + macro_width * self.zoom() - margin, y + macro_height * self.zoom() - margin,
                                 outline=patchcol
                             )
                         )

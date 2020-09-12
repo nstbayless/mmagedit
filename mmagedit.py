@@ -105,14 +105,16 @@ if filepath is not None:
         print("An error occurred while reading the rom.")
         sys.exit()
 
+    result = True
+
     if infile != "":
         mmdata.parse(infile)
 
     if exportnes != "":
-        mmdata.write(exportnes)
+        result = result and mmdata.write(exportnes)
         
     if outpatch != "":
-        mmdata.write_ips(outpatch)
+        result = result and mmdata.write_ips(outpatch)
 
     if expimage:
         if not mmimage.available:
@@ -124,6 +126,10 @@ if filepath is not None:
         mmdata.stat(outfile)
 
     if len(mmdata.errors) > 0:
-        print("The following error(s) occurred:")
+        if result:
+            print("The following warning(s) occurred:")
+        else:
+            print("The following error(s) occurred:")
         for error in mmdata.errors:
             print("- " + error)
+    sys.exit(0 if result else 1)

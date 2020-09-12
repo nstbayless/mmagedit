@@ -237,7 +237,7 @@ class GuiMicroGrid(tk.Canvas):
                     width=2,
                     outline=selcol
                 )
-            )
+            )        
 
 # an undoable action
 class GuiAction:
@@ -250,14 +250,62 @@ class GuiAction:
         for name, value in kwargs.items():
             setattr(self, name, value)
 
-# 16x16 macro-tile editor
-class GuiMedEdit:
-    def __init__(self, core):
+class GuiSubWindow:
+    def __init__(self, core, title):
         self.core = core
         self.window = tk.Toplevel(core.window)
-        self.window.title("Med-Tile Editor")
+        self.window.title(title)
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
         self.window.bind("<Key>", self.core.on_keypress)
+        self.closed = False
+    
+    def on_close(self):
+        self.closed = True
+        self.window.destroy()
+        self.core.subwindows.pop(type(self))
+        
+    def ctl(self, kwargs):
+        pass
+
+# select mods to enable
+class GuiMod(GuiSubWindow):
+    def __init__(self, core):
+        super().__init__(core, "Mods")
+        self.mods = []
+        for mod in {**core.data.mods, "mapper-extension": False}:
+            if mod == "":
+                continue
+            enabled = core.data.mapper_extension if mod == "mapper-extension" else core.data.mods[mod]
+            modl = {
+                "name": mod,
+                "widget": ttk.Checkbutton(self.window, text=mod, command=self.command)
+            }
+            modl["widget"].pack(fill=tk.X)
+            modl["widget"].state(['!alternate'])
+            if enabled:
+                modl["widget"].state(['selected'])
+            else:
+                modl["widget"].state(['!selected'])
+            self.mods.append(modl)
+    
+    def command(self):
+        for mod in self.mods:
+            enabled = mod["widget"].instate(['selected'])
+            name = mod["name"]
+            if name == "mapper-extension":
+                self.core.data.mapper_extension = enabled
+            else:
+                self.core.data.mods[name] = enabled
+        
+        self.core.dirty = True
+        self.core.refresh_label()
+        self.core.refresh_title()
+        
+
+# 16x16 macro-tile editor
+class GuiMedEdit(GuiSubWindow):
+    def __init__(self, core):
+        super().__init__(core, "Med-Tile Editor")
         self.v_world_idx = tk.StringVar()
         self.v_world_idx.set("1")
         self.v_med_tile_idx = tk.StringVar()
@@ -267,7 +315,6 @@ class GuiMedEdit:
         self.v_palette_idx = tk.IntVar(0, name="palette_idx")
         self.world_idx = 0
         self.med_tile_idx = 0xD
-        self.closed = False
         self.select_canvas = None
         self.elts_micro_select = []
         self.init()
@@ -277,11 +324,6 @@ class GuiMedEdit:
         self.v_hard.trace("w", callback=self.on_idx_change)
         self.v_palette_idx.trace("w", callback=self.on_idx_change)
         self.handling = False
-        
-    def on_close(self):
-        self.closed = True
-        self.window.destroy()
-        self.core.subwindows.pop(type(self))
         
     def on_idx_change(self, var, unk, mode):
         if self.handling:
@@ -449,13 +491,9 @@ class GuiMedEdit:
         pass
 
 # 32x32 macro-tile editor
-class GuiMacroEdit:
+class GuiMacroEdit(GuiSubWindow):
     def __init__(self, core):
-        self.core = core
-        self.window = tk.Toplevel(core.window)
-        self.window.title("Macro-Tile Editor")
-        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.window.bind("<Key>", self.core.on_keypress)
+        super().__init__(core, "Macro-Tile Editor")
         self.v_world_idx = tk.StringVar()
         self.v_world_idx.set("1")
         self.v_macro_tile_idx = tk.StringVar()
@@ -464,7 +502,6 @@ class GuiMacroEdit:
         self.v_hard.set(False)
         self.world_idx = 0
         self.macro_tile_idx = 0xD
-        self.closed = False
         self.select_canvas = None
         self.elts_med_select = []
         self.init()
@@ -473,11 +510,6 @@ class GuiMacroEdit:
         self.v_macro_tile_idx.trace("w", callback=self.on_idx_change)
         self.v_hard.trace("w", callback=self.on_idx_change)
         self.handling = False
-        
-    def on_close(self):
-        self.closed = True
-        self.window.destroy()
-        self.core.subwindows.pop(type(self))
         
     def on_idx_change(self, var, unk, mode):
         if self.handling:
@@ -1271,6 +1303,10 @@ class Gui:
         self.add_menu_command(editmenu, "Flip Object Y", lambda: self.ctl(flipy=not self.flipy), "Y")
         editmenu.add_separator()
         self.add_menu_command(editmenu, "Clear Stage", partial(self.clear_stage), None)
+        editmenu.add_separator()
+        self.add_menu_command(editmenu, "Macro Tiles...", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
+        self.add_menu_command(editmenu, "Med Tiles...", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
+        self.add_menu_command(editmenu, "Mods...", lambda: self.subwindowctl(GuiMod), "Ctrl+Shift+D")
         menu.add_cascade(label="Edit", menu=editmenu)
         
         viewmenu = tk.Menu(menu, tearoff=0)
@@ -1303,12 +1339,6 @@ class Gui:
         self.add_menu_command(viewmenu, "Zoom 3x", lambda: self.set_zoom(2), "Ctrl+3")
         
         menu.add_cascade(label="View", menu=viewmenu)
-        
-        windowmenu = tk.Menu(menu, tearoff=0)
-        self.windowmenu = windowmenu
-        self.add_menu_command(windowmenu, "Macro Tile Editor", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
-        self.add_menu_command(windowmenu, "Med Tile Editor", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
-        menu.add_cascade(label="Window", menu=windowmenu)
         
         helpmenu = tk.Menu(menu, tearoff=0)
         self.add_menu_command(helpmenu, "About", self.about, None)
@@ -1782,28 +1812,27 @@ class Gui:
                 str += " "
                 
             # space remaining
-            max = self.level.total_length
             ps_ = self.level.produce_patches_stream()
             os_ = self.level.produce_objects_stream()
             
             bits_used = int(ps_.length_bytes() * 8 + os_.length_bits())
-            if max is None:
-                bytes_used = int((bits_used) / 8)
-                bits_used = int(bits_used % 8)
-                str += "Used: " + HB(bytes_used) + "." + HB(bits_used * 2)[1] + " bytes"
+            bytes_used = int((bits_used) / 8)
+            bits_used = int(bits_used % 8)
+            str += "Level: " + HB(bytes_used) + "." + HB(bits_used * 2)[1] + " bytes; "
+            
+            # total level space
+            total_level_length = 0
+            for level in self.data.levels:
+                total_level_length += level.length_bytes()
+            max_level_length = constants.ram_range_levels[1] - constants.ram_range_levels[0]
+            if self.data.mapper_extension:
+                max_level_length = 0x4000
+            
+            if total_level_length <= max_level_length:
+                str += "Total Remaining: " + HX(max_level_length - total_level_length) + " of " + HX(max_level_length) + " bytes"
             else:
-                max = abs(max) # paranoia
-                if bits_used > max * 8:
-                    color="red"
-                    bits_o = bits_used - max * 8
-                    bytes_o = int((bits_o) / 8)
-                    bits_o = int(bits_o % 8)
-                    str += "OVERLIMIT: " + HB(bytes_o) + "." + HB(bits_o * 2)[1] + " past " + HB(max) + " bytes"
-                else:
-                    bits_r = max * 8 - bits_used
-                    bytes_r = int((bits_r) / 8)
-                    bits_r = int(bits_r % 8)
-                    str += "Available: " + HB(bytes_r) + "." + HB(bits_r * 2)[1] + " of " + HB(max) + " bytes"
+                str += "OVERLIMIT: " + HX(total_level_length - max_level_length) + " past " + HX(max_level_length) + " bytes"
+                color="red"
             
         self.label.configure(text=str, fg=color, anchor=tk.W, font=("TkFixedFont", 7, "normal"))
     

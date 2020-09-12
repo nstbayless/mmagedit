@@ -1,14 +1,14 @@
 from util import *
 
-mmname = "MMagEdit V1.6"
+mmname = "MMagEdit V1.7"
 mmrepo = "https://github.com/nstbayless/mmagedit"
 mmfmt = 202009111710
 mminfo = """
-MMagEdit created by NaOH
+MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.6: 11 September 2020
+Version 1.7: 11 September 2020
 
-Special thanks to -7 (negativeseven) and Julius.
+Special thanks to Julius.
 
 Please support Morphcat Games.
 """.strip()

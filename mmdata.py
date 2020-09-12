@@ -5,6 +5,7 @@ import json
 import functools
 import hashlib
 import ips
+import mappermages
 
 class PatchStream:
     def __init__(self):
@@ -149,7 +150,6 @@ class Level:
         self.macro_rows = []
         self.objects = []
         self.hardmode_patches = []
-        self.total_length = None
     
     def get_name(self, hard=False):
         s = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
@@ -165,15 +165,15 @@ class Level:
         self.music_idx = self.data.read_byte(self.data.ram_to_rom(constants.ram_music_table + self.level_idx))
         
         # get ram start address
-        self.ram = self.data.read_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table))
+        ram = self.data.read_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table))
         
         # read data from start address...
-        hardmode_length = self.data.read_byte(self.data.ram_to_rom(self.ram))
+        hardmode_length = self.data.read_byte(self.data.ram_to_rom(ram))
         
         row_count = constants.macro_rows_per_level
         for i in range(row_count):
             row = LevelMacroRow(self.data)
-            row.read(self.data.ram_to_rom(self.ram + i * 4 + 1))
+            row.read(self.data.ram_to_rom(ram + i * 4 + 1))
             self.macro_rows.append(row)
         
         # hardmode patches
@@ -185,7 +185,7 @@ class Level:
                 patch_x -= 4
                 patch_y += 1
             
-            patch_byte = self.data.read_byte(self.data.ram_to_rom(i + self.ram + row_count * 4 + 1))
+            patch_byte = self.data.read_byte(self.data.ram_to_rom(i + ram + row_count * 4 + 1))
             
             i = (patch_byte & 0xf0) >> 4
             gap = (patch_byte & 0x0f)
@@ -201,7 +201,7 @@ class Level:
         # read object data
         object_y = constants.objects_start_y
         
-        ram_objects_start = self.ram + hardmode_length + 1 + row_count * 4
+        ram_objects_start = ram + hardmode_length + 1 + row_count * 4
         bs = BitStream(self.data.bin, self.data.ram_to_rom(ram_objects_start))
         while True:
             type = bs.read_bits(2)
@@ -240,27 +240,24 @@ class Level:
             if obj.y >= 0:
                 self.objects.append(obj)
         
-        objects_length = bs.offset - self.data.ram_to_rom(ram_objects_start) + (1 if bs.bitoffset > 0 else 0)
-        self.total_length = objects_length + hardmode_length
-        
-    def commit(self):
+    def length_bytes(self):
+        ps = self.produce_patches_stream()
+        os = self.produce_objects_stream()
+        return os.length_bytes() + ps.length_bytes() + 4 * constants.macro_rows_per_level + 1
+    
+    # returns error, new rom output location
+    def commit(self, ram):
         ps = self.produce_patches_stream()
         os = self.produce_objects_stream()
         
-        # check length (sanity)
-        if self.total_length is not None:
-            if ps.length_bytes() + os.length_bytes() > self.total_length:
-                self.data.errors += ["Size limit exceeded: " + self.get_name()]
-                return False
-        
         # write music index
-        #self.data.write_byte(self.data.ram_to_rom(constants.ram_music_table + self.level_idx), self.music_idx)
+        self.data.write_byte(self.data.ram_to_rom(constants.ram_music_table + self.level_idx), self.music_idx)
         
         # write level ram offset
-        self.data.write_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table), self.ram)
+        self.data.write_word(self.data.ram_to_rom(self.level_idx * 2 + constants.ram_level_table), ram)
         
         # write hardmode data length
-        rom = self.data.ram_to_rom(self.ram)
+        rom = self.data.ram_to_rom(ram, "level")
         self.data.write_byte(rom, ps.length_bytes())
             
         # write tile data
@@ -278,7 +275,7 @@ class Level:
         for entry in os.entries:
             bs.write_bits_list(entry)
         
-        return True
+        return True, ram + self.length_bytes()
         
     def produce_patches_stream(self):
         ps = PatchStream()
@@ -745,12 +742,26 @@ class Music:
 
 class MMData:
     # convert ram address to rom address
-    def ram_to_rom(self, address):
+    def ram_to_rom(self, address, chunk=""):
+        if self.mapper_extension and len(self.bin) > 0xa010:
+            if chunk == "" and address >= 0xc000:
+                address += mappermages.EXTENSION_LENGTH
+            if chunk == "level":
+                return 0x10 + (address - 0x8000 + 0x4000)
         return 0x10 + (address - 0x8000)
         
     def chr_to_rom(self, address):
-        return 0x10 + 0x8000 + address
+        return 0x10 + 0x8000 + address + (mappermages.EXTENSION_LENGTH if self.mapper_extension and len(self.bin) > 0xa010 else 0)
+    
+    def commit_bank_extension(self):
+        # edit header
+        self.bin[0x4] = (mappermages.EXTENSION_LENGTH // 0x4000) + 2 # prg ROM banks
+        self.bin[0x5] = 0x01 # chr ROM banks (unchanged)
+        self.bin[0x6] = 0x20 # mapper
         
+        # inserts two banks
+        self.bin[0x4010:0x4010] = bytearray(mappermages.EXTENSION_LENGTH)
+    
     def read_nibble(self, addr, offset):
         b = self.bin[addr + (offset // 2)]
         if offset % 2 == 1:
@@ -806,6 +817,10 @@ class MMData:
             if len(self.bin) <= 0x10:
                 self.errors += ["NES file " + filepath + " is empty."]
                 return False
+                
+            if len(self.bin) != 0xa010:
+                self.errors += ["NES file must be exactly 0xa010 in size. (Mapper changes can be applied by " + constants.mmname + ", but cannot be read.)"]
+                return False
             
             self.levels = []
             self.spawnable_objects = []
@@ -820,6 +835,7 @@ class MMData:
             self.mods = dict()
             self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
+            self.mapper_extension = False
             
             # read spawnable objects list
             for i in range(0x20):
@@ -901,6 +917,10 @@ class MMData:
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
     def commit(self):
+        # possibly add extra banks
+        if self.mapper_extension:
+            self.commit_bank_extension()
+        
         # write spawnable objects list
         for i in range(len(self.spawnable_objects)):
             self.write_byte(self.ram_to_rom(constants.ram_object_i_gid_lookup + i), self.spawnable_objects[i])
@@ -940,10 +960,16 @@ class MMData:
             world.commit()
         
         # write levels
+        level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
         for level in self.levels:
+            result, level_ram_location = level.commit(level_ram_location)
             # write level data
-            if not level.commit():
+            if not result:
                 return False
+        ram_level_end = 0xC000 if self.mapper_extension else constants.ram_range_levels[1]
+        if level_ram_location > ram_level_end:
+            self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
+            return False
                 
         # write music
         if not self.music.commit():
@@ -961,18 +987,24 @@ class MMData:
                     self.ram_to_rom(constants.ram_mod_no_auto_scroll[i]),
                     constants.ram_mod_no_auto_scroll_replacement[i]
                 )
+        if self.mapper_extension:
+            mappermages.patch(self.bin)
         
         return True
         
     def write(self, file):
         self.errors = []
-        if not self.commit():
+        try:
+            if not self.commit():
+                return False
+            with open(file, "wb") as nes:
+                nes.write(self.bin)
+                return True
+            self.errors += ["Failed to open file \"" + file + "\" for writing."]
             return False
-        with open(file, "wb") as nes:
-            nes.write(self.bin)
-            return True
-        self.errors += ["Failed to open file \"" + file + "\" for writing."]
-        return False
+        finally:
+            # restore bin to original.
+            self.bin = bytearray(self.orgbin)
         
     def write_ips(self, file):
         self.errors = []
@@ -984,6 +1016,7 @@ class MMData:
         return rval
     
     def __init__(self):
+        self.mapper_extension = False
         self.bin = None
         self.errors = []
         self.object_config = [
@@ -1047,7 +1080,8 @@ class MMData:
                         out('    "' + mod + '": true,')
                     else:
                         out('    "' + mod + '": false,')
-            out('  "":""}') # FIXME: a nasty hack to make the comma logic easier...
+            out('  "mapper-extension": ' + ("true" if self.mapper_extension else "false"))
+            out('  }')
             out("}")
             out()
             
@@ -1131,17 +1165,8 @@ class MMData:
                 level = self.levels[level_idx]
                 
                 out("# " + level.get_name())
-                out("# data from rom " + hex(self.ram_to_rom(level.ram)) + " / ram " + hex(level.ram))
+                out("# data from rom " + hex(self.ram_to_rom(level.ram, "level")) + " / ram " + hex(level.ram))
                 out("ram", HW(level.ram))
-                out()
-                out("# This field measures (in bytes, hex) the total length of the level data.")
-                out("# Optional, but recommended. If exceeded, an error will be thrown. If underrun, will be padded.")
-                calculated_length = level.produce_objects_stream().length_bytes() + level.produce_patches_stream().length_bytes()
-                if level.total_length is not None:
-                    out("size", HB(level.total_length))
-                else:
-                    out("# size", HB(calculated_length))
-                out()
                 
                 out("# Level music")
                 for i in range(len(self.music.songs)):
@@ -1329,7 +1354,6 @@ class MMData:
                             level_complete = level
                             level = self.levels[level_idx]
                             level.objects = []
-                            level.total_length = None
                             level.hardmode_patches = []
                             row = constants.macro_rows_per_level - 1
                             obji = 0
@@ -1374,9 +1398,6 @@ class MMData:
                     
                     if directive == "ram":
                         level.ram = int(tokens[1], 16)
-                    
-                    if directive == "size":
-                        level.total_length = int(tokens[1], 16)
                         
                     if directive == "song":
                         level.music_idx = int(tokens[1], 16)
@@ -1525,7 +1546,10 @@ class MMData:
                         self.mirror_pairs.append([int(i, 16) for i in pair])
                     if "mods" in config:
                         for mod in config["mods"]:
-                            self.mods[mod] = config["mods"][mod]
+                            if mod == "mapper-extension":
+                                self.mapper_extension = config["mods"][mod]
+                            else:
+                                self.mods[mod] = config["mods"][mod]
                     parsing_globals_complete = True
             return True
         return False

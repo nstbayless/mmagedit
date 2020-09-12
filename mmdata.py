@@ -740,6 +740,95 @@ class Music:
         
         return True
 
+class TitleScreen:
+    def __init__(self, data):
+        self.data = data
+        
+    def write(self):
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
+        table = self.table + self.palette_idxs
+        
+        # Lempel–Ziv compression, more or less
+        # TODO: this can be optimized further.
+        i = 0
+        while i < len(table):
+            # search for longest prefix
+            best_prefix = (0, 0)
+            for j in range(max(0, i - 256), i - 1):
+                l = common_prefix_length(table[i:], table[j:], min(len(table) - i, 0x20))
+                if l > best_prefix[1]:
+                    best_prefix = (j, l)
+            
+            # discard if too short
+            if best_prefix[1] <= 1:
+                best_prefix = (0, 0)
+            
+            # how long is the following chain of zeros?
+            best_zeros = common_prefix_length(table[i:], [0] * 0x100, min(len(table) - i, 0x100))
+            
+            # which compression should we use for the following substring?
+            if best_zeros < 8 + 5 + 3 and best_zeros >= best_prefix[1] and best_zeros > 0:
+                for j in range(best_zeros):
+                    bs.write_bit(0)
+                    i += 1
+            elif best_prefix[1] > 1:
+                # write reference
+                bs.write_bit(1)
+                bs.write_bit(1)
+                
+                # location difference
+                bs.write_bits(i - best_prefix[0] - 1, 8)
+                
+                # length
+                bs.write_bits(best_prefix[1] - 1, 5)
+                i += best_prefix[1]
+            else:
+                # write literal byte
+                bs.write_bit(1)
+                bs.write_bit(0)
+                bs.write_bits(table[i], 8)
+                i += 1
+        
+        # bounds check
+        if bs.offset + (bs.bitoffset / 8) > constants.ram_range_title_screen[1]:
+            self.errors += ["title screen exceeds range"]
+            return False
+        return True
+    
+    def read(self):
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
+        self.table = []
+        
+        # Lempel–Ziv decompression, more or less
+        while len(self.table) < constants.title_screen_tile_count + constants.title_screen_palette_idx_count: # FIXME: this is the wrong condition.
+            isblank = bs.read_bits(1) == 0
+            if isblank:
+                self.table.append(0)
+            else:
+                ispointer = bs.read_bits(1) == 1
+                if ispointer:
+                    sub = bs.read_bits(8) + 1
+                    count = bs.read_bits(5) + 1
+                    for i in range(count):
+                        if len(self.table) <= sub:
+                            self.table.append(0)
+                        else:
+                            self.table.append(self.table[-sub])
+                else:
+                    self.table.append(bs.read_bits(8))
+        
+        self.palette_idxs = self.table[-constants.title_screen_palette_idx_count:]
+        self.table = self.table[0:-constants.title_screen_palette_idx_count]
+        
+        # palettes
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen_palette[0]))
+        self.palettes = []
+        for i in range(4):
+            palette = [0xf]
+            for j in range(3):
+                palette.append(bs.read_bits(6))
+            self.palettes.append(palette)
+
 class MMData:
     # convert ram address to rom address
     def ram_to_rom(self, address, chunk=""):
@@ -909,6 +998,10 @@ class MMData:
             # read music data
             self.music = Music(self)
             self.music.read()
+            
+            # read title screen data
+            self.title_screen = TitleScreen(self)
+            self.title_screen.read()
                 
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
@@ -974,6 +1067,9 @@ class MMData:
         # write music
         if not self.music.commit():
             return False
+            
+        # write title screen
+        self.title_screen.write()
                 
         # patches over
         if self.mods["no_bounce"]:
@@ -1085,6 +1181,29 @@ class MMData:
             out("}")
             out()
             
+            # title screen
+            out("-- title --")
+            out("# data for the title screen")
+            out("# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.")
+            out()
+            out("# tiles")
+            for i in range(0, len(self.title_screen.table), 0x20):
+                row = self.title_screen.table[i:(i+0x20)]
+                s = "T "
+                for j in row:
+                    s += HB(j) + " "
+                out(s)
+                
+            out()
+            out("# palette indices")
+            for i in range(0, len(self.title_screen.palette_idxs), 0x8):
+                row = self.title_screen.palette_idxs[max(i - 0x6, 0):min(i + 0x2, len(self.title_screen.palette_idxs) - 1)]
+                s = "P "
+                for j in row:
+                    s += HB(j) + " "
+                out(s)
+            out()
+            
             # config data
             for gid in range(len(self.object_config)):
                 cfg = self.object_config[gid]
@@ -1165,8 +1284,6 @@ class MMData:
                 level = self.levels[level_idx]
                 
                 out("# " + level.get_name())
-                out("# data from rom " + hex(self.ram_to_rom(level.ram, "level")) + " / ram " + hex(level.ram))
-                out("ram", HW(level.ram))
                 
                 out("# Level music")
                 for i in range(len(self.music.songs)):
@@ -1304,6 +1421,7 @@ class MMData:
             music = None
             music_nibble = 0
             cfg = None
+            title_screen = None
             
             for line in f.readlines():
                 if "#" in line:
@@ -1319,6 +1437,7 @@ class MMData:
                         level = None
                         song_idx = None
                         cfg = None
+                        title_screen = None
                         
                         # configuration
                         if tokens[1] == "config":
@@ -1337,6 +1456,11 @@ class MMData:
                             
                         if tokens[1] == "world":
                             world = self.worlds[int(tokens[2], 16) - 1]
+                        
+                        if tokens[1] == "title":
+                            title_screen = self.title_screen
+                            title_screen.table = []
+                            title_screen.palette_idxs = []
                         
                         if tokens[1] == "song":
                             song_idx = int(tokens[2], 16)
@@ -1363,6 +1487,16 @@ class MMData:
                         cfg.parse(tokens)
                         
                         # next line
+                        continue
+                        
+                    # title screen is a bit different
+                    elif title_screen is not None:
+                        if tokens[0] == "T":
+                            for token in tokens[1:]:
+                                title_screen.table.append(int(token, 16))
+                        if tokens[0] == "P":
+                            for token in tokens[1:]:
+                                title_screen.palette_idxs.append(int(token, 16))
                         continue
                             
                     # music code is different
@@ -1551,6 +1685,12 @@ class MMData:
                             else:
                                 self.mods[mod] = config["mods"][mod]
                     parsing_globals_complete = True
+                    
+            # correct title screen
+            while len(self.title_screen.table) < constants.title_screen_tile_count:
+                self.title_screen.table.append(0)
+            while len(self.title_screen.palette_idxs) < constants.title_screen_palette_idx_count:
+                self.title_screen.palette_idxs.append(0)
             return True
         return False
                         

@@ -1,12 +1,12 @@
 from util import *
 
-mmname = "MMagEdit V1.7"
+mmname = "MMagEdit V1.8"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009111710
+mmfmt = 202009121657
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.7: 11 September 2020
+Version 1.8: 12 September 2020
 
 Special thanks to Julius.
 
@@ -31,7 +31,10 @@ ram_music_table = 0xdaa3 # music for each level
 ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait command waits for.
 ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
 
-ram_title_screen = 0xc5a4
+title_screen_tile_count = 0x340
+title_screen_palette_idx_count = 0x1b
+ram_range_title_screen = [0xc5a2, 0xc6ae]
+ram_range_title_screen_palette = [0xc737, 0xc737 + 0x9]
 
 # space available
 ram_range_music = [0x8000, 0x860A]
@@ -207,6 +210,15 @@ sprite_palettes = [
 greyscale_palette = [0x0f, 0x0, 0x10, 0x20] # a simple grayscale palette
 bg_palette = [0x0f, 0x0c, 0x1c, 0x20]
 sprite_palette = [0xf, 0x08, 0x26, 0x20]
+title_red_palette = [0x0f, 0x15, 0x26, 0x20]
+
+# bg palette used as a default by editor if no palette is in context
+bg_palettes = [
+    [0xf, 0x5, 0x15, 0x30], # special tiles
+    [0xf, 0x08, 0x17, 0x35], # solid tiles
+    [0xf, 0x0b, 0x1a, 0x20], # acid
+    [0xf, 0x0c, 0x2D, 0x10]  # bg tiles
+]
 
 # this is the basic NES palette (rgb format)
 palette = [
@@ -279,6 +291,29 @@ palette = [
 # the above, but as tuples.
 palette_rgb = [
     (p >> 16, (p >> 8) & 0xff, p & 0xff) for p in palette
+]
+
+# how to render tiles in the med-tile editor
+component_micro_tile_palettes = [
+    [0 for _ in range(0x10)],
+    [1 for _ in range(0x10)],
+    [1 for _ in range(0x10)],
+    [1 for _ in range(0x10)],
+    
+    [1 for _ in range(0x10)],
+    [*[1 for _ in range(0x6)], *[3 for _ in range(0xa)]],
+    [3 for _ in range(0x10)],
+    [3 for _ in range(0x10)],
+    
+    [3 for _ in range(0x10)],
+    [3 for _ in range(0x10)],
+    [3 for _ in range(0x10)],
+    [3 for _ in range(0x10)],
+    
+    [3 for _ in range(0x10)],
+    [3, 3, 3, *[2 for _ in range(0x5)], *[3 for _ in range(0x8)]],
+    [3 for _ in range(0x10)],
+    [3 for _ in range(0x10)]
 ]
 
 object_names = [

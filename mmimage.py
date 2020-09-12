@@ -86,21 +86,21 @@ def produce_object_images(data, semi=False):
     
     return object_images
     
-def produce_micro_tile_images(world, hard=False):
+def produce_micro_tile_images(data, world, hard=False):
     minitile_images = []
     for palette_idx in range(4):
         minitile_images_paletted = []
         for i in range(0x100):
-            palette = world.palettes[palette_idx + (4 if hard else 0)]
+            palette = world.palettes[palette_idx + (4 if hard else 0)] if world is not None else constants.bg_palettes[palette_idx]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
                 for x in range(8):
                     for y in range(8):
-                        col_idx = world.data.micro_tiles[i][x][y]
+                        col_idx = data.micro_tiles[i][x][y]
                         rgb = constants.palette_rgb[palette[col_idx]]
                         
                         # hidden block effect
-                        if i in constants.hidden_micro_tiles and palette_idx in world.hidden_tile_palettes():
+                        if world is not None and i in constants.hidden_micro_tiles and palette_idx in world.hidden_tile_palettes():
                             if (x + y) % 2 == 1:
                                 rgb = constants.hidden_colour
                         
@@ -113,7 +113,24 @@ def produce_micro_tile_images(world, hard=False):
             minitile_images_paletted.append(img)
         minitile_images.append(minitile_images_paletted)
     return minitile_images
-    
+
+def produce_title_screen(data):
+    img = Image.new('RGB', (256, 224), color = 'black')
+    for i in range(0x20, len(data.title_screen.table) + 0x20):
+        x = (i % 0x20) * 0x8
+        y = (i // 0x20) * 0x8
+        tile = data.title_screen.table[i - 0x20]
+        
+        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
+        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
+        palette_idx = 0 if palette_i >= len(data.title_screen.palette_idxs) or palette_i < 0 else (data.title_screen.palette_idxs[palette_i] >> (2 * (palette_sub_i))) & 0x3
+        
+        # we remap the 0 palette because it fades in, so the initial value would be invisible.
+        palette = constants.title_red_palette if palette_idx == 0 else data.title_screen.palettes[palette_idx]
+        
+        chr_to_img(data, tile * 0x10, img, palette, (x, y))
+    return img
+
 def export_images(data, path="."):
     if not os.path.exists(path):
         os.path.makedirs(path)
@@ -125,6 +142,11 @@ def export_images(data, path="."):
     chr_image = produce_chr_sheet(data)
     chr_image.save(outfile)
 
+    # export title
+    outfile = "mm-title.png"
+    print("exporting", outfile)
+    outfile = os.path.join(path, outfile)
+    produce_title_screen(data).save(outfile)
 
     # export levels
     for level in data.levels:
@@ -134,7 +156,7 @@ def export_images(data, path="."):
             outfile = os.path.join(path, outfile)
             
             # create tiles per-palette per-level (could be optimized to per-world)
-            minitile_images = produce_micro_tile_images(level.world, hard)
+            minitile_images = produce_micro_tile_images(data, level.world, hard)
             
             # create object data images
             object_images = produce_object_images(data)

@@ -69,5 +69,6 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 - Editing music
 - Adjusting object stats (hp, etc.)
 - Editing chest loot drop rates
+- Editing the title screen
 - Adjusting world palette colours
 - Adjusting the world med-tile self-symmetry index

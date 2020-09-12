@@ -304,6 +304,7 @@ class GuiMod(GuiSubWindow):
 
 # 16x16 macro-tile editor
 class GuiMedEdit(GuiSubWindow):
+    palette_var_counter = 0
     def __init__(self, core):
         super().__init__(core, "Med-Tile Editor")
         self.v_world_idx = tk.StringVar()
@@ -312,7 +313,9 @@ class GuiMedEdit(GuiSubWindow):
         self.v_med_tile_idx.set("28") # a reasonable default tile to edit
         self.v_hard = tk.BooleanVar()
         self.v_hard.set(False)
-        self.v_palette_idx = tk.IntVar(0, name="palette_idx")
+        self.v_palette_var_string = "palette_idx" + str(GuiMedEdit.palette_var_counter)
+        GuiMedEdit.palette_var_counter += 1
+        self.v_palette_idx = tk.IntVar(0, name=self.v_palette_var_string)
         self.world_idx = 0
         self.med_tile_idx = 0xD
         self.select_canvas = None
@@ -351,7 +354,7 @@ class GuiMedEdit(GuiSubWindow):
                 self.v_med_tile_idx.set("")
                 pass
             
-            if var == "palette_idx":
+            if var == self.v_palette_var_string:
                 self.core.apply_action(GuiAction(
                     type="med-palette", refresh=["med"],
                     context=GuiMedEdit,
@@ -393,7 +396,8 @@ class GuiMedEdit(GuiSubWindow):
         self.med_tile_select_width = 4
         height=224
         
-        self.select_canvas = GuiMicroGrid(mainframe, self.core, height=256, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False)
+        self.select_canvas = GuiMicroGrid(mainframe, self.core, height=8 * 16 * self.core.zoom() + 16, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False)
+        self.select_canvas.divides = [0x10, 0x56]
         self.select_canvas.pack(side=tk.RIGHT)
         
         self.place_canvas = GuiMicroGrid(mainframe, self.core, height=med_height * self.core.zoom(), dims=(med_width // micro_width, med_height // micro_height), scroll=False, cb=self.on_place_click)
@@ -434,7 +438,8 @@ class GuiMedEdit(GuiSubWindow):
             y = (micro_tile_idx // 16)
             
             # set images
-            img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
+            palette_idx = constants.component_micro_tile_palettes[y][x]
+            img = self.core.micro_images[len(self.core.data.worlds)][palette_idx][micro_tile_idx]
             self.select_canvas.set_tile_image(x, y, img)
         self.select_canvas.refresh()
         
@@ -1431,11 +1436,11 @@ class Gui:
         
         # micro-tile images
         # list [world][palette_idx][id]
-        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
-        for world_idx in range(len(self.data.worlds)):
-            world = self.data.worlds[world_idx]
-            images = [mmimage.produce_micro_tile_images(world, hard) for hard in [False, True]]
-            for palette_idx in range(len(world.palettes)):
+        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in [*self.data.worlds, None]]
+        for world_idx in range(len(self.data.worlds) + 1):
+            world = [*self.data.worlds, None][world_idx]
+            images = [mmimage.produce_micro_tile_images(self.data, world, hard) for hard in [False, True]]
+            for palette_idx in range(8):
                 for id in range(0x100):
                     img = images[palette_idx // 4][palette_idx % 4][id]
                     imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()))

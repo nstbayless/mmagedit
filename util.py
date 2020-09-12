@@ -63,3 +63,9 @@ def stat_out(file, *args):
 def clamp_hoi(x, a, b):
     assert(a <= b - 1)
     return int(max(a, min(x, b - 1)))
+
+def common_prefix_length(a, b, maxlen):
+    i = 0
+    while i < maxlen and a[i] == b[i]:
+        i += 1
+    return i

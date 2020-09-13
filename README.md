@@ -11,7 +11,25 @@ This utility can edit levels, worlds, and tile information for Micro Mages (by [
 **Linux**: See "Launching (Ubuntu)" below.
 
 <center><img src="screenshot.png" alt="Screenshot of MMagEdit" /></center>
- 
+
+## GUI Usage
+
+### Lag
+
+Please be aware that some functionality is a bit laggy in the GUI. Most prominently, **changing the zoom level**
+and **closing a subwindow** are likely to incur quite a lot of lag. Optimizations for this may be figured out in the future,
+but in the meantime please bear with it.
+
+Users have also reported that some lag may occur for a few minutes while the program first loads, but will go away afterward.
+
+### Placing Stage Elements
+
+Left-clicking, middle-clicking (or shift-clicking), and right-clicking all achieve different effects:
+
+- Left Click: places a tile, tile patch, or object
+- Right Click: removes a tile, tile patch, or object
+- Middle Click / Shift Click: edits the mirror position (seam position). Only available when a tile is selected, and never on hard mode.
+
 ## Launching (Ubuntu)
 
 To launch with python3 on Ubuntu Linux, first make sure the dependencies are met:
@@ -66,6 +84,7 @@ python3 mmagedit.py base.nes -o hack.txt
 
 Some capabilities of MMagEdit are limited to the CLI simply because they have not yet been added to the GUI. This is a non-exhaustive list.
 
+- Editing text
 - Editing music
 - Adjusting object stats (hp, etc.)
 - Editing chest loot drop rates

@@ -1214,7 +1214,7 @@ class Gui:
                         type="seam", refresh=["row"],
                         macro_row_idx=macro_row_idx,
                         prev_seam=macro_row.seam,
-                        seam=clamp_hoi(x / med_width, 0, level_width // med_width)
+                        seam=int(max(0, (x + micro_width - 2) / med_width)) % (level_width // med_width)
                     ))
     
     def subwindowctl(self, type, **kwargs):

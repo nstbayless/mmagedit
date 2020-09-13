@@ -1,12 +1,12 @@
 from util import *
 
-mmname = "MMagEdit V1.8"
+mmname = "MMagEdit V1.9"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009121657
+mmfmt = 202009121909
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.8: 12 September 2020
+Version 1.9: 12 September 2020
 
 Special thanks to Julius.
 
@@ -36,9 +36,12 @@ title_screen_palette_idx_count = 0x1b
 ram_range_title_screen = [0xc5a2, 0xc6ae]
 ram_range_title_screen_palette = [0xc737, 0xc737 + 0x9]
 
+text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
+
 # space available
 ram_range_music = [0x8000, 0x860A]
 ram_range_levels = [0xdaec, 0xe6c3]
+ram_range_text = [0xEC67, 0xEE66]
 
 # ~ special mods ~
 ram_mod_bounce = 0xd5d7

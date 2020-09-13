@@ -829,6 +829,70 @@ class TitleScreen:
                 palette.append(bs.read_bits(6))
             self.palettes.append(palette)
 
+class TextData:
+    def __init__(self, data):
+        self.data = data
+        self.text = []
+    
+    def read(self):
+        for i in range(29):
+            bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+            text = ""
+            # skip to marker
+            for j in range(i + 1):
+                while bs.read_bits(5) != 1:
+                    pass
+            
+            # read text
+            while True:
+                b = bs.read_bits(5)
+                if b == 0:
+                    text += " "
+                elif b == 1:
+                    #done
+                    self.text.append(text)
+                    break
+                elif b == 2:
+                    # rare two-byte character
+                    b = bs.read_bits(5)
+                    text += constants.text_lookup[b + 0x1a]
+                elif b == 3:
+                    text += "%"
+                else:
+                    text += constants.text_lookup[b - 4]
+        
+    def write(self):
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+        for text in self.text:
+            # start-of-text marker
+            bs.write_bits(1, 5)
+            
+            for t in text:
+                if t == " ":
+                    bs.write_bits(0, 5)
+                elif t == "%" or t == "\n":
+                    bs.write_bits(3, 5)
+                else:
+                    if t in constants.text_lookup:
+                        i = constants.text_lookup.index(t)
+                        if i < 0x1b:
+                            # common character
+                            bs.write_bits(i + 4, 5)
+                        else:
+                            # extended character
+                            bs.write_bits(2, 5)
+                            bs.write_bits(i - 0x1a, 5)
+                    else:
+                        self.data.errors += ["Invalid text symbol: \"" + t + "\""]
+                        return False
+            
+        # bounds check
+        if bs.offset + (bs.bitoffset / 8) > constants.ram_range_text[1]:
+            self.errors += ["text section exceeds range"]
+            return False
+        return True
+            
+
 class MMData:
     # convert ram address to rom address
     def ram_to_rom(self, address, chunk=""):
@@ -1011,6 +1075,10 @@ class MMData:
             # read title screen data
             self.title_screen = TitleScreen(self)
             self.title_screen.read()
+            
+            # read text data
+            self.text = TextData(self)
+            self.text.read()
                 
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
@@ -1084,7 +1152,12 @@ class MMData:
             return False
             
         # write title screen
-        self.title_screen.write()
+        if not self.title_screen.write():
+            return False
+        
+        # write text
+        if not self.text.write():
+            return False
                 
         # patches over
         if self.mods["no_bounce"]:
@@ -1191,7 +1264,7 @@ class MMData:
                         out('    "' + mod + '": true,')
                     else:
                         out('    "' + mod + '": false,')
-            out('  "mapper-extension": ' + ("true" if self.mapper_extension else "false"))
+            out('    "mapper-extension": ' + ("true" if self.mapper_extension else "false"))
             out('  }')
             out("}")
             out()
@@ -1205,8 +1278,12 @@ class MMData:
             for i in range(0, len(self.title_screen.table), 0x20):
                 row = self.title_screen.table[i:(i+0x20)]
                 s = "T "
+                
                 for j in row:
-                    s += HB(j) + " "
+                    if j == 0:
+                        s += "__ "
+                    else:
+                        s += HB(j) + " "
                 out(s)
                 
             out()
@@ -1239,6 +1316,12 @@ class MMData:
                 for j in range(3):
                     s += HX(self.sprite_palettes[i][j + 1]) + " "
                 out(s)
+            
+            # text data
+            out()
+            out("# text data")
+            for text in self.text.text:
+                out(">" + text + "<")
             
             # med-tiles
             out()
@@ -1429,7 +1512,6 @@ class MMData:
             
     # read data from a human-readable hack.txt file
     def parse(self, file):
-        print(self.title_screen.palette_idxs)
         with open(file, "r") as f:
             
             level = None
@@ -1477,6 +1559,7 @@ class MMData:
                             cfg = self.object_config[int(tokens[2], 16)]
                         
                         if tokens[1] == "global":
+                            self.text.text = []
                             world = None
                             
                         if tokens[1] == "world":
@@ -1518,7 +1601,10 @@ class MMData:
                     elif title_screen is not None:
                         if tokens[0] == "T":
                             for token in tokens[1:]:
-                                title_screen.table.append(int(token, 16))
+                                if token == "__":
+                                    title_screen.table.append(0)
+                                else:
+                                    title_screen.table.append(int(token, 16))
                         if tokens[0] == "P":
                             for token in tokens[1:]:
                                 title_screen.palette_idxs.append(int(token, 16))
@@ -1676,7 +1762,11 @@ class MMData:
                         if fmt < constants.mmfmt:
                             # this is a warning, not an error.
                             self.errors += ["Hack uses an older version of MMagEdit. Please be wary of errors or artifacts caused by updating."]
-                            
+                    
+                    # text        
+                    if directive[0] == ">":
+                        text = line.split(">")[1].split("<")[0]
+                        self.text.text.append(text)
                     
                     # song directives
                     if directive == "name" and song_idx is not None:

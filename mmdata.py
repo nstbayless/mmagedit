@@ -7,6 +7,60 @@ import hashlib
 import ips
 import mappermages
 
+# this is used for the optional single-med-tile patching mod
+# represents the bit sequence for the patches
+class UnitileStream:
+    def __init__(self):
+        self.entries = []
+        self.i = 0
+        self.complete = False
+    
+    def length_bits(self):
+        assert(self.complete)
+        l = 0
+        for entry in self.entries:
+            l += len(entry)
+        return l
+        
+    def length_bytes(self):
+        lb = self.length_bits()
+        if lb % 8 == 0:
+            return int(lb / 8)
+        else:
+            return int(lb / 8) + 1
+    
+    def as_bits(self, value, n):
+        l = []
+        for i in range(n):
+            l.append(0 if value & (1 << (n - i - 1)) == 0 else 1)
+        return l
+    
+    def add_patch(self, patch):
+        assert(not self.complete)
+        assert(patch.get_i() > self.i)
+        
+        # optional single-unit 'advance'
+        
+        if patch.get_i() == self.i + 1:
+            self.entries.append(self.as_bits(3, 8))
+            self.i += 1
+        
+        # write 'advance' tokens
+        while patch.get_i() > self.i:
+            idiff = min(patch.get_i() - self.i, 0x100)
+            assert(idiff > 0)
+            self.i += idiff
+            self.entries.append( self.as_bits(1, 8) + self.as_bits(idiff - 1, 8) )
+        
+        # write patch byte
+        self.entries.append(self.as_bits(2 | patch.get_flags(), 8) + self.as_bits(patch.med_tile_idx, 8))
+    
+    def finalize(self):
+        assert(not self.complete)
+        self.complete = True
+        self.entries.append( self.as_bits(0, 8) )
+
+# represents the bit sequence for hard mode patches in a stage
 class PatchStream:
     def __init__(self):
         self.entries = []
@@ -38,7 +92,8 @@ class PatchStream:
                 self.position += 0x10
                 self.entries[-1] |= 0x0f
                 self.entries.append(0)
-            
+
+# represents the bit sequence for the object data in a level
 class ObjectStream:
     def __init__(self):
         self.entries = []
@@ -89,7 +144,7 @@ class Object:
         self.x = 0 # in microtiles
         self.y = 0 # in microtiles
         self.gid = 0 # lookup (0xdab1),i
-        self.name = ""
+        self.name = "" # TDDO: remove this field, it's redundant and not worth the headache.
         self.flipx = False
         self.flipy = False
         self.compressed = False
@@ -112,6 +167,23 @@ class HardPatch:
         self.x = 0
         self.y = 0
         self.i = 0
+    
+class UnitilePatch:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+        self.med_tile_idx = 0
+        
+        # which difficulties does this appear on?
+        self.flag_normal = True
+        self.flag_hard   = True
+        self.flag_hell   = True
+    
+    def get_i(self):
+        return self.x + self.y * 0x10
+        
+    def get_flags(self):
+        return (0 if self.flag_normal else 0x80) | (0 if self.flag_hard else 0x40) | (0 if self.flag_hell else 0x20)
 
 class LevelMacroRow:
     def __init__(self, data):
@@ -150,6 +222,7 @@ class Level:
         self.macro_rows = []
         self.objects = []
         self.hardmode_patches = []
+        self.unitile_patches = []
     
     def get_name(self, hard=False):
         s = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
@@ -245,7 +318,37 @@ class Level:
         os = self.produce_objects_stream()
         return os.length_bytes() + ps.length_bytes() + 4 * constants.macro_rows_per_level + 1
     
-    # returns error, new rom output location
+    def length_unitile_bytes(self):
+        us = self.produce_unitile_stream()
+        return us.length_bytes()
+    
+    def produce_unitile_rows(self):
+        out = [[[None] * 3 for x in range(0x10)] for y in range(constants.macro_rows_per_level * 2)]
+        
+        for ut in self.unitile_patches:
+            for j in range(3):
+                if ut.get_flags() & (1 << (7 - j)) == 0:
+                    out[ut.y][ut.x][j] = ut
+        
+        return out
+    
+    # returns error, new ram output location
+    def commit_unitile(self, ram):
+        rom = self.data.ram_to_rom(ram)
+        
+        # write pointer to unitile data
+        rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 2 * self.level_idx)
+        self.data.write_word(rom_table_location, ram)
+        
+        # write unitile data sequence
+        us = self.produce_unitile_stream()
+        bs = BitStream(self.data.bin, rom)
+        for entry in us.entries:
+            bs.write_bits_list(entry)
+            
+        return True, ram + self.length_unitile_bytes()
+    
+    # returns error, new ram output location
     def commit(self, ram):
         ps = self.produce_patches_stream()
         os = self.produce_objects_stream()
@@ -280,7 +383,7 @@ class Level:
     def produce_patches_stream(self):
         ps = PatchStream()
         
-        # add objects to stream sorted by y position.
+        # add objects to stream sorted by y and x position.
         for patch in sorted(self.hardmode_patches, key=lambda patch : patch.y * 4 + patch.x):
             ps.add_patch(patch)
         
@@ -297,6 +400,17 @@ class Level:
         
         return os
         
+    def produce_unitile_stream(self):
+        us = UnitileStream()
+        
+        # add unitiles to stream sorted by y position
+        for patch in sorted(self.unitile_patches, key=lambda patch : patch.y * 0x10 + patch.x):
+            us.add_patch(patch)
+        
+        us.finalize()
+        
+        return us
+        
     def get_macro_patch_tile(self, patch_i):
         return 0x2f + patch_i
         
@@ -305,6 +419,9 @@ class Level:
     def produce_med_tiles(self, hardmode=False, orows=range(constants.macro_rows_per_level)):
         rows = []
         macro_tile_idxs = []
+        if self.data.mapper_extension:
+            unitile_j = (1 if hardmode else 0) # TODO: hellmode?
+            unitile_rows = self.produce_unitile_rows()
         for y in orows:
             lmr = self.macro_rows[y]
             row = [[0] * 16, [0] * 16]
@@ -324,7 +441,17 @@ class Level:
                     row[j][0x10 - i *2 - 2] = self.world.mirror_tile(row[j][i * 2 + 1])
             
             for j in range(2):
+                # seam shift
                 row[j] = rotated(row[j], (0x10 - lmr.seam) % 0x10)
+                
+                # apply unitile data
+                if self.data.mapper_extension:
+                    x = -1
+                    for h in unitile_rows[2 * y + 1 - j]:
+                        x += 1
+                        u = h[unitile_j]
+                        if u is not None:
+                            row[j][x] = u.med_tile_idx
             
             rows.append(row[1])
             rows.append(row[0])
@@ -754,7 +881,8 @@ class TitleScreen:
         while i < len(table):
             # search for longest prefix
             best_prefix = (0, 0)
-            for j in range(max(0, i - 256), i - 1):
+            for j in range(max(0, i - 256), i):
+                assert(j < i)
                 l = common_prefix_length(table[i:], table[j:], min(len(table) - i, 0x20))
                 if l > best_prefix[1]:
                     best_prefix = (j, l)
@@ -762,6 +890,14 @@ class TitleScreen:
             # discard if too short
             if best_prefix[1] <= 1:
                 best_prefix = (0, 0)
+            
+            # discard if enough zeros to not make it worth it
+            if best_prefix[1] < 8 + 5 + 3:
+                altsize = 0
+                for t in table[best_prefix[0]:best_prefix[0]+best_prefix[1]]:
+                    altsize += (1 if t == 0 else 8)
+                if altsize < 8 + 5 + 3:
+                    best_prefix = (0, 0)
             
             # how long is the following chain of zeros?
             best_zeros = common_prefix_length(table[i:], [0] * 0x100, min(len(table) - i, 0x100))
@@ -771,6 +907,10 @@ class TitleScreen:
                 for j in range(best_zeros):
                     bs.write_bit(0)
                     i += 1
+            elif best_zeros > 8 + 5 + 3 + 1 and best_zeros > best_prefix[1] and i > 0 and table[i - 1] != 0:
+                # permits good RLE compression on next pass.
+                bs.write_bit(0)
+                i += 1
             elif best_prefix[1] > 1:
                 # write reference
                 bs.write_bit(1)
@@ -781,6 +921,7 @@ class TitleScreen:
                 
                 # length
                 bs.write_bits(best_prefix[1] - 1, 5)
+                
                 i += best_prefix[1]
             else:
                 # write literal byte
@@ -790,8 +931,8 @@ class TitleScreen:
                 i += 1
         
         # bounds check
-        if bs.offset + (bs.bitoffset / 8) > constants.ram_range_title_screen[1]:
-            self.errors += ["title screen exceeds range"]
+        if bs.offset + (bs.bitoffset / 8) > self.data.ram_to_rom(constants.ram_range_title_screen[1]):
+            self.data.errors += ["title screen exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_title_screen[1])) + ")" ]
             return False
         return True
     
@@ -815,7 +956,8 @@ class TitleScreen:
                         else:
                             self.table.append(self.table[-sub])
                 else:
-                    self.table.append(bs.read_bits(8))
+                    b = bs.read_bits(8)
+                    self.table.append(b)
         
         self.palette_idxs = self.table[-constants.title_screen_palette_idx_count:]
         self.table = self.table[0:-constants.title_screen_palette_idx_count]
@@ -875,20 +1017,22 @@ class TextData:
                 else:
                     if t in constants.text_lookup:
                         i = constants.text_lookup.index(t)
-                        if i < 0x1b:
+                        if i <= 0x1b:
                             # common character
+                            assert(i + 4 < 0x20)
                             bs.write_bits(i + 4, 5)
                         else:
                             # extended character
                             bs.write_bits(2, 5)
+                            assert(i - 0x1a < 0x20)
                             bs.write_bits(i - 0x1a, 5)
                     else:
                         self.data.errors += ["Invalid text symbol: \"" + t + "\""]
                         return False
             
         # bounds check
-        if bs.offset + (bs.bitoffset / 8) > constants.ram_range_text[1]:
-            self.errors += ["text section exceeds range"]
+        if bs.offset + (bs.bitoffset / 8) > self.data.ram_to_rom(constants.ram_range_text[1]):
+            self.data.errors += ["text section exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_text[1])) + ")" ]
             return False
         return True
             
@@ -1137,16 +1281,31 @@ class MMData:
         
         # write levels
         level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
+        unitile_location = mappermages.unitile_table_range[0] + 2 * constants.level_count
         for level in self.levels:
-            result, level_ram_location = level.commit(level_ram_location)
             # write level data
+            result, level_ram_location = level.commit(level_ram_location)
             if not result:
                 return False
+            
+            # optional unitile extension
+            if self.mapper_extension:
+                result, unitile_location = level.commit_unitile(unitile_location)
+                
+                if not result:
+                    return False
+            
+        # level bounds check
         ram_level_end = 0xC000 if self.mapper_extension else constants.ram_range_levels[1]
         if level_ram_location > ram_level_end:
             self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
             return False
-                
+        
+        if self.mapper_extension:
+            if unitile_location > mappermages.unitile_table_range[1]:
+                self.errors += ["unitile (med-tile patch) space exceeded (" + HX(unitile_location) + " > " + HX(mappermages.unitile_table_range[1]) + ")"]
+                return False
+        
         # write music
         if not self.music.commit():
             return False
@@ -1275,6 +1434,8 @@ class MMData:
             out("# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.")
             out()
             out("# tiles")
+            out("# __ is equivalent to 00.")
+            out()
             for i in range(0, len(self.title_screen.table), 0x20):
                 row = self.title_screen.table[i:(i+0x20)]
                 s = "T "
@@ -1414,6 +1575,25 @@ class MMData:
                             
                     out(hx(row.seam) + ":", hb(row.macro_tiles[0]), hb(row.macro_tiles[1]), hb(row.macro_tiles[2]), hb(row.macro_tiles[3]), "    " + hmode)
                 out()
+                
+                if self.mapper_extension:
+                    out("# unitile (med-tile patch) rows (from top/end of level to bottom/start).")
+                    out("# Each row is 256x16 pixels.")
+                    out()
+                    
+                    utrows = level.produce_unitile_rows()
+                    for j in range(3):
+                        out("# " + ["Normal", "Hard", "Hell"][j] + " mode")
+                        for row in reversed(utrows):
+                            s = "U" + ["N", "H", "L"][j] + " "
+                            for u in row:
+                                if u[j] is None:
+                                    s += "__ "
+                                else:
+                                    s += HB(u[j].med_tile_idx) + " "
+                            out(s)
+                        out()
+                
                 out("# objects ")
                 out("# x and y are in micro-tiles (8 pixels)")
                 out("# optional flag -x or -y or -xy to flip the object.")
@@ -1589,6 +1769,7 @@ class MMData:
                             level.hardmode_patches = []
                             row = constants.macro_rows_per_level - 1
                             obji = 0
+                            unitile_row_idx = [constants.macro_rows_per_level * 2 - 1] * 3
                     
                     # object config is different
                     elif cfg is not None:
@@ -1713,6 +1894,26 @@ class MMData:
                         level.macro_rows[row] = mrow
                         row -= 1
                     
+                    # unitile patch
+                    if directive[0] == "U":
+                        j = "NHL".index(directive[1])
+                        
+                        x = -1
+                        for token in tokens[1:]:
+                            x += 1
+                            if token == "__":
+                                continue
+                            u = UnitilePatch()
+                            u.y = unitile_row_idx[j]
+                            u.x = x
+                            u.flag_normal = j == 0
+                            u.flag_hard = j == 1
+                            u.flag_hell = j == 2
+                            u.med_tile_idx = int(token, 16)
+                            level.unitile_patches.append(u)
+                            
+                        unitile_row_idx[j] -= 1
+                    
                     # object
                     if directive == "-":
                         assert(len(tokens) > 3)
@@ -1804,8 +2005,14 @@ class MMData:
             # correct title screen
             while len(self.title_screen.table) < constants.title_screen_tile_count:
                 self.title_screen.table.append(0)
+            if len(self.title_screen.table) > constants.title_screen_tile_count:
+                self.errors += ["title screen has too many tiles."]
+                return False
             while len(self.title_screen.palette_idxs) < constants.title_screen_palette_idx_count:
                 self.title_screen.palette_idxs.append(0)
+            if len(self.title_screen.palette_idxs) > constants.title_screen_palette_idx_count:
+                self.errors += ["title screen has too many palette idxs."]
+                return False
             return True
         return False
                         

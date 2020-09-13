@@ -11,7 +11,7 @@ filemax = 0x1000000
 def endhunk(out, hunk):
     size = bytearray(2)
     for i in range(2):
-        size[i] = len(hunk) >> (8 if i == 0 else 0)
+        size[i] = (len(hunk) >> (8 if i == 0 else 0)) & 0xff
     out(size)
     out(hunk)
 

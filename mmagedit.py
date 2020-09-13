@@ -108,7 +108,9 @@ if filepath is not None:
     result = True
 
     if infile != "":
+        tprev = mmdata.title_screen.table
         mmdata.parse(infile)
+        tnew = mmdata.title_screen.table
 
     if exportnes != "":
         result = result and mmdata.write(exportnes)

@@ -22,7 +22,7 @@ class Config0E(ConfigHP):
         
     def commit(self):
         super().commit()
-        self.data.write_byte(self.data.ram_to_rom(self.throw_interval), self.throw_interval)
+        self.data.write_byte(self.data.ram_to_rom(ram_interval_address), self.throw_interval)
     
     def stat(self, out):
         super().stat(out)

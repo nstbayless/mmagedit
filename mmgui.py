@@ -869,6 +869,9 @@ class Gui:
         
         if zoom_idx == self.zoom_idx:
             return
+            
+        if tkinter.messagebox.askyesno("Warning", "Zooming logic is currently in beta. It may take several seconds to process this request. Continue?") is False:
+            return
         
         # close subwindows
         while len(self.subwindows) > 0:
@@ -1431,7 +1434,7 @@ class Gui:
                     if flipy:
                         img = ImageOps.flip(img)
                     if self.zoom() != 1:
-                        img = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()))
+                        img = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()), method=Image.NEAREST)
                     self.object_images[j][i] = ImageTk.PhotoImage(image=img)
         
         # micro-tile images
@@ -1443,7 +1446,7 @@ class Gui:
             for palette_idx in range(8):
                 for id in range(0x100):
                     img = images[palette_idx // 4][palette_idx % 4][id]
-                    imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()))
+                    imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()), method=Image.NEAREST)
                     self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=imgzoom)
     
     def select_stage(self, stage_idx, hard=False):

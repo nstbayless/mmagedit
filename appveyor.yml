@@ -15,8 +15,8 @@ build_script:
 
 after_build:
     - dir mmagedit /a-D /S /B
-    - mmagedit\\mmagedit.exe --deps
-    - mmagedit\\mmagedit.exe --help
+    # - mmagedit\\mmagedit.exe --help
+    # - mmagedit\\mmagedit.exe --deps
 
 artifacts:
     - path: mmagedit

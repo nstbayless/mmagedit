@@ -56,7 +56,7 @@ def produce_object_images(data, semi=False):
             
             palette = constants.greyscale_palette
             if "palette" in object_data:
-                palette = constants.sprite_palettes[object_data["palette"]]
+                palette = data.sprite_palettes[object_data["palette"]]
             
             for i in range(len(chr)):
                 for j in range(len(chr[i])):

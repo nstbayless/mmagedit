@@ -919,12 +919,21 @@ class MMData:
             self.worlds = []
             self.mirror_pairs = []
             self.chest_objects = []
+            self.sprite_palettes = []
             
             # read special mods
             self.mods = dict()
             self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
             self.mapper_extension = False
+            
+            # read palettes
+            bs = BitStream(self.bin, self.ram_to_rom(constants.ram_sprite_palette_table))
+            for i in range(4):
+                palette = [0xf]
+                for j in range(3):
+                    palette.append(bs.read_bits(6))
+                self.sprite_palettes.append(palette)
             
             # read spawnable objects list
             for i in range(0x20):
@@ -1013,6 +1022,12 @@ class MMData:
         # possibly add extra banks
         if self.mapper_extension:
             self.commit_bank_extension()
+        
+        # write palettes
+        bs = BitStream(self.bin, self.ram_to_rom(constants.ram_sprite_palette_table))
+        for i in range(4):
+            for j in range(3):
+                bs.write_bits(self.sprite_palettes[i][j + 1], 6)
         
         # write spawnable objects list
         for i in range(len(self.spawnable_objects)):
@@ -1197,7 +1212,7 @@ class MMData:
             out()
             out("# palette indices")
             for i in range(0, len(self.title_screen.palette_idxs), 0x8):
-                row = self.title_screen.palette_idxs[max(i - 0x6, 0):min(i + 0x2, len(self.title_screen.palette_idxs) - 1)]
+                row = self.title_screen.palette_idxs[max(i - 0x5, 0):min(i + 0x3, len(self.title_screen.palette_idxs))]
                 s = "P "
                 for j in row:
                     s += HB(j) + " "
@@ -1215,8 +1230,17 @@ class MMData:
             
             # global tile data
             
-            # med-tiles
             out("-- global --")
+            
+            out()
+            out("# sprite palettes")
+            for i in range(4):
+                s = "P" + str(i) + " "
+                for j in range(3):
+                    s += HX(self.sprite_palettes[i][j + 1]) + " "
+                out(s)
+            
+            # med-tiles
             out()
             out("# 16x16 med-tile data, common to all worlds")
             out("# details 8x8 micro-tile composition of 16x16 med-tiles")
@@ -1405,6 +1429,7 @@ class MMData:
             
     # read data from a human-readable hack.txt file
     def parse(self, file):
+        print(self.title_screen.palette_idxs)
         with open(file, "r") as f:
             
             level = None
@@ -1543,7 +1568,7 @@ class MMData:
                             col = int(tokens[i], 16)
                             palette = None
                             if world is None:
-                                palette = self.palettes_sprite[palette_idx]
+                                palette = self.sprite_palettes[palette_idx]
                             else:
                                 palette = world.palettes[palette_idx]
                             palette[i] = col

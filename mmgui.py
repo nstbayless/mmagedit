@@ -4,6 +4,7 @@ import os
 
 import mmimage
 import mmdata
+import mappermages
 from functools import partial
 import math
 
@@ -39,6 +40,7 @@ linecol = "#888"
 divcol = "#cff"
 selcol = constants.meta_colour_str
 patchcol = constants.meta_colour_str
+unipatchcol = "#cfc"
 objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str_b}
 
 zoom_levels = [2]
@@ -293,13 +295,23 @@ class GuiMod(GuiSubWindow):
             enabled = mod["widget"].instate(['selected'])
             name = mod["name"]
             if name == "mapper-extension":
-                self.core.data.mapper_extension = enabled
+                if self.core.data.mapper_extension != enabled:
+                    self.core.apply_action(GuiAction(
+                        type="mod", refresh=["all"],
+                        context=GuiMod,
+                        mod_name=name,
+                        new_value=enabled,
+                        prev_value=not enabled
+                    ))
             else:
-                self.core.data.mods[name] = enabled
-        
-        self.core.dirty = True
-        self.core.refresh_label()
-        self.core.refresh_title()
+                if self.core.data.mods[name] != enabled:
+                    self.core.apply_action(GuiAction(
+                        type="mod", refresh=[],
+                        context=GuiMod,
+                        mod_name=name,
+                        new_value=enabled,
+                        prev_value=not enabled
+                    ))
         
 
 # 16x16 macro-tile editor
@@ -711,6 +723,7 @@ class Gui:
         self.menu_commands = dict()
         self.object_select_gid = None
         self.macro_tile_select_id = None
+        self.unitile_select_id = None
         self.level = None
         self.stage_idx = 0
         self.hard = False
@@ -728,6 +741,9 @@ class Gui:
         self.elts_objects = []
         self.elts_patch_rects = []
         self.elt_object_select_rect = None
+        
+        self.mapper_extension_components_init = False
+        
         self.init()
     
     def zoom(self):
@@ -887,6 +903,8 @@ class Gui:
         self.stage_canvas.configure(width=screenwidth * self.zoom(), scrollregion=(0, 0, level_width * self.zoom(), level_height * self.zoom()))
         self.object_canvas.configure(width=objwidth * self.zoom())
         self.macro_canvas.refresh_zoom()
+        if self.mapper_extension_components_init and self.data.mapper_extension:
+            self.unitile_canvas.refresh_zoom()
         self.refresh_all()
         
     def refresh_all(self):
@@ -937,7 +955,7 @@ class Gui:
                 self.refresh_row_lines(i)
             if self.show_crosshairs and self.show_lines:
                 self.refresh_objects() # necessary to prevent crosshairs from falling behind grid
-        if "show_patches" in kw and self.hard:
+        if "show_patches" in kw and (self.hard or self.data.mapper_extension):
             self.show_patches = kw["show_patches"]
             self.refresh_patch_rects()
         
@@ -1078,7 +1096,49 @@ class Gui:
         if action.type == "med-palette":
             world = self.data.worlds[action.world_idx]
             world.med_tile_palettes[action.med_tile_idx] = action.prev_palette_idx if undo else action.palette_idx
+        if action.type == "mod":
+            if action.mod_name == "mapper-extension":
+                self.data.mapper_extension = action.prev_value if undo else action.new_value
+            else:
+                self.data.mods[action.mod_name] = action.prev_value if undo else action.new_value
+        if action.type == "unitile":
+            # unitile (med-tile patch) -- requires mapper extension
+            # action.x
+            # action.y
+            # action.med_tile_idx [array of idxs per difficulty]
+            # action.prev_med_tile_idx [array of idxs per difficulty]
+            # action.difficulty_flag
+            level.split_unitiles_by_difficulty()
             
+            fill_in_prev = False
+            if action.prev_med_tile_idx is None and not undo:
+                fill_in_prev = True
+                action.prev_med_tile_idx = [None] * 3
+
+            med_tile_idx = action.prev_med_tile_idx if undo else action.med_tile_idx
+            for j in range(3):
+                jflag = 1 << (7 - j)
+                if jflag & action.difficulty_flag:
+                    continue
+                matches = [u for u in level.unitile_patches if u.x == action.x and u.y == action.y and u.get_flags() & jflag == 0]
+                if len(matches) == 0:
+                    # add a new unitile
+                    u = mmdata.UnitilePatch()
+                    u.y = action.y
+                    u.x = action.x
+                    u.flag_normal = j == 0
+                    u.flag_hard = j == 1
+                    u.flag_hell = j == 2
+                    u.med_tile_idx = None
+                    matches.append(u)
+                    level.unitile_patches.append(u)
+                for u in matches:
+                    if fill_in_prev:
+                        action.prev_med_tile_idx[j] = u.med_tile_idx
+                    u.med_tile_idx = med_tile_idx[j]
+                
+            level.combine_unitiles_by_difficulty()
+
         if "row" in action.refresh:
             self.refresh_row_tiles(action.macro_row_idx)
             self.refresh_row_lines(action.macro_row_idx)
@@ -1097,8 +1157,8 @@ class Gui:
             self.subwindowctl(GuiMacroEdit, refresh=True, open=False)
             self.subwindowctl(GuiMedEdit, refresh=True, open=False)
             self.refresh_on_med_tile_update(action.med_tile_idx)
-            self.refresh_title()
-            self.refresh_label() # just in case
+        if "all" in action.refresh:
+            self.refresh_all()
             
         # we've made a change.
         self.dirty = True
@@ -1154,6 +1214,38 @@ class Gui:
                 ))
             
             self.refresh_objects()
+        
+        # med-tile placement
+        if self.unitile_select_id is not None:
+            med_y = clamp_hoi(constants.macro_rows_per_level * 2 - int(y / med_height) - 1, 0, constants.macro_rows_per_level * 2)
+            med_x = clamp_hoi(x // med_width, 0, 0x10)
+            macro_row_idx = med_y // 2
+            
+            # place hell-hard or normal
+            jflag = (0x80 if self.hard else 0x60)
+            
+            if action == "remove":
+                self.apply_action(GuiAction(
+                    type="unitile", refresh=["row", "patches"],
+                    macro_row_idx=macro_row_idx,
+                    x=med_x,
+                    y=med_y,
+                    difficulty_flag=jflag,
+                    med_tile_idx=[None, None, None],
+                    prev_med_tile_idx=None # fill this in on application.
+                ))
+            
+            if action == "place":
+                self.apply_action(GuiAction(
+                    type="unitile", refresh=["row", "patches"],
+                    macro_row_idx=macro_row_idx,
+                    x=med_x,
+                    y=med_y,
+                    difficulty_flag=jflag,
+                    med_tile_idx=[self.unitile_select_id] * 3,
+                    prev_med_tile_idx=None # fill this in on application.
+                ))
+            
         
         # tile adjustment
         if self.macro_tile_select_id is not None or (action == "seam" and not place_duplicates):
@@ -1244,6 +1336,7 @@ class Gui:
         if idx < len(self.placable_tiles):
             self.macro_tile_select_id = self.placable_tiles[idx]
             self.object_select_gid = None
+            self.unitile_select_id = None
             if edit:
                 self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx, macro_tile_idx=self.macro_tile_select_id)
             self.refresh_selection_rect()
@@ -1255,6 +1348,7 @@ class Gui:
         y = self.get_event_y(event, self.object_canvas, len(self.placable_objects) * (objheight * self.zoom())) / self.zoom()
         idx = clamp_hoi(y / (objheight), 0, len(self.placable_objects))
         self.macro_tile_select_id = None
+        self.unitile_select_id = None
         self.object_select_gid = self.placable_objects[idx]
         self.refresh_selection_rect()
         self.refresh_label()
@@ -1359,14 +1453,21 @@ class Gui:
         stage_frame = tk.Frame(main_frame)
         stage_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
+        stage_topbar = tk.Frame(stage_frame)
+        stage_topbar.pack(side=tk.BOTTOM, fill=tk.X, expand=False)
+        
         selectors_frame = tk.Frame(main_frame)
+        self.selectors_frame = selectors_frame
         selectors_frame.pack(side = tk.RIGHT, fill=tk.Y)
         
         selector_macro_frame = tk.Frame(selectors_frame)
-        selector_macro_frame.pack(side = tk.LEFT, fill=tk.Y, expand=True)
+        selector_macro_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True)
         
-        selector_objects_frame = tk.Frame(selectors_frame)
-        selector_objects_frame.pack(side = tk.RIGHT, fill=tk.Y, expand=True)
+        self.selectors_subframe = tk.Frame(selectors_frame)
+        self.selectors_subframe.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
+        
+        selector_objects_frame = tk.Frame(self.selectors_subframe)
+        selector_objects_frame.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
         
         # canvases
         stage_canvas = tk.Canvas(stage_frame, width=screenwidth * self.zoom(), height=screenheight, scrollregion=(0, 0, level_width * self.zoom(), level_height * self.zoom()), bg="black")
@@ -1377,7 +1478,6 @@ class Gui:
         stage_canvas.bind("<Button-3>", partial(self.on_stage_click, 3))
         
         macro_canvas = GuiMicroGrid(selector_macro_frame, self, w=macro_width // micro_width * self.macro_tile_select_width, height=screenheight, chunkdim=(macro_width // micro_width, macro_height // micro_height), cb=self.on_macro_click)
-        macro_canvas.divides = [constants.global_macro_tiles_count]
         macro_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
         
         object_canvas = tk.Canvas(selector_objects_frame, width=objwidth, height=screenheight, bg="black")
@@ -1398,8 +1498,16 @@ class Gui:
         self.stage_mirror_cover_images = [[None for x in range(level_width // med_width)] for y in range(level_height // macro_height)]
         self.object_select_images = [None for y in range(0x100)]
         
+        # stage topbar
+        musiclabel = tk.Label(stage_topbar, text="Music: ")
+        musiclabel.grid(column=0, row=0)
+        self.musicdropdown_var = tk.StringVar(self.window)
+        self.musicdropdown = tk.OptionMenu(stage_topbar, self.musicdropdown_var, "---")
+        self.musicdropdown.grid(column=1, row=0)
+        self.musicdropdown_var.set("---")
+        
         # bottom label
-        self.label = tk.Label(self.window)
+        self.label = tk.Label(self.window, width=40)
         self.label.pack(side=tk.BOTTOM, fill=tk.X)
         
         self.window.config(menu=menu)
@@ -1454,6 +1562,7 @@ class Gui:
             return
             
         self.object_select_gid = None
+        self.unitile_select_id = None
         self.macro_tile_select_id = 0x30 if hard else 0xd # a good default selection.
         self.stage_idx = stage_idx
         self.hard = hard
@@ -1461,7 +1570,7 @@ class Gui:
         
         self.placable_objects = []
         
-        self.viewmenu.entryconfig(self.menu_view_patches, state=tk.NORMAL if hard else tk.DISABLED)
+        self.viewmenu.entryconfig(self.menu_view_patches, state=tk.NORMAL if (hard or self.data.mapper_extension) else tk.DISABLED)
         
         # decide on placable tiles
         if hard:
@@ -1499,6 +1608,29 @@ class Gui:
         self.refresh_title()
         self.refresh_label()
         
+        # refresh mapper extension components (only relevant if the mapper-extension mod is enabled)
+        self.refresh_mapper_components()
+        
+        # sets the music dropdown value
+        self.refresh_music_dropdown()
+    
+    def refresh_music_dropdown(self):
+        # set options
+        self.musicdropdown['menu'].delete(0, 'end')
+        
+        if self.hard:
+            self.musicdropdown.config(state=tk.DISABLED)
+        else:
+            self.musicdropdown.config(state=tk.NORMAL)
+        
+        if self.level is not None:
+            options = []
+            for i in range(len(self.data.music.songs)):
+                options.append(HB(i) + " - " + self.data.music.songs[i])        
+                self.musicdropdown['menu'].add_command(label=options[i], command=tk._setit(self.musicdropdown_var, options[i]))
+            
+            self.musicdropdown_var.set(options[self.level.music_idx])
+        
     def refresh_on_macro_tile_update(self, macro_tile_idx):
         for i in range(constants.macro_rows_per_level):
             self.refresh_row_tiles(i, macro_tile_idx=macro_tile_idx)
@@ -1519,6 +1651,7 @@ class Gui:
             self.macro_tile_select_width * macro_width // micro_width,
             ceil_to((len(self.placable_tiles) * macro_height // micro_height) / self.macro_tile_select_width, macro_height // micro_height)
         ))
+        self.macro_canvas.divides = [] if self.hard else [constants.global_macro_tiles_count]
         self.macro_canvas.refresh()
                 
         if self.level is None:
@@ -1593,6 +1726,14 @@ class Gui:
         else:
             self.macro_canvas.selection_idx = None
         self.macro_canvas.refresh()
+        
+        # med canvas handles its own selection rect
+        if self.data.mapper_extension and self.mapper_extension_components_init:
+            if self.unitile_select_id is not None:
+                self.unitile_canvas.selection_idx = self.placable_med_tiles.index(self.unitile_select_id)
+            else:
+                self.unitile_canvas.selection_idx = None
+            self.unitile_canvas.refresh()
         
         # rectangle properties
         rect_colstr = selcol
@@ -1768,24 +1909,101 @@ class Gui:
         self.delete_elements(self.stage_canvas, self.elts_patch_rects)
         self.elts_patch_rects = []
         
-        if self.hard and self.show_patches and self.level is not None:
-            for patch in self.level.hardmode_patches:
-                macro_row = self.level.macro_rows[patch.y]
-                seam = macro_row.seam
-                for mirror in [False, True]:
-                    for loop in [-1, 0, 1]:
-                        y = (constants.macro_rows_per_level -  patch.y - 1) * macro_height
-                        x = (((7 - patch.x) if mirror else patch.x) * 2 + seam) * med_width
-                        x += level_width * loop
-                        x *= self.zoom()
-                        y *= self.zoom()
-                        margin = 4 * self.zoom()
+        if self.show_patches and self.level is not None:
+            if self.hard:
+                for patch in self.level.hardmode_patches:
+                    macro_row = self.level.macro_rows[patch.y]
+                    seam = macro_row.seam
+                    for mirror in [False, True]:
+                        for loop in [-1, 0, 1]:
+                            y = (constants.macro_rows_per_level -  patch.y - 1) * macro_height
+                            x = (((7 - patch.x) if mirror else patch.x) * 2 + seam) * med_width
+                            x += level_width * loop
+                            x *= self.zoom()
+                            y *= self.zoom()
+                            margin = 4 * self.zoom()
+                            self.elts_patch_rects.append(
+                                self.stage_canvas.create_rectangle(
+                                    x + margin, y + margin, x + macro_width * self.zoom() - margin - 1, y + macro_height * self.zoom() - margin - 1,
+                                    outline=patchcol
+                                )
+                            )
+                            
+            # unitile patches
+            if self.data.mapper_extension:
+                margin = 2 * self.zoom()
+                for u in self.level.unitile_patches:
+                    if (self.hard and u.flag_hard) or (not self.hard and u.flag_normal):
+                        x = u.x * med_width * self.zoom()
+                        y = (level_height - (u.y + 1) * med_height) * self.zoom()
                         self.elts_patch_rects.append(
                             self.stage_canvas.create_rectangle(
-                                x + margin, y + margin, x + macro_width * self.zoom() - margin, y + macro_height * self.zoom() - margin,
-                                outline=patchcol
+                                x + margin, y + margin, x + med_width * self.zoom() - margin - 1, y + med_height * self.zoom() - margin - 1,
+                                outline=unipatchcol
                             )
                         )
+    
+    def refresh_mapper_components(self):
+        world = self.data.worlds[self.level.world_idx] if self.level is not None else None
+        if not self.mapper_extension_components_init and self.data.mapper_extension:
+            self.mapper_extension_components_init = True
+            self.unitile_select_width = 4
+            self.selector_unitile_frame = tk.Frame(self.selectors_subframe)
+            self.unitile_canvas = GuiMicroGrid(self.selector_unitile_frame, self, w=med_width // micro_width * self.unitile_select_width, height=screenheight, chunkdim=(med_width // micro_width, med_height // micro_height), cb=self.on_unitile_click)
+            self.unitile_canvas.divides = [constants.global_med_tiles_count]
+            self.unitile_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
+        
+        if self.mapper_extension_components_init:
+            if not self.data.mapper_extension:
+                self.selector_unitile_frame.pack_forget()
+                self.unitile_select_id = None
+            else:
+                self.selector_unitile_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True)
+        
+            if self.data.mapper_extension and world is not None:
+                self.placable_med_tiles = list(range(len(world.med_tiles) + constants.global_med_tiles_count))
+                dims=(
+                    self.unitile_select_width * med_width // micro_width,
+                    ceil_to((len(self.placable_med_tiles) * med_height // micro_height) / self.unitile_select_width, med_height // micro_height)
+                )
+                self.unitile_canvas.configure(dims=dims)
+                self.unitile_canvas.refresh()
+                
+                clear_coords = [(x, y) for x in range(self.unitile_canvas.w) for y in range(self.unitile_canvas.h)]
+                # populate
+                for med_sel_idx in range(len(self.placable_med_tiles)):
+                    med_idx = self.placable_med_tiles[med_sel_idx]
+                    med_y = (med_sel_idx // self.unitile_select_width)
+                    med_x = (med_sel_idx % self.unitile_select_width)
+                    
+                    # set images
+                    med_tile = world.get_med_tile(med_idx)
+                    for j in range(4):
+                        micro_tile_idx = world.get_micro_tile(med_tile[j], self.hard)
+                        x = (j % 2) + med_x * 2
+                        y = (j // 2) + med_y * 2
+                        palette_idx = world.get_med_tile_palette_idx(med_idx, self.hard)
+                        img = self.micro_images[world.idx][palette_idx][micro_tile_idx]
+                        self.unitile_canvas.set_tile_image(x, y, img)
+                        if (x, y) in clear_coords:
+                            clear_coords.remove((x, y))
+                self.unitile_canvas.clear_from(len(self.placable_med_tiles))
+                
+                for clear_coord in clear_coords:
+                    self.unitile_canvas.set_tile_image(clear_coord[0], clear_coord[1], self.blank_image)
+            
+            self.refresh_selection_rect()
+            self.refresh_label()
+    
+    def on_unitile_click(self, idx, edit):
+        if idx < len(self.placable_med_tiles):
+            self.unitile_select_id = self.placable_med_tiles[idx]
+            self.object_select_gid = None
+            self.macro_tile_select_id = None
+            if edit:
+                self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx, med_tile_idx=self.unitile_select_id)
+            self.refresh_selection_rect()
+            self.refresh_label()
     
     def refresh_title(self):
         str = constants.mmname
@@ -1814,7 +2032,9 @@ class Gui:
                 object_name = constants.object_names[self.object_select_gid][0]
                 str += "Object: " + object_name
             elif self.macro_tile_select_id is not None:
-                str += "Tile: " + HB(self.macro_tile_select_id)
+                str += "Macro-Tile: " + HB(self.macro_tile_select_id)
+            elif self.unitile_select_id is not None:
+                str += "Med-tile: " + HB(self.unitile_select_id)
             
             while len(str) < 0x26:
                 str += " "
@@ -1840,7 +2060,25 @@ class Gui:
                 str += "Total Remaining: " + HX(max_level_length - total_level_length) + " of " + HX(max_level_length) + " bytes"
             else:
                 str += "OVERLIMIT: " + HX(total_level_length - max_level_length) + " past " + HX(max_level_length) + " bytes"
-                color="red"
+                color = "red"
+
+            # unitile patch data
+            if self.data.mapper_extension:
+                unitile_size = 0
+                unitile_max = mappermages.unitile_table_range[1] - mappermages.unitile_table_range[0]
+                for level in self.data.levels:
+                    # add 2 for the pointer at the start, which is not part of the stream
+                    unitile_size += level.produce_unitile_stream().length_bytes() + 2
+                
+                str += " | Level Med-Tile patches: " + HX(self.level.produce_unitile_stream().length_bytes() + 2)
+                
+                str += " bytes; Total remaining: "
+                if unitile_size <= unitile_max:
+                    str += HX(unitile_max - unitile_size) + " free of " + HX(unitile_max) + " bytes"
+                else:
+                    str += HX(unitile_size - unitile_max) + " OVERLIMIT past " + HX(unitile_max) + " bytes"
+                    color = "red"
+
             
         self.label.configure(text=str, fg=color, anchor=tk.W, font=("TkFixedFont", 7, "normal"))
     

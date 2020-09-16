@@ -6,6 +6,7 @@ import functools
 import hashlib
 import ips
 import mappermages
+import copy
 
 # this is used for the optional single-med-tile patching mod
 # represents the bit sequence for the patches
@@ -37,7 +38,7 @@ class UnitileStream:
     
     def add_patch(self, patch):
         assert(not self.complete)
-        assert(patch.get_i() > self.i)
+        assert(patch.get_i() >= self.i)
         
         # optional single-unit 'advance'
         
@@ -175,6 +176,7 @@ class UnitilePatch:
         self.med_tile_idx = 0
         
         # which difficulties does this appear on?
+        # true means it appears.
         self.flag_normal = True
         self.flag_hard   = True
         self.flag_hell   = True
@@ -183,7 +185,14 @@ class UnitilePatch:
         return self.x + self.y * 0x10
         
     def get_flags(self):
+        # produces a 1 in bits 5-7 depending on which difficulty the tile
+        # does NOT appear on. A 0-valued bit means the tile does appear.
         return (0 if self.flag_normal else 0x80) | (0 if self.flag_hard else 0x40) | (0 if self.flag_hell else 0x20)
+    
+    def set_flags(self, flags):
+        self.flag_normal = flags & 0x80 == 0
+        self.flag_hard = flags & 0x40 == 0
+        self.flag_hell = flags & 0x20 == 0
 
 class LevelMacroRow:
     def __init__(self, data):
@@ -332,6 +341,55 @@ class Level:
         
         return out
     
+    # there is some redundancy in the ways the unitiles can be expressed
+    # these two functions re-express the same data in different ways
+    # this simplifies other logic which operate on unitiles.
+    def split_unitiles_by_difficulty(self):
+        old_unitiles = self.unitile_patches
+        self.unitile_patches = []
+        for u in old_unitiles:
+            if u.med_tile_idx is not None:
+                for j in range(3):
+                    flag = 1 << (7 - j)
+                    if u.get_flags() & flag == 0:
+                        if u.get_flags() == 0x80 or u.get_flags == 0x40 or u.get_flags == 0x20 or u.get_flags == 0:
+                            # we make a copy so that we can have exactly one of the flags active.
+                            uc = UnitilePatch()
+                            uc.x = u.x
+                            uc.y = u.y
+                            uc.med_tile_idx = u.med_tile_idx
+                        else:
+                            # tile already has exactly one flag active, so we reuse it; no need to copy.
+                            uc = u
+                        uc.flag_normal = j == 0
+                        uc.flag_hard = j == 1
+                        uc.flag_hell = j == 2
+                        assert(uc.get_flags() != 0 and uc.get_flags() != 0xE0)
+                        self.unitile_patches.append(uc)
+
+    def combine_unitiles_by_difficulty(self):
+        old_unitiles = self.unitile_patches
+        self.unitile_patches = []
+        for u in old_unitiles:
+            # don't add if the tile is vacuous (would not appear on any difficulty)
+            if u.med_tile_idx is not None and u.get_flags() != 0xE0:
+                # check if a compatible tile was already added
+                matches = [v for v in self.unitile_patches if v.x == u.x and v.y == u.y and v.med_tile_idx == u.med_tile_idx]
+                if len(matches) == 0:
+                    # no luck -- add new tile instead
+                    uc = UnitilePatch()
+                    uc.x = u.x
+                    uc.y = u.y
+                    uc.med_tile_idx = u.med_tile_idx
+                    uc.set_flags(u.get_flags())
+                    self.unitile_patches.append(uc)
+                else:
+                    for v in matches:
+                        # adjust the flags of the existing tile
+                        v.flag_normal = v.flag_normal or u.flag_normal
+                        v.flag_hard = v.flag_hard or u.flag_hard
+                        v.flag_hell = v.flag_hell or u.flag_hell
+
     # returns error, new ram output location
     def commit_unitile(self, ram):
         rom = self.data.ram_to_rom(ram)
@@ -341,6 +399,7 @@ class Level:
         self.data.write_word(rom_table_location, ram)
         
         # write unitile data sequence
+        self.combine_unitiles_by_difficulty()
         us = self.produce_unitile_stream()
         bs = BitStream(self.data.bin, rom)
         for entry in us.entries:
@@ -404,7 +463,7 @@ class Level:
         us = UnitileStream()
         
         # add unitiles to stream sorted by y position
-        for patch in sorted(self.unitile_patches, key=lambda patch : patch.y * 0x10 + patch.x):
+        for patch in sorted(self.unitile_patches, key=lambda patch : patch.get_i()):
             us.add_patch(patch)
         
         us.finalize()
@@ -875,7 +934,7 @@ class TitleScreen:
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
         table = self.table + self.palette_idxs
         
-        # Lempel–Ziv compression, more or less
+        # Lempelï¿½Ziv compression, more or less
         # TODO: this can be optimized further.
         i = 0
         while i < len(table):
@@ -940,7 +999,7 @@ class TitleScreen:
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
         self.table = []
         
-        # Lempel–Ziv decompression, more or less
+        # Lempelï¿½Ziv decompression, more or less
         while len(self.table) < constants.title_screen_tile_count + constants.title_screen_palette_idx_count: # FIXME: this is the wrong condition.
             isblank = bs.read_bits(1) == 0
             if isblank:
@@ -1721,6 +1780,9 @@ class MMData:
                     if directive == "--" and len(tokens) >= 3:
                         music = None
                         world = None
+                        if level is not None:
+                            # optimization.
+                            level.combine_unitiles_by_difficulty()
                         level = None
                         song_idx = None
                         cfg = None

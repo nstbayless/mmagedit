@@ -1472,7 +1472,7 @@ class Gui:
         # canvases
         stage_canvas = tk.Canvas(stage_frame, width=screenwidth * self.zoom(), height=screenheight, scrollregion=(0, 0, level_width * self.zoom(), level_height * self.zoom()), bg="black")
         self.attach_scrollbar(stage_canvas, stage_frame)
-        stage_canvas.pack(side=tk.LEFT, fill=tk.Y, expand=True)
+        stage_canvas.pack(side=tk.TOP, fill=tk.Y, expand=True)
         stage_canvas.bind("<Button-1>", partial(self.on_stage_click, 1))
         stage_canvas.bind("<Button-2>", partial(self.on_stage_click, 2))
         stage_canvas.bind("<Button-3>", partial(self.on_stage_click, 3))
@@ -1501,10 +1501,9 @@ class Gui:
         # stage topbar
         musiclabel = tk.Label(stage_topbar, text="Music: ")
         musiclabel.grid(column=0, row=0)
-        self.musicdropdown_var = tk.StringVar(self.window)
-        self.musicdropdown = tk.OptionMenu(stage_topbar, self.musicdropdown_var, "---")
-        self.musicdropdown.grid(column=1, row=0)
-        self.musicdropdown_var.set("---")
+        self.stage_topbar = stage_topbar
+        self.musicdropdown = None
+        self.stage_topbar.pack_forget()
         
         # bottom label
         self.label = tk.Label(self.window, width=40)
@@ -1616,20 +1615,25 @@ class Gui:
     
     def refresh_music_dropdown(self):
         # set options
-        self.musicdropdown['menu'].delete(0, 'end')
-        
-        if self.hard:
-            self.musicdropdown.config(state=tk.DISABLED)
-        else:
-            self.musicdropdown.config(state=tk.NORMAL)
-        
+        if self.musicdropdown is not None:
+            self.musicdropdown.destroy()
+            
         if self.level is not None:
             options = []
             for i in range(len(self.data.music.songs)):
                 options.append(HB(i) + " - " + self.data.music.songs[i])        
-                self.musicdropdown['menu'].add_command(label=options[i], command=tk._setit(self.musicdropdown_var, options[i]))
+        
+            self.stage_topbar.pack(side=tk.BOTTOM, fill=tk.X, expand=False)
             
+            self.musicdropdown_var = tk.StringVar(self.window)
+            self.musicdropdown = tk.OptionMenu(self.stage_topbar, self.musicdropdown_var, *options)
+            self.musicdropdown.grid(column=1, row=0)
             self.musicdropdown_var.set(options[self.level.music_idx])
+            
+            if self.hard:
+                self.musicdropdown.config(state=tk.DISABLED)
+            else:
+                self.musicdropdown.config(state=tk.NORMAL)
         
     def refresh_on_macro_tile_update(self, macro_tile_idx):
         for i in range(constants.macro_rows_per_level):
@@ -1755,16 +1759,17 @@ class Gui:
         self.elts_stage_horizontal_lines = []
         
         # top and bottom dark shadow lines
-        for i in [0, 1, 3, 5, 7]:
-            for top in [False, True]:
-                y = i if top else level_height - i - 1
-                self.elts_stage_horizontal_lines.append(
-                    self.stage_canvas.create_line(
-                        0, y * self.zoom(), level_width * self.zoom(), y * self.zoom(),
-                        fill="black",
-                        width=self.zoom()
+        if self.show_lines:
+            for i in [0, 1, 3, 5, 7]:
+                for top in [False, True]:
+                    y = i if top else level_height - i - 1
+                    self.elts_stage_horizontal_lines.append(
+                        self.stage_canvas.create_line(
+                            0, y * self.zoom(), level_width * self.zoom(), y * self.zoom(),
+                            fill="black",
+                            width=self.zoom()
+                        )
                     )
-                )
         
         # horizontal grid lines
         if self.show_lines:

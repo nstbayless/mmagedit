@@ -48,7 +48,6 @@ zoom_levels = [2]
 resource_dir = os.path.dirname(os.path.realpath(__file__))
 icon_path = os.path.join(resource_dir, "icon.png")
 
-
 # a component based on a grid of micro-tiles
 class GuiMicroGrid(tk.Canvas):
     def __init__(self, parent, core, **kwargs):
@@ -1529,7 +1528,8 @@ class Gui:
     
     # this is quite expensive... progress bar? coroutine?
     def refresh_chr(self):
-        assert(self.data)
+        if self.data is None:
+            return
         
         # image for covering mirrored side
         self.mirror_cover_image = Image.new('RGBA', (med_width * self.zoom(), macro_height * self.zoom()), color=(0xa0, 0xa0, 0xa0, 0xc0))
@@ -1641,11 +1641,20 @@ class Gui:
             self.musicdropdown = tk.OptionMenu(self.stage_topbar, self.musicdropdown_var, *options)
             self.musicdropdown.grid(column=1, row=0)
             self.musicdropdown_var.set(options[self.level.music_idx])
+            self.musicdropdown_var.trace("w", callback=self.on_music_idx_change)
             
             if self.hard:
                 self.musicdropdown.config(state=tk.DISABLED)
             else:
                 self.musicdropdown.config(state=tk.NORMAL)
+    
+    def on_music_idx_change(self, avr, unk, mode):
+        s = self.musicdropdown_var.get()
+        if s.startswith("-") or " " not in s:
+            return
+        else:
+            n = int(s.split(" ")[0], 16)
+            self.level.music_idx = n
         
     def refresh_on_macro_tile_update(self, macro_tile_idx):
         for i in range(constants.macro_rows_per_level):

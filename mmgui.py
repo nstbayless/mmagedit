@@ -657,6 +657,7 @@ class GuiMacroEdit(GuiSubWindow):
                 y = i // 2 + med_y * 2
                 img = self.core.micro_images[world.idx][palette_idx][micro_tile_idx]
                 self.select_canvas.set_tile_image(x, y, img)
+            self.select_canvas.clear_from(count)
         self.select_canvas.refresh()
         
         # set label
@@ -1216,7 +1217,6 @@ class Gui:
                 obj.flipx = self.flipx
                 obj.flipy = self.flipy
                 obj.gid = self.object_select_gid
-                obj.name = constants.object_names[obj.gid][0]
                 
                 self.apply_action(GuiAction(
                     type="object", refresh=["objects"],

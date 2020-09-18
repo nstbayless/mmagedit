@@ -210,7 +210,7 @@ def export_images(data, path="."):
                 elif obj.flipy:
                     text += "|"
                 if objimg is None:
-                    draw.text((x, y), text, fill="white" if obj.name[0:4] != "unk-" else "red")
+                    draw.text((x, y), text, fill="white" if self.data.get_object_name(obj.gid)[0:4] != "unk-" else "red")
                 else:
                     x += 4 - objimg.width//2 + objimg._mm_offset[0]
                     y += 8 - objimg.height + objimg._mm_offset[1]

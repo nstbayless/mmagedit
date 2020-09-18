@@ -91,3 +91,16 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 - Editing the title screen
 - Adjusting world palette colours
 - Adjusting the world med-tile self-symmetry index
+
+## TODO
+
+- more obvious object flip checkbox
+- GUI string editor
+- GUI title screen editor
+- research how relics are stored
+- display space remaining more neatly
+- more efficient med-tile patch loading when mapper extension is enabled
+- arbitrary object placement when mapper extension is enabled
+- objects with normal/hard/hell flags
+- adjust level size?
+- adjust level direction/orientation?

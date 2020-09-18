@@ -145,7 +145,6 @@ class Object:
         self.x = 0 # in microtiles
         self.y = 0 # in microtiles
         self.gid = 0 # lookup (0xdab1),i
-        self.name = "" # TDDO: remove this field, it's redundant and not worth the headache.
         self.flipx = False
         self.flipy = False
         self.compressed = False
@@ -318,7 +317,6 @@ class Level:
                 break
                 
             obj.gid = self.data.spawnable_objects[i]
-            obj.name = self.data.get_object_name(obj.gid)
             if obj.y >= 0:
                 self.objects.append(obj)
         
@@ -1667,7 +1665,7 @@ class MMData:
                     pads = " "
                     if obj.compressed:
                         pads = "*"
-                    out("-", obj.name + " " * (10 - len(obj.name)), pads, "x" + hb(obj.x), "y" + hb(obj.y), flags)
+                    out("-", self.get_object_name(obj.gid) + " " * (10 - len(self.get_object_name(obj.gid))), pads, "x" + hb(obj.x), "y" + hb(obj.y), flags)
                 
                 out()
             
@@ -1984,7 +1982,6 @@ class MMData:
                         
                         # look up name.
                         name = tokens[1]
-                        obj.name = name
                         if name.startswith("unk-"):
                             obj.gid = int(name[4:], 16)
                         else:

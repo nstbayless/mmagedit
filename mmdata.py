@@ -15,6 +15,7 @@ class UnitileStream:
         self.entries = []
         self.i = 0
         self.complete = False
+        self.region_starts = [-1, -1, -1, -1]
     
     def length_bits(self):
         assert(self.complete)
@@ -40,8 +41,22 @@ class UnitileStream:
         assert(not self.complete)
         assert(patch.get_i() >= self.i)
         
-        # optional single-unit 'advance'
+        # force alignment to a region boundary
+        region_boundaries = [0, 0x100, 0x200, 0x300]
+        j = -1
+        for region_boundary in region_boundaries:
+            j += 1
+            if patch.get_i() > region_boundary and self.i < region_boundary:
+                up = UnitilePatch()
+                up.med_tile_idx = None
+                up.x = region_boundary % 0x10
+                up.y = region_boundary // 0x10
+                self.add_patch(up)
         
+            if self.i == region_boundary and self.region_starts[j] == -1:
+                self.region_starts[j] = len(self.entries)
+        
+        # optional single-unit 'advance'
         if patch.get_i() == self.i + 1:
             self.entries.append(self.as_bits(3, 8))
             self.i += 1
@@ -54,7 +69,8 @@ class UnitileStream:
             self.entries.append( self.as_bits(1, 8) + self.as_bits(idiff - 1, 8) )
         
         # write patch byte
-        self.entries.append(self.as_bits(2 | patch.get_flags(), 8) + self.as_bits(patch.med_tile_idx, 8))
+        if patch.med_tile_idx is not None:
+            self.entries.append(self.as_bits(2 | patch.get_flags(), 8) + self.as_bits(patch.med_tile_idx, 8))
     
     def finalize(self):
         assert(not self.complete)
@@ -327,6 +343,8 @@ class Level:
     
     def length_unitile_bytes(self):
         us = self.produce_unitile_stream()
+        if len(us.entries) <= 1:
+            return 0
         return us.length_bytes()
     
     def produce_unitile_rows(self):
@@ -392,16 +410,24 @@ class Level:
     def commit_unitile(self, ram):
         rom = self.data.ram_to_rom(ram)
         
-        # write pointer to unitile data
-        rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 2 * self.level_idx)
-        self.data.write_word(rom_table_location, ram)
+        # zero out the table
+        for j in range(4):
+            rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * j)
+            self.data.write_word(rom_table_location, 0)
         
         # write unitile data sequence
         self.combine_unitiles_by_difficulty()
         us = self.produce_unitile_stream()
         bs = BitStream(self.data.bin, rom)
-        for entry in us.entries:
-            bs.write_bits_list(entry)
+        
+        if len(us.entries) > 1: # we skip if there are no unitiles at all.
+            for i in range(len(us.entries)):
+                if i in us.region_starts:
+                    idx = us.region_starts.index(i)
+                    rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * idx)
+                    self.data.write_word(rom_table_location, bs.offset - rom + ram)
+                entry = us.entries[i]
+                bs.write_bits_list(entry)
             
         return True, ram + self.length_unitile_bytes()
     
@@ -1338,7 +1364,7 @@ class MMData:
         
         # write levels
         level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
-        unitile_location = mappermages.unitile_table_range[0] + 2 * constants.level_count
+        unitile_location = mappermages.unitile_table_range[0] + 8 * constants.level_count
         for level in self.levels:
             # write level data
             result, level_ram_location = level.commit(level_ram_location)

@@ -2100,9 +2100,9 @@ class Gui:
                 unitile_max = mappermages.unitile_table_range[1] - mappermages.unitile_table_range[0]
                 for level in self.data.levels:
                     # add 2 for the pointer at the start, which is not part of the stream
-                    unitile_size += level.produce_unitile_stream().length_bytes() + 2
+                    unitile_size += level.length_unitile_bytes() + 8
                 
-                str += " | Level Med-Tile patches: " + HX(self.level.produce_unitile_stream().length_bytes() + 2)
+                str += " | Level Med-Tile patches: " + HX(self.level.length_unitile_bytes() + 8)
                 
                 str += " bytes; Total remaining: "
                 if unitile_size <= unitile_max:

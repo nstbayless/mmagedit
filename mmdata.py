@@ -934,7 +934,8 @@ class TitleScreen:
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
         table = self.table + self.palette_idxs
         
-        # Lempel�Ziv compression, more or less
+        # Lempel-Ziv compression, more or less
+        
         # TODO: this can be optimized further.
         i = 0
         while i < len(table):
@@ -999,7 +1000,7 @@ class TitleScreen:
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
         self.table = []
         
-        # Lempel�Ziv decompression, more or less
+        # Lempel-Ziv decompression, more or less
         while len(self.table) < constants.title_screen_tile_count + constants.title_screen_palette_idx_count: # FIXME: this is the wrong condition.
             isblank = bs.read_bits(1) == 0
             if isblank:
@@ -1095,7 +1096,6 @@ class TextData:
             return False
         return True
             
-
 class MMData:
     # convert ram address to rom address
     def ram_to_rom(self, address, chunk=""):

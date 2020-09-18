@@ -290,25 +290,25 @@ palette_rgb = [
 
 # how to render tiles in the med-tile editor
 component_micro_tile_palettes = [
-    [0 for _ in range(0x10)],
-    [1 for _ in range(0x10)],
-    [1 for _ in range(0x10)],
-    [1 for _ in range(0x10)],
+    [0] * 0x10,
+    [1] * 0x10,
+    [1] * 0x10,
+    [1] * 0x10,
     
-    [1 for _ in range(0x10)],
-    [*[1 for _ in range(0x6)], *[3 for _ in range(0xa)]],
-    [3 for _ in range(0x10)],
-    [3 for _ in range(0x10)],
+    [1] * 0x10,
+    [1] * 0x6 + [3] * 0xa,
+    [3] * 0x10,
+    [3] * 0x10,
     
-    [3 for _ in range(0x10)],
-    [3 for _ in range(0x10)],
-    [3 for _ in range(0x10)],
-    [3 for _ in range(0x10)],
+    [3] * 0x10,
+    [3] * 0x10,
+    [3] * 0x10,
+    [3] * 0x10,
     
-    [3 for _ in range(0x10)],
-    [3, 3, 3, *[2 for _ in range(0x5)], *[3 for _ in range(0x8)]],
-    [3 for _ in range(0x10)],
-    [3 for _ in range(0x10)]
+    [3] * 0x10,
+    [3] * 0x3 + [2] * 0x5 + [3] * 0x8,
+    [3] * 0x10,
+    [3] * 0x10
 ]
 
 object_names = [

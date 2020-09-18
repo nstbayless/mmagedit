@@ -450,8 +450,20 @@ class GuiMedEdit(GuiSubWindow):
             y = (micro_tile_idx // 16)
             
             # set images
-            palette_idx = constants.component_micro_tile_palettes[y][x]
-            img = self.core.micro_images[len(self.core.data.worlds)][palette_idx][micro_tile_idx]
+            
+            # (please don't look at this code. This was done to fix a horrible, horrible bug.)
+            palette_idx = constants.component_micro_tile_palettes[y][x] % 4
+            palette_sub_idx = 1
+            
+            # because...
+            if palette_idx == 0:
+                palette_sub_idx = 0
+            if palette_idx == 1:
+                palette_idx = 0
+            
+            # ok
+            img = self.core.micro_images[palette_idx][palette_sub_idx][micro_tile_idx]
+            
             self.select_canvas.set_tile_image(x, y, img)
         self.select_canvas.refresh()
         
@@ -1546,9 +1558,9 @@ class Gui:
         
         # micro-tile images
         # list [world][palette_idx][id]
-        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in [*self.data.worlds, None]]
-        for world_idx in range(len(self.data.worlds) + 1):
-            world = [*self.data.worlds, None][world_idx]
+        self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
+        for world_idx in range(len(self.data.worlds)):
+            world = self.data.worlds[world_idx]
             images = [mmimage.produce_micro_tile_images(self.data, world, hard) for hard in [False, True]]
             for palette_idx in range(8):
                 for id in range(0x100):
@@ -1716,7 +1728,10 @@ class Gui:
             self.elts_object_select.append(self.object_canvas.create_line(0, line_y, objwidth * self.zoom(), line_y, fill=divcol if divide else linecol, width=2 if divide else 1))
             
             # set object
-            self.object_canvas.itemconfig(self.object_select_images[i], image=self.object_images[flip_idx][gid])
+            img = self.object_images[flip_idx][gid]
+            if img is None:
+                img = self.blank_image
+            self.object_canvas.itemconfig(self.object_select_images[i], image=img)
         
     def refresh_selection_rect(self):
         # clear previous
@@ -1877,9 +1892,12 @@ class Gui:
                 
                 flip_idx = (4 if semi else 0) + (2 if obj.flipy else 0) + (1 if obj.flipx else 0)
                 img = self.object_images[flip_idx][obj.gid]
-
-                offset = obj_data["offset"] if "offset" in obj_data else (0, 0)
-                offset = (offset[0] * self.zoom() - (img.width() // 2), offset[1] * self.zoom() + 8 * self.zoom() - (img.height()))
+                if img is None:
+                    img = self.blank_image
+                    offset = (0, 0)
+                else:
+                    offset = obj_data["offset"] if "offset" in obj_data else (0, 0)
+                    offset = (offset[0] * self.zoom() - (img.width() // 2), offset[1] * self.zoom() + 8 * self.zoom() - (img.height()))
                 
                 # add image
                 self.elts_objects.append(

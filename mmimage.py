@@ -78,8 +78,7 @@ def produce_object_images(data, semi=False):
             img._mm_hard = object_data["hard"] if "hard" in object_data else False
             object_images.append(img)
         else:
-            img = Image.new('RGBA', (8, 8))
-            object_images.append(img)
+            object_images.append(None)
     
     # make the list length 0xff to fit any possible object gid.        
     while len(object_images) < 0x100:

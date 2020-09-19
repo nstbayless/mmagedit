@@ -23,6 +23,7 @@ ram_world_mirror_index_table = 0xaf0c
 ram_sprite_palette_table = 0xbd5f
 ram_chest_table = 0xC45B
 ram_chest_table_length = 0xD
+ram_default_lives = 0xB8F1
 
 ram_object_hp_table = 0xBD9A # first entry is likely omitted.
 ram_object_hp_table_length = 0x19 # speculative

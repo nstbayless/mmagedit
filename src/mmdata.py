@@ -5,6 +5,7 @@ import json
 import functools
 import hashlib
 import src.ips
+import src.bps
 import src.mappermages
 import copy
 
@@ -1218,6 +1219,9 @@ class MMData:
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
             self.mapper_extension = False
             
+            # read number of lives
+            self.default_lives = self.read_byte(self.ram_to_rom(constants.ram_default_lives))
+            
             # read palettes
             bs = BitStream(self.bin, self.ram_to_rom(constants.ram_sprite_palette_table))
             for i in range(4):
@@ -1317,6 +1321,9 @@ class MMData:
         # possibly add extra banks
         if self.mapper_extension:
             self.commit_bank_extension()
+        
+        # write number of lives
+        self.write_byte(self.ram_to_rom(constants.ram_default_lives), self.default_lives)
         
         # write palettes
         bs = BitStream(self.bin, self.ram_to_rom(constants.ram_sprite_palette_table))
@@ -1439,7 +1446,7 @@ class MMData:
             return False
         if not self.commit():
             return False
-        rval = ips.create_patch(self.orgbin, self.bin, file)
+        rval = src.ips.create_patch(self.orgbin, self.bin, file)
         if not rval:
             self.errors += ["Failed to export IPS patch."]
         return rval
@@ -1449,9 +1456,9 @@ class MMData:
         if not self.commit():
             return False
         try:
-            bps.create_patch(self.orgbin, self.bin, file)
-        except:
-            self.errors += ["Failed to export BPS patch."]
+            src.bps.create_patch(self.orgbin, self.bin, file)
+        except Exception as e:
+            self.errors += ["Failed to export BPS patch: " + str(e)]
             return False
         return True
     

@@ -28,10 +28,10 @@ class BPS:
             x = data & 0x7f
             data >>= 7
             if data == 0:
-                out(bytes((0x80 | x)))
+                out(bytes((0x80 | x,)))
                 return
             else:
-                out(bytes((x)))
+                out(bytes((x,)))
             data -= 1
 
     def encode_signed_number(self, data):
@@ -54,7 +54,7 @@ class BPS:
             (c & 0xff000000) >> 24,
         )))
 
-    def write(self, v)
+    def write(self, v):
         self.f.write(v)
         self.patch += v
 
@@ -71,7 +71,7 @@ class BPS:
                     # force a hunk to be written
                     byte_matches = not matches
                 else:
-                    org_offset_byte = self.output_offset - init_offset + org_offset
+                    org_offset_byte = offset - init_offset + org_offset
                     orgbyte = self.org[org_offset_byte]
                     modbyte = self.mod[offset]
                     byte_matches = orgbyte == modbyte
@@ -87,7 +87,7 @@ class BPS:
                     self.insert(offset - self.output_offset)
                     break
 
-    def copy(out, org_offset, length):
+    def copy(self, org_offset, length):
         assert(length > 0)
         if org_offset == self.output_offset:
             # SourceRead
@@ -97,11 +97,12 @@ class BPS:
             self.encode_action_header(2, length)
             self.encode_signed_number(org_offset - self.source_relative_offset)
             self.source_relative_offset = org_offset + length
+        self.output_offset += length
 
     def insert(self, length):
         assert(length > 0)
         # optimization -- encode RLE for last section of patch section
-        rle_end = length
+        """rle_end = length
         orglength = length
         apply_rle = False
         while rle_end > 0:
@@ -112,7 +113,7 @@ class BPS:
         if rle_end < length - 5:
             apply_rle = True
             rle_end += 1 # TargetRead section should encode one of the bytes so we can RLE copy it.
-            length = rle_end
+            length = rle_end"""
 
         assert(length > 0)
         # TargetRead
@@ -122,7 +123,7 @@ class BPS:
         )
         self.output_offset += length
 
-        if apply_rle:
+        """if apply_rle:
             # RLE encode to repeat the last byte written.
             length = orglength - rle_end
             assert(length > 0)
@@ -132,7 +133,7 @@ class BPS:
             self.encode_signed_number(self.output_offset - 1 - self.target_relative_offset)
             self.target_relative_offset = self.output_offset + length
 
-            self.output_offset += length
+            self.output_offset += length"""
 
 # creates an org -> mod patch, saves it in the given file.
 # returns True on success.
@@ -161,6 +162,6 @@ def create_patch(org, mod, file):
         bps.delta(0x4010, 0x6000)
 
         # write crc32
-        bps.crc32(out, org)
-        bps.crc32(out, mod)
-        bps.crc32(out, patch)
+        bps.crc32(org)
+        bps.crc32(mod)
+        bps.crc32(bps.patch)

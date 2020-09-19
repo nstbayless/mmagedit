@@ -94,7 +94,6 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 
 ## TODO
 
-- scroll with middle mouse
 - select, copy, paste, delete (all undoable)
 - display space remaining more neatly
 - more obvious "object flip" checkbox

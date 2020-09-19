@@ -41,6 +41,7 @@ outfile=""
 infile=""
 exportnes=""
 outpatch=""
+outbps=""
 gui = True
 
 expimage = False
@@ -62,7 +63,7 @@ if "-p" in sys.argv[2:-1]:
 
 if "-b" in sys.argv[2:-1]:
     gui = False
-    outbps = sys.argv[sys.argv.index("-p") + 1]
+    outbps = sys.argv[sys.argv.index("-b") + 1]
     
 if "--export-images" in sys.argv[2:]:
     gui = False

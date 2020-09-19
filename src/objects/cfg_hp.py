@@ -1,5 +1,5 @@
-import constants
-from util import *
+from src import constants
+from src.util import *
 
 class ConfigHP:
     def __init__(self, data, gid):

@@ -1,7 +1,7 @@
 # exports levels as images
 
-import constants
-from util import *
+from src import constants
+from src.util import *
 import os
 
 available = True

@@ -1,0 +1,166 @@
+import os
+import functools
+import binascii
+import math
+from src import constants
+
+# BPS file exporting.
+# format created by byuu
+# implementation by NaOH, tailored to optimize for bank insertions.
+
+# misc data shared among functions in the bps patch production process
+class BPS:
+    def __init__(self, org, mod, f):
+        self.org = org
+        self.mod = mod
+        self.patch = bytearray()
+        self.f = f
+        self.out = functools.partial(self.write)
+
+        # see BPS file format specification
+        self.output_offset = 0
+        self.source_relative_offset = 0
+        self.target_relative_offset = 0
+
+    def encode_number(self, data):
+        out = self.out
+        while True:
+            x = data & 0x7f
+            data >>= 7
+            if data == 0:
+                out(bytes((0x80 | x)))
+                return
+            else:
+                out(bytes((x)))
+            data -= 1
+
+    def encode_signed_number(self, data):
+        negative = (0 if data >= 0 else 1)
+        self.encode_number(negative | (abs(data) << 1))
+
+    def encode_action_header(self, action_type, length):
+        assert(length > 0)
+        assert(action_type in range(4))
+        self.encode_number(
+            (action_type & 0x3) | ((length - 1) << 2)
+        )
+
+    def crc32(self, b):
+        c = binascii.crc32(b)
+        self.out(bytes((
+            (c & 0x000000ff),
+            (c & 0x0000ff00) >> 8,
+            (c & 0x00ff0000) >> 16,
+            (c & 0xff000000) >> 24,
+        )))
+
+    def write(self, v)
+        self.f.write(v)
+        self.patch += v
+
+    def delta(self, org_offset, length):
+        assert(length > 0)
+        dst_offset = self.output_offset + length
+        init_offset = self.output_offset
+        while self.output_offset < dst_offset:
+            matches = None
+            for offset in range(self.output_offset, dst_offset + 1):
+                if offset == dst_offset:
+                    if matches is None:
+                        break # paranoia
+                    # force a hunk to be written
+                    byte_matches = not matches
+                else:
+                    org_offset_byte = self.output_offset - init_offset + org_offset
+                    orgbyte = self.org[org_offset_byte]
+                    modbyte = self.mod[offset]
+                    byte_matches = orgbyte == modbyte
+                
+                if matches is None:
+                    matches = byte_matches
+                elif matches and not byte_matches:
+                    # hunk - copy
+                    self.copy(self.output_offset - init_offset + org_offset, offset - self.output_offset)
+                    break
+                elif byte_matches and not matches:
+                    # hunk - write
+                    self.insert(offset - self.output_offset)
+                    break
+
+    def copy(out, org_offset, length):
+        assert(length > 0)
+        if org_offset == self.output_offset:
+            # SourceRead
+            self.encode_action_header(0, length)
+        else:
+            # SourceCopy
+            self.encode_action_header(2, length)
+            self.encode_signed_number(org_offset - self.source_relative_offset)
+            self.source_relative_offset = org_offset + length
+
+    def insert(self, length):
+        assert(length > 0)
+        # optimization -- encode RLE for last section of patch section
+        rle_end = length
+        orglength = length
+        apply_rle = False
+        while rle_end > 0:
+            if self.mod[self.output_offset + rle_end] != self.mod[self.output_offset + length - 1]:
+                break
+            rle_end -= 1
+        
+        if rle_end < length - 5:
+            apply_rle = True
+            rle_end += 1 # TargetRead section should encode one of the bytes so we can RLE copy it.
+            length = rle_end
+
+        assert(length > 0)
+        # TargetRead
+        self.encode_action_header(1, length)
+        self.write(
+            self.mod[self.output_offset:self.output_offset+length]
+        )
+        self.output_offset += length
+
+        if apply_rle:
+            # RLE encode to repeat the last byte written.
+            length = orglength - rle_end
+            assert(length > 0)
+
+            # TargetCopy
+            self.encode_action_header(3, length)
+            self.encode_signed_number(self.output_offset - 1 - self.target_relative_offset)
+            self.target_relative_offset = self.output_offset + length
+
+            self.output_offset += length
+
+# creates an org -> mod patch, saves it in the given file.
+# returns True on success.
+def create_patch(org, mod, file):
+    with open(file, "wb") as f:
+        bps = BPS(org, mod, f)
+
+        # write header
+        bps.out(bytes("BPS1", "ascii"))
+        bps.encode_number(len(org))
+        bps.encode_number(len(mod))
+        metadata = bytes("Generated by " + constants.mmname + ". fmt " + str(constants.mmfmt), "utf-8")
+        bps.encode_number(len(metadata))
+        bps.out(metadata)
+
+        # encode NES header and first bank
+        bps.delta(0x0, 0x4010)
+        assert(bps.output_offset == 0x4010)
+
+        for j in range(0x4010, len(mod) - 0x6000, 0x4000):
+            # add new inserted banks
+            bps.insert(0x4000)
+            assert(bps.output_offset == j + 0x4000)
+
+        # encode last bank and chr
+        bps.delta(0x4010, 0x6000)
+
+        # write crc32
+        bps.crc32(out, org)
+        bps.crc32(out, mod)
+        bps.crc32(out, patch)

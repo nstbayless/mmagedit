@@ -94,13 +94,18 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 
 ## TODO
 
-- more obvious object flip checkbox
+- scroll with middle mouse
+- select, copy, paste, delete (all undoable)
+- display space remaining more neatly
+- more obvious "object flip" checkbox
+- mod to make game over respawn from start of level instead of world
+- edit default no. of lives
 - GUI string editor
 - GUI title screen editor
 - research how relics are stored
-- display space remaining more neatly
-- more efficient med-tile patch loading when mapper extension is enabled
-- arbitrary object placement when mapper extension is enabled
+- allow placing arbitrary objects (when mapper extension is enabled)
 - objects with normal/hard/hell flags
+- edit crate drops
+- objects as drops
 - adjust level size?
 - adjust level direction/orientation?

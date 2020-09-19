@@ -1,10 +1,10 @@
-import constants
-from util import *
+from src import constants
+from src.util import *
 import os
 
-import mmimage
-import mmdata
-import mappermages
+from src import mmimage
+from src import mmdata
+import src.mappermages
 from functools import partial
 import math
 
@@ -721,7 +721,7 @@ class Gui:
         self.data = None
         self.subwindows = dict()
         self.mouse_button_actions = ["place", "seam", "remove", "seam"] # left, middle, right, shift
-        self.file = {"hack": None, "rom": None, "image": None, "ips": None}
+        self.file = {"hack": None, "rom": None, "image": None, "ips": None, "bps": None}
         self.dirty = False
         self.undo_buffer = []
         self.redo_buffer = []
@@ -788,6 +788,8 @@ class Gui:
                 promptfn = partial(promptfn, defaultextension=".txt")
             if type == "ips":
                 promptfn = partial(promptfn, defaultextension=".ips")
+            if type == "bps":
+                promptfn = partial(promptfn, defaultextension=".bps")
         
         if path is None:
             path = promptfn(title=title)
@@ -838,6 +840,10 @@ class Gui:
             if type == "ips" and not save:
                 return False
             
+            # cannot load bps
+            if type == "bps" and not save:
+                return False
+            
             if type == "rom":
                 if save:
                     rval = self.data.write(path)
@@ -867,6 +873,12 @@ class Gui:
             if type == "ips" and save:
                 self.file[type] = path
                 rval = self.data.write_ips(path)
+                self.errorbox(rval)
+                return rval
+
+            if type == "bps" and save:
+                self.file[type] = path
+                rval = self.data.write_bps(path)
                 self.errorbox(rval)
                 return rval
             
@@ -940,6 +952,23 @@ class Gui:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         scrollbar.config(command=canvas.yview)
         canvas.config(yscrollcommand=scrollbar.set)
+        # scrolling
+        fn = partial(self.on_mousewheel, canvas)
+        if os.name == 'nt':
+            # windows
+            canvas.bind("<MouseWheel>", fn)
+        else:
+            # linux
+            canvas.bind("<Button-4>", fn)
+            canvas.bind("<Button-5>", fn)
+    
+    def on_mousewheel(self, canvas, event):
+        if event.num == 5:
+            canvas.yview_scroll(+2, "units")
+        elif event.num == 4:
+            canvas.yview_scroll(-2, "units")
+        else:
+            canvas.yview_scroll(-1*(event.delta/120), "units")
         
     def ctl(self, **kw):
         if "flipx" in kw:
@@ -1396,6 +1425,7 @@ class Gui:
         self.menu_fio += [
             self.add_menu_command(filemenu, "Export Patched ROM...", partial(self.fio_prompt, "rom", True), "Ctrl+E"),
             self.add_menu_command(filemenu, "Export IPS Patch...", partial(self.fio_prompt, "ips", True), "Ctrl+P"),
+            self.add_menu_command(filemenu, "Export BPS Patch...", partial(self.fio_prompt, "bps", True), "Ctrl+B"),
             self.add_menu_command(filemenu, "Export Image Sheet...", partial(self.fio_prompt, "image", True), "Ctrl+J")
         ]
         
@@ -2097,7 +2127,7 @@ class Gui:
             # unitile patch data
             if self.data.mapper_extension:
                 unitile_size = 0
-                unitile_max = mappermages.unitile_table_range[1] - mappermages.unitile_table_range[0]
+                unitile_max = src.mappermages.unitile_table_range[1] - src.mappermages.unitile_table_range[0]
                 for level in self.data.levels:
                     # add 2 for the pointer at the start, which is not part of the stream
                     unitile_size += level.length_unitile_bytes() + 8

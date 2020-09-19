@@ -1,11 +1,11 @@
-from bitstream import BitStream
-from util import *
-import constants
+from src.bitstream import BitStream
+from src.util import *
+from src import constants
 import json
 import functools
 import hashlib
-import ips
-import mappermages
+import src.ips
+import src.mappermages
 import copy
 
 # this is used for the optional single-med-tile patching mod
@@ -412,7 +412,7 @@ class Level:
         
         # zero out the table
         for j in range(4):
-            rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * j)
+            rom_table_location = self.data.ram_to_rom(src.mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * j)
             self.data.write_word(rom_table_location, 0)
         
         # write unitile data sequence
@@ -424,7 +424,7 @@ class Level:
             for i in range(len(us.entries)):
                 if i in us.region_starts:
                     idx = us.region_starts.index(i)
-                    rom_table_location = self.data.ram_to_rom(mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * idx)
+                    rom_table_location = self.data.ram_to_rom(src.mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * idx)
                     self.data.write_word(rom_table_location, bs.offset - rom + ram)
                 entry = us.entries[i]
                 bs.write_bits_list(entry)
@@ -1125,22 +1125,22 @@ class MMData:
     def ram_to_rom(self, address, chunk=""):
         if self.mapper_extension and len(self.bin) > 0xa010:
             if chunk == "" and address >= 0xc000:
-                address += mappermages.EXTENSION_LENGTH
+                address += src.mappermages.EXTENSION_LENGTH
             if chunk == "level":
                 return 0x10 + (address - 0x8000 + 0x4000)
         return 0x10 + (address - 0x8000)
         
     def chr_to_rom(self, address):
-        return 0x10 + 0x8000 + address + (mappermages.EXTENSION_LENGTH if self.mapper_extension and len(self.bin) > 0xa010 else 0)
+        return 0x10 + 0x8000 + address + (src.mappermages.EXTENSION_LENGTH if self.mapper_extension and len(self.bin) > 0xa010 else 0)
     
     def commit_bank_extension(self):
         # edit header
-        self.bin[0x4] = (mappermages.EXTENSION_LENGTH // 0x4000) + 2 # prg ROM banks
+        self.bin[0x4] = (src.mappermages.EXTENSION_LENGTH // 0x4000) + 2 # prg ROM banks
         self.bin[0x5] = 0x01 # chr ROM banks (unchanged)
         self.bin[0x6] = 0x20 # mapper
         
         # inserts two banks
-        self.bin[0x4010:0x4010] = bytearray(mappermages.EXTENSION_LENGTH)
+        self.bin[0x4010:0x4010] = bytearray(src.mappermages.EXTENSION_LENGTH)
     
     def read_nibble(self, addr, offset):
         b = self.bin[addr + (offset // 2)]
@@ -1364,7 +1364,7 @@ class MMData:
         
         # write levels
         level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
-        unitile_location = mappermages.unitile_table_range[0] + 8 * constants.level_count
+        unitile_location = src.mappermages.unitile_table_range[0] + 8 * constants.level_count
         for level in self.levels:
             # write level data
             result, level_ram_location = level.commit(level_ram_location)
@@ -1385,8 +1385,8 @@ class MMData:
             return False
         
         if self.mapper_extension:
-            if unitile_location > mappermages.unitile_table_range[1]:
-                self.errors += ["unitile (med-tile patch) space exceeded (" + HX(unitile_location) + " > " + HX(mappermages.unitile_table_range[1]) + ")"]
+            if unitile_location > src.mappermages.unitile_table_range[1]:
+                self.errors += ["unitile (med-tile patch) space exceeded (" + HX(unitile_location) + " > " + HX(src.mappermages.unitile_table_range[1]) + ")"]
                 return False
         
         # write music
@@ -1414,7 +1414,7 @@ class MMData:
                     constants.ram_mod_no_auto_scroll_replacement[i]
                 )
         if self.mapper_extension:
-            mappermages.patch(self.bin)
+            src.mappermages.patch(self.bin)
         
         return True
         
@@ -1434,12 +1434,26 @@ class MMData:
         
     def write_ips(self, file):
         self.errors = []
+        if self.mapper_extension:
+            self.errors += ["IPS is not available when mapper-extension is enabled."]
+            return False
         if not self.commit():
             return False
         rval = ips.create_patch(self.orgbin, self.bin, file)
         if not rval:
-            self.errors += ["Failed to export patch."]
+            self.errors += ["Failed to export IPS patch."]
         return rval
+
+    def write_bps(self, file):
+        self.errors = []
+        if not self.commit():
+            return False
+        try:
+            bps.create_patch(self.orgbin, self.bin, file)
+        except:
+            self.errors += ["Failed to export BPS patch."]
+            return False
+        return True
     
     def __init__(self):
         self.mapper_extension = False
@@ -1775,6 +1789,7 @@ class MMData:
             
     # read data from a human-readable hack.txt file
     def parse(self, file):
+        self.errors = []
         with open(file, "r") as f:
             
             level = None
@@ -1853,6 +1868,7 @@ class MMData:
                             level = self.levels[level_idx]
                             level.objects = []
                             level.hardmode_patches = []
+                            level.unitile_patches = []
                             row = constants.macro_rows_per_level - 1
                             obji = 0
                             unitile_row_idx = [constants.macro_rows_per_level * 2 - 1] * 3
@@ -2074,8 +2090,10 @@ class MMData:
                     config = json.loads(globalstr)
                     assert(len(config["spawnable"]) == 0x10)
                     assert(len(config["spawnable-ext"]) == 0x10)
-                    self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
-                    self.chest_objects = [constants.object_names_to_gid[name] for name in config["chest-objects"]]
+                    if "spawnable" in config and "spawnable-ext" in config:
+                        self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
+                    if "chest-objects" in config:
+                        self.chest_objects = [constants.object_names_to_gid[name] for name in config["chest-objects"]]
                     self.mirror_pairs = []
                     for pair in config["mirror-pairs"]:
                         self.mirror_pairs.append([int(i, 16) for i in pair])

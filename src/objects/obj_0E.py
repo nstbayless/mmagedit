@@ -1,5 +1,5 @@
-from objects.cfg_hp import ConfigHP
-from util import *
+from src.objects.cfg_hp import ConfigHP
+from src.util import *
 
 # skeleton
 

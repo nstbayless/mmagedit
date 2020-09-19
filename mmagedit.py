@@ -1,13 +1,13 @@
 import sys
 from array import array
-from mmdata import MMData
+from src.mmdata import MMData
 try:
-    import mmimage
-    import mmgui
+    import src.mmimage
+    import src.mmgui
 except ImportError as e:
     pass
     
-import constants
+from src import constants
 
 def usage():
     print(constants.mmname)
@@ -19,6 +19,7 @@ def usage():
     print("-o: save hack")
     print("-e: export to rom")
     print("-p: export to ips patch")
+    print("-b: export to bps patch")
     print("--deps: check dependencies")
     print("--export-images: creates image sheet for levels")
 
@@ -27,10 +28,10 @@ if "--help" in sys.argv or "-h" in sys.argv:
     sys.exit()
     
 if "--deps" in sys.argv:
-    if not mmimage.available:
+    if not src.mmimage.available:
         print("Not available: image")
         sys.exit(1)
-    elif not mmgui.available:
+    elif not src.mmgui.available:
         print("Not available: gui")
         sys.exit(1)
     print("All modules available.")
@@ -58,6 +59,10 @@ if "-e" in sys.argv[2:-1]:
 if "-p" in sys.argv[2:-1]:
     gui = False
     outpatch = sys.argv[sys.argv.index("-p") + 1]
+
+if "-b" in sys.argv[2:-1]:
+    gui = False
+    outbps = sys.argv[sys.argv.index("-p") + 1]
     
 if "--export-images" in sys.argv[2:]:
     gui = False
@@ -74,10 +79,10 @@ if filepath is not None and not filepath.endswith(".nes"):
     sys.exit()
 
 if gui:
-    if not mmgui.available:
+    if not src.mmgui.available:
         print("gui requires tkinter and PIL (Pillow) to be available, including PIL.ImageTk.")
     else:
-        gui = mmgui.Gui()
+        gui = src.mmgui.Gui()
         
         # read the rom
         if filepath != "":
@@ -117,6 +122,9 @@ if filepath is not None:
         
     if outpatch != "":
         result = result and mmdata.write_ips(outpatch)
+    
+    if outbps != "":
+        result = result and mmdata.write_bps(outbps)
 
     if expimage:
         if not mmimage.available:

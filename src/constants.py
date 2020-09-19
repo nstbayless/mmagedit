@@ -1,12 +1,12 @@
-from util import *
+from src.util import *
 
-mmname = "MMagEdit V1.11"
+mmname = "MMagEdit V1.12"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009172131
+mmfmt = 202009191158
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.11: 17 September 2020
+Version 1.12: 19 September 2020
 
 Special thanks to Julius and Leaf_It.
 
@@ -631,11 +631,11 @@ for i in range(0x100):
     object_names_to_gid["unk-" + hb(i)] = i
     
 # set object config
-import objects.cfg_hp, objects.obj_0E
+import src.objects.cfg_hp, src.objects.obj_0E
 
 # first 0x19 objects have hitpoints
 for i in range(1, 0x19):
-    object_data[i]["config"] = objects.cfg_hp.ConfigHP
+    object_data[i]["config"] = src.objects.cfg_hp.ConfigHP
 
 # skeleton has special config known
-object_data[0xE]["config"] = objects.obj_0E.Config0E
+object_data[0xE]["config"] = src.objects.obj_0E.Config0E

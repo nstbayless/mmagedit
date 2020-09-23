@@ -24,11 +24,12 @@ Users have also reported that some lag may occur for a few minutes while the pro
 
 ### Placing Stage Elements
 
-Left-clicking, middle-clicking (or shift-clicking), and right-clicking all achieve different effects:
+Left-clicking, middle-clicking (or ctrl-clicking), shift-clicking, and right-clicking all achieve different effects:
 
 - Left Click: places a tile, tile patch, or object
 - Right Click: removes a tile, tile patch, or object
-- Middle Click / Shift Click: edits the mirror position (seam position). Only available when a tile is selected, and never on hard mode.
+- Middle Click / Ctrl Click: edits the mirror position (seam position). Only available when a tile is selected, and never on hard mode.
+- Shift Click: drag to select a rectangle.
 
 ## Launching (Ubuntu)
 
@@ -98,13 +99,10 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 - display space remaining more neatly
 - more obvious "object flip" checkbox
 - mod to make game over respawn from start of level instead of world
-- edit default no. of lives
 - GUI string editor
 - GUI title screen editor
 - research how relics are stored
-- allow placing arbitrary objects (when mapper extension is enabled)
 - objects with normal/hard/hell flags
-- edit crate drops
 - objects as drops
 - adjust level size?
 - adjust level direction/orientation?

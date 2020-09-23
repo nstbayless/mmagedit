@@ -113,10 +113,11 @@ class PatchStream:
 
 # represents the bit sequence for the object data in a level
 class ObjectStream:
-    def __init__(self):
+    def __init__(self, data):
         self.entries = []
         self.y = constants.objects_start_y # in microtiles (8 pixels)
         self.complete = False
+        self.data = data
     
     def length_bits(self):
         assert(self.complete)
@@ -141,6 +142,11 @@ class ObjectStream:
     def add_object(self, obj):
         assert(not self.complete)
         assert(obj.y <= self.y)
+
+        # drop objects are not part of the object stream
+        if obj.drop:
+            return
+
         while obj.y < self.y:
             ydiff = max(1, min(self.y - obj.y, 8))
             self.y -= ydiff
@@ -149,7 +155,13 @@ class ObjectStream:
         if (obj.compressible()):
             self.entries.append( [1, 0] + self.as_bits(int((obj.x - 1) / 2), 4) + self.as_bits(obj.get_i(), 4) )
         else:
-            self.entries.append( [0, 1] + [1 if obj.flipy else 0] + [1 if obj.flipx else 0] + self.as_bits(obj.x, 5) + self.as_bits(obj.get_i(), 5) )
+            self.entries.append(
+                  [0, 1]
+                + [1 if obj.flipy else 0]
+                + [1 if obj.flipx else 0]
+                + self.as_bits(obj.x, 5)
+                + (self.as_bits(obj.gid, 6) if self.data.has_mod("extended_objects") else self.as_bits(obj.get_i(), 5))
+            )
     
     def finalize(self):
         assert(not self.complete)
@@ -165,15 +177,18 @@ class Object:
         self.flipx = False
         self.flipy = False
         self.compressed = False
+        self.drop = False # only appears as a drop.
     
     # gets placing index of object
     def get_i(self):
+        if self.gid not in self.data.spawnable_objects:
+            return None
         return self.data.spawnable_objects.index(self.gid)
     
     def compressible(self):
         if self.flipx or self.flipy:
             return False
-        if self.get_i() >= 0x10:
+        if self.get_i() is None or self.get_i() >= 0x10:
             return False
         if self.x % 2 == 0:
             return False
@@ -474,7 +489,7 @@ class Level:
         return ps
         
     def produce_objects_stream(self):
-        os = ObjectStream()
+        os = ObjectStream(self.data)
         
         # add objects to stream sorted by y position.
         for obj in sorted(self.objects, key=lambda obj : -obj.y):
@@ -1217,6 +1232,7 @@ class MMData:
             self.mods = dict()
             self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
+            self.mods["extended_objects"] = False
             self.mapper_extension = False
             
             # read number of lives
@@ -1231,7 +1247,7 @@ class MMData:
                 self.sprite_palettes.append(palette)
             
             # read spawnable objects list
-            for i in range(0x20):
+            for i in range(0x1F):
                 self.spawnable_objects.append(self.read_byte(self.ram_to_rom(constants.ram_object_i_gid_lookup + i)))
             
             # read med-tile mirror pairs table
@@ -1314,6 +1330,9 @@ class MMData:
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
         return False
+    
+    def has_mod(self, mod):
+        return mod in self.mods and self.mods[mod]
     
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
@@ -1422,6 +1441,15 @@ class MMData:
                 )
         if self.mapper_extension:
             src.mappermages.patch(self.bin)
+        if self.mods["extended_objects"]:
+            for i in range(len(constants.ram_mod_extended_objects)):
+                # requires slight modification to be compatible with mapper extension
+                if not self.mapper_extension and i == 2:
+                    continue
+                self.write_patch(
+                    self.ram_to_rom(constants.ram_mod_extended_objects[i]),
+                    constants.ram_mod_extended_objects_replacement[i]
+                )
         
         return True
         
@@ -1502,14 +1530,16 @@ class MMData:
             out()
             #config
             out("{")
+            out('  # Default number of lives.')
+            out('  "lives":    ', str(self.default_lives) + ",")
+            out()
             out('  # objects which can be spawned using the compressed format.')
             out('  # Length must be exactly 16.')
             out('  "spawnable":    ', self.stat_spawnstr(self.spawnable_objects[:0x10]) + ",")
             out()
             out('  # objects which can be spawned using either the compressed or extended object format.')
-            out('  # it is not recommended to change the last element of this list, as it might be part of other data.')
-            out('  # Length must be exactly 16.')
-            out('  "spawnable-ext":', self.stat_spawnstr(self.spawnable_objects[0x10:0x20]) + ",")
+            out('  # Length must be exactly 15.')
+            out('  "spawnable-ext":', self.stat_spawnstr(self.spawnable_objects[0x10:0x1F]) + ",")
             out()
             out('  # objects which can be spawned from a chest (looked up randomly).')
             out('  # the final element of this list can only be spawned on multiplayer.')
@@ -1704,11 +1734,13 @@ class MMData:
                 out("# mark an object with an asterisk (*) to force it to use the compressed format.")
                 out("# compressed format: x must be odd, cannot be flipped, and id must from the spawnable list (not spawnable-ext).")
                 out("# The asterisk itself has no effect except that an error is thrown if the object cannot be compressed.")
+                if self.mapper_extension:
+                    out("# Flag -k can be used to mark the object as an item drop for a crate or chest at the same location (mapper-extension only.)")
                 out()
                 for obj in sorted(level.objects, key=lambda obj : -obj.y):
                     flags = ""
-                    if obj.flipx or obj.flipy:
-                        flags = "-" + ("x" if obj.flipx else "") + ("y" if obj.flipy else "")
+                    if obj.flipx or obj.flipy or obj.drop:
+                        flags = "-" + ("x" if obj.flipx else "") + ("y" if obj.flipy else "") + ("k" if obj.drop else "")
                     pads = " "
                     if obj.compressed:
                         pads = "*"
@@ -2049,11 +2081,14 @@ class MMData:
                                     obj.flipx = True
                                 if "y" in token:
                                     obj.flipy = True
+                                if "k" in token:
+                                    obj.drop = True
                         
-                        compressible = obj.compressible()
-                        if force_compress and not compressible:
-                            assert(False)
-                        obj.compressed = compressible
+                        if not obj.drop:
+                            compressible = obj.compressible()
+                            if force_compress and not compressible:
+                                assert(False)
+                            obj.compressed = compressible
                         
                         level.objects.append(obj)
                     
@@ -2099,8 +2134,12 @@ class MMData:
                     assert(len(config["spawnable-ext"]) == 0x10)
                     if "spawnable" in config and "spawnable-ext" in config:
                         self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
+                        if len(self.spawnable_objects) > 0x1F:
+                            self.spawnable_objects = self.spawnable_objects[:0x1F]
                     if "chest-objects" in config:
                         self.chest_objects = [constants.object_names_to_gid[name] for name in config["chest-objects"]]
+                    if "lives" in config:
+                        self.default_lives = int(config["lives"])
                     self.mirror_pairs = []
                     for pair in config["mirror-pairs"]:
                         self.mirror_pairs.append([int(i, 16) for i in pair])

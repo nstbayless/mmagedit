@@ -198,6 +198,8 @@ def export_images(data, path="."):
                     
             # objects
             for obj in level.objects:
+                if obj.drop:
+                    continue
                 x = obj.x * 8 - 4
                 y = obj.y * 8
                 text = hb(obj.gid)

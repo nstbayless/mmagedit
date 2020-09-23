@@ -37,6 +37,9 @@ def json_list(list, map):
         is_first = False
     return str + "]"
 
+def floor_to(x, to=1):
+    return to * math.floor(x / to)
+
 def ceil_to(x, to=1):
     return to * math.ceil(x / to)
 

@@ -119,6 +119,7 @@ PATCHES = [
 ]
 
 # this adds support for unitile data
+# asm source: https://github.com/nstbayless/mm-patches
 unitile_patches = [
 	(0x7630+0x8000, bytearray.fromhex("20 43 DB EA")),
 	

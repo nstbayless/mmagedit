@@ -128,10 +128,10 @@ if filepath is not None:
         result = result and mmdata.write_bps(outbps)
 
     if expimage:
-        if not mmimage.available:
+        if not src.mmimage.available:
             print("Image export requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
         else:
-            mmimage.export_images(mmdata)
+            src.mmimage.export_images(mmdata)
 
     if not expimage and exportnes == "" and outfile != "":
         mmdata.stat(outfile)

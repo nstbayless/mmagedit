@@ -1,12 +1,12 @@
 from src.util import *
 
-mmname = "MMagEdit V1.12"
+mmname = "MMagEdit V1.13"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009191158
+mmfmt = 202009230919
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.12: 19 September 2020
+Version 1.13: 23 September 2020
 
 Special thanks to Julius and Leaf_It.
 
@@ -45,10 +45,13 @@ ram_range_levels = [0xdaec, 0xe6c3]
 ram_range_text = [0xEC67, 0xEE67]
 
 # ~ special mods ~
+# the source for these hacks: https://github.com/nstbayless/mm-patches
 ram_mod_bounce = 0xd5d7
 ram_mod_bounce_replacement = [0x00]
 ram_mod_no_auto_scroll = [0x8d81]
 ram_mod_no_auto_scroll_replacement = [[0xA5, 0xD0, 0x88, 0xF0, 0x05, 0xD9, 0x15, 0x8D, 0x90, 0x0F, 0xE0, 0x0F, 0x90, 0x0D, 0xA5, 0xD0, 0xF0, 0x09, 0xC6, 0xD0, 0xF0, 0x05, 0xC6, 0xD0, 0x60, 0xE6, 0xD0, 0x60]]
+ram_mod_extended_objects = [0xDAC1, 0xF800, 0xDAC1+3]
+ram_mod_extended_objects_replacement = [[0xA0, 0x06, 0x20, 0xB7, 0xCA, 0x4C, 0x07, 0xF8], [0x4C, 0xC1, 0xDA], [0x0e, 0xdb]]
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4
@@ -327,7 +330,7 @@ object_names = [
     ["beer", "barrel-thrower", "beer-bros"],
     
     # 6
-    ["boss-final", "boss-5"], # eye boss, but in s pace.
+    ["boss-final", "boss-5"], # eye boss, but in space.
     
     # 7
     ["goat"],
@@ -533,9 +536,14 @@ object_data = [
     # e -- skeleton
     { "palette": 2, "chr":  [[0x2b]] },
     
+    # f -- blue gem
+    { "palette": 2, "chr":  [[0xcb]] },
+    
+    # 10
     { },
-    { },
-    { },
+    
+    # 11 - warp
+    { "palette": 1, "chr":  [[0xc7]] },
     
     # 12 -- resting bat
     { "palette": 0, "chr":  [[0x23]] },
@@ -546,9 +554,14 @@ object_data = [
     # 14 -- goblin
     { "palette": 3, "chr":  [[0x37]] },
     
-    { },
-    { },
-    { },
+    # 15 -- green gem
+    { "palette": 3, "chr":  [[0xcb]] },
+    
+    # 16 -- active bat
+    { "palette": 0, "chr":  [[0x24]] },
+    
+    # 15 -- blue orb
+    { "palette": 2, "chr":  [[0xc6]] },
     
     # 18 -- eye
     { "palette": 0, "chr":  [[0x3a]] },
@@ -573,7 +586,8 @@ object_data = [
     # 1f -- fanv
     { "palette": 2, "chr":  [[0x60, 0x61]] },
     
-    { },
+    # 20 -- feather
+    { "palette": 1, "chr":  [[0xCD]] },
     
     # 21 -- spawn
     { "palette": 0, "chr":  [[0x16]] },
@@ -593,10 +607,18 @@ object_data = [
     { "palette": 1, "chr":  [[0x6e]] },
     
     { },
-    { },
-    { },
-    { },
-    { },
+    
+    # 2A -- 1-up
+    { "palette": 1, "chr":  [[0xC9]] },
+    
+    # 2B -- fairy
+    { "palette": 2, "chr":  [[0xD0]] },
+    
+    # 2C -- invincible eye
+    { "palette": 3, "chr":  [[0x3a]] },
+    
+    # 2D -- dog
+    { "palette": 1, "chr":  [[0x31]] },
     
     # 2e -- pipe-A
     { "chr":  [[0x1DD]] },

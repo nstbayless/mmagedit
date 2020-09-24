@@ -1,12 +1,12 @@
 from src.util import *
 
-mmname = "MMagEdit V1.13"
+mmname = "MMagEdit V1.14"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202009230919
+mmfmt = 202009231802
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.13: 23 September 2020
+Version 1.14: 23 September 2020
 
 Special thanks to Julius and Leaf_It.
 
@@ -52,6 +52,14 @@ ram_mod_no_auto_scroll = [0x8d81]
 ram_mod_no_auto_scroll_replacement = [[0xA5, 0xD0, 0x88, 0xF0, 0x05, 0xD9, 0x15, 0x8D, 0x90, 0x0F, 0xE0, 0x0F, 0x90, 0x0D, 0xA5, 0xD0, 0xF0, 0x09, 0xC6, 0xD0, 0xF0, 0x05, 0xC6, 0xD0, 0x60, 0xE6, 0xD0, 0x60]]
 ram_mod_extended_objects = [0xDAC1, 0xF800, 0xDAC1+3]
 ram_mod_extended_objects_replacement = [[0xA0, 0x06, 0x20, 0xB7, 0xCA, 0x4C, 0x07, 0xF8], [0x4C, 0xC1, 0xDA], [0x0e, 0xdb]]
+ram_mod_no_relic_1 = [0xCB0C]
+ram_mod_no_relic_1_replacement = [[0xEA, 0xEA, 0xEA]]
+ram_mod_no_relic_2 = [0xE894]
+ram_mod_no_relic_2_replacement = [[0xEA, 0xEA, 0xEA]]
+ram_mod_no_relic_3 = [0xCD9D]
+ram_mod_no_relic_3_replacement = [[0xEA, 0xEA, 0xEA]]
+ram_mod_no_relic_4 = [0xBCBE]
+ram_mod_no_relic_4_replacement = [[0xEA, 0xEA, 0xEA]]
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4

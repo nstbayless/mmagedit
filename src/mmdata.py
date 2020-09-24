@@ -1233,6 +1233,10 @@ class MMData:
             self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
             self.mods["extended_objects"] = False
+            self.mods["no_relic_1"] = False
+            self.mods["no_relic_2"] = False
+            self.mods["no_relic_3"] = False
+            self.mods["no_relic_4"] = False
             self.mapper_extension = False
             
             # read number of lives
@@ -1439,6 +1443,26 @@ class MMData:
                     self.ram_to_rom(constants.ram_mod_no_auto_scroll[i]),
                     constants.ram_mod_no_auto_scroll_replacement[i]
                 )
+        if self.mods["no_relic_1"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_no_relic_1[0]),
+                constants.ram_mod_no_relic_1_replacement[0]
+            )
+        if self.mods["no_relic_2"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_no_relic_2[0]),
+                constants.ram_mod_no_relic_2_replacement[0]
+            )
+        if self.mods["no_relic_3"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_no_relic_3[0]),
+                constants.ram_mod_no_relic_3_replacement[0]
+            )
+        if self.mods["no_relic_4"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_no_relic_4[0]),
+                constants.ram_mod_no_relic_4_replacement[0]
+            )
         if self.mapper_extension:
             src.mappermages.patch(self.bin)
         if self.mods["extended_objects"]:

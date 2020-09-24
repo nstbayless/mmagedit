@@ -1,6 +1,7 @@
 import sys
 from array import array
 from src.mmdata import MMData
+import os
 try:
     import src.mmimage
     import src.mmgui
@@ -86,12 +87,22 @@ if gui:
         gui = src.mmgui.Gui()
         
         # read the rom
-        if filepath != "":
+        if filepath != "" and filepath is not None:
             gui.fio_direct(filepath, "rom")
             
             # read a hack file
             if infile != "":
                 gui.fio_direct(infile, "hack")
+        else:
+            # load whatever nes file is in the folder.
+            nesfiles = []
+            for file in os.listdir(os.path.dirname(os.path.realpath(__file__))):
+                if file.lower().endswith(".nes"):
+                    nesfiles.append(file)
+            if len(nesfiles) > 1:
+                gui.showinfo("Multiple .nes files found in the editor folder. Please ensure there is exactly one .nes file there to be opened by default.")
+            elif len(nesfiles) == 1:
+                gui.fio_direct(nesfiles[0], "rom")
 
         # refresh the display if a rom file was successfully loaded.
         if gui.data:

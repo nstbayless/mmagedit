@@ -1039,14 +1039,17 @@ class Gui:
                 self.select_stage(self.stage_idx, self.hard)
                 self.clear_undo_buffers()
     
+    def showinfo(self, msg, title="Information"):
+        tkinter.messagebox.showinfo(title, msg)
+        
     def about(self):
         tkinter.messagebox.showinfo(constants.mmname, constants.mminfo)
     
     # handles a kepyress event
     def on_keypress(self, event):
-        shift = event.state & 1
-        ctrl = event.state & 4
-        alt = event.state & 8
+        shift = event.state & 0x1
+        ctrl = event.state & 0x4
+        alt = event.state & 0x88
         for acc, command in self.menu_commands.items():
             if acc is None:
                 continue
@@ -1056,7 +1059,8 @@ class Gui:
             if shift and "shift+" not in acc:
                 continue
             if alt and "alt+" not in acc:
-                continue
+                if acc in ["ctrl+" + str(i) for i in range(10)]: # hacky zoom fix for tkinter alt modifier bug.
+                    continue
             if acc.startswith("ctrl+"):
                 if not ctrl:
                     continue

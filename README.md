@@ -95,9 +95,9 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 
 ## TODO
 
-- select, copy, paste, delete (all undoable)
 - display space remaining more neatly
 - more obvious "object flip" checkbox
+- edit mouse bindings
 - mod to make game over respawn from start of level instead of world
 - GUI string editor
 - GUI title screen editor

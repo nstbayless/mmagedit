@@ -43,11 +43,16 @@ selcol = constants.meta_colour_str
 patchcol = constants.meta_colour_str
 unipatchcol = "#cfc"
 objcrosscol = {False: constants.meta_colour_str, True: constants.meta_colour_str_b, "drop": "#FFCC44"}
+usagecol = {
+    "overlimit": "#9c2611",
+    "used": "#06368f",
+    "unused": "#5d5a63"
+}
 
 zoom_levels = [2]
 
 resource_dir = os.path.dirname(os.path.realpath(__file__))
-icon_path = os.path.join(resource_dir, "icon.png")
+icon_path = os.path.join(resource_dir, "../icon.png")
 
 class CopyBuffer:
     def __init__(self):
@@ -57,7 +62,79 @@ class CopyBuffer:
         self.macro_row_idx_max = 0
         self.objects = []
         self.macro_rows = []
+        self.macro_patches = []
         self.unitile_patches = []
+
+# a component to show usage data
+class GuiUsageBar(tk.Canvas):
+    def __init__(self, parent, core, **kwargs):
+        self.max = 0
+        self.usage = 0
+        self.text = ""
+        self.core = core
+        if "max" in kwargs:
+            self.max = kwargs.pop("max")
+        if "usage" in kwargs:
+            self.usage = kwargs.pop("usage")
+        if "text" in kwargs:
+            self.text = kwargs.pop("text")
+        tk.Canvas.__init__(self, parent, **kwargs)
+        self.bind("<Configure>", self.on_resize)
+        self.elts = []
+    
+    def on_resize(self, event):
+        self.refresh()
+
+    def configure(self, **kwargs):
+        if "max" in kwargs:
+            self.max = kwargs.pop("max")
+        if "usage" in kwargs:
+            self.usage = kwargs.pop("usage")
+        if "text" in kwargs:
+            self.text = kwargs.pop("text")
+        tk.Canvas.configure(self, **kwargs)
+        self.refresh()
+    
+    def refresh(self):
+        self.core.delete_elements(self, self.elts)
+        self.elts = []
+
+        width, height = self.winfo_width(), self.winfo_height()
+        p = 1 if self.max <= 0 else float(self.usage) / float(self.max)
+        overlimit = False
+        if self.usage > self.max:
+            overlimit = True
+            p = 1
+        pwidth = p * width
+
+        # rectangles
+        self.elts.append(
+            self.create_rectangle(
+                0, 0, width, height,
+                fill=usagecol["unused"]
+            )
+        )
+        self.elts.append(
+            self.create_rectangle(
+                0, 0, pwidth, height,
+                fill=usagecol["overlimit" if overlimit else "used"]
+            )
+        )
+
+        # text
+        s = self.text + ": " if self.text != "" else ""
+        if overlimit:
+            s += HX(self.usage - self.max) + " OVERLIMIT past " + HX(self.max) + " bytes"
+        else:
+            s += HX(self.max - self.usage) + " free of " + HX(self.max) + " bytes"
+        self.elts.append(
+            self.create_text(
+                2, height / 2.0,
+                anchor=tk.W,
+                text=s,
+                fill="white"
+            )
+        )
 
 # a component based on a grid of micro-tiles
 class GuiMicroGrid(tk.Canvas):
@@ -748,9 +825,6 @@ class Gui:
         self.level = None
         self.stage_idx = 0
         self.hard = False
-        self.flipx = False
-        self.flipy = False
-        self.drop = False
         self.zoom_idx = 0
         
         # preferences
@@ -991,13 +1065,13 @@ class Gui:
         
     def ctl(self, **kw):
         if "flipx" in kw:
-            self.flipx = kw["flipx"]
+            self.v_flipx.set(kw["flipx"])
             self.refresh_object_select()
         if "flipy" in kw:
-            self.flipy = kw["flipy"]
+            self.v_flipy.set(kw["flipy"])
             self.refresh_object_select()
         if "drop" in kw:
-            self.drop = kw["drop"]
+            self.v_drop.set(kw["drop"] if self.data.mapper_extension else False)
             self.refresh_object_select()
         if "show_objects" in kw:
             self.show_objects = kw["show_objects"]
@@ -1169,6 +1243,8 @@ class Gui:
         if action.type == "mod":
             if action.mod_name == "mapper-extension":
                 self.data.mapper_extension = action.prev_value if undo else action.new_value
+                # set UI to not be on object drop in case object drop is disabled.
+                self.ctl(drop=False)
             else:
                 self.data.mods[action.mod_name] = action.prev_value if undo else action.new_value
         if action.type == "unitile":
@@ -1312,6 +1388,11 @@ class Gui:
         copy_buffer = self.copy_buffer    
         actions = []
         
+        if copy_buffer.source_world_idx != level.world_idx:
+            # we do this due to differing tilesets between worlds.
+            self.showinfo("Cannot paste between worlds.")
+            return
+        
         if self.get_stage_placement_type() == "med-tile":
             for u in copy_buffer.unitile_patches:
                 jflag = (0x80 if self.hard else 0x60)
@@ -1360,7 +1441,7 @@ class Gui:
                             object=obj,
                             remove=False
                         ))
-        if self.get_stage_placement_type() == "macro-tile":
+        if self.get_stage_placement_type() in "macro-tile":
             macro_row_offset = clamp_hoi((level_height - self.select_rect[1]) // macro_height, 0, level_height // macro_height) if self.select_rect is not None and None not in self.select_rect else copy_buffer.macro_row_idx_max
             for i in range(len(copy_buffer.macro_rows)):
                 macro_row = copy_buffer.macro_rows[i]
@@ -1405,29 +1486,46 @@ class Gui:
             self.copy_buffer = CopyBuffer()
             self.copy_buffer.source_world_idx = self.level.world_idx
             self.copy_buffer.offset = (clamp_hoi(self.select_rect[0], 0, level_width), clamp_hoi(self.select_rect[1], 0, level_height))
-        if self.get_stage_placement_type() == "macro-tile":
+        if self.get_stage_placement_type() in ["macro-tile", "macro-patch"]:
             macro_row_idx_min = clamp_hoi((level_height - self.select_rect[3]) / macro_height, 0, level_height / macro_height)
             macro_row_idx_max = clamp_hoi((level_height - self.select_rect[1]) / macro_height, 0, level_height / macro_height + 1)
             if do_copy:
                 self.copy_buffer.macro_row_idx_max = macro_row_idx_max
-            for macro_row_idx in range(macro_row_idx_min, macro_row_idx_max):
-                if do_copy:
-                    self.copy_buffer.macro_rows.append(
-                        copy.deepcopy(
-                            level.macro_rows[macro_row_idx]
-                        )
-                    )
-                if do_clear:
-                    for j in range(4):
-                        actions.append(
-                            GuiAction(
-                                type="tile", refresh=["row"],
-                                macro_row_idx=macro_row_idx,
-                                macro_idx=j,
-                                tile=0,
-                                prev_tile=None # fill in later
+            if self.get_stage_placement_type() == "macro-tile":
+                for macro_row_idx in range(macro_row_idx_min, macro_row_idx_max):
+                    if do_copy:
+                        self.copy_buffer.macro_rows.append(
+                            copy.deepcopy(
+                                level.macro_rows[macro_row_idx]
                             )
                         )
+                    if do_clear:
+                        for j in range(4):
+                            actions.append(
+                                GuiAction(
+                                    type="tile", refresh=["row"],
+                                    macro_row_idx=macro_row_idx,
+                                    macro_idx=j,
+                                    tile=0,
+                                    prev_tile=None # fill in later
+                                )
+                            )
+            else:
+                for patch in level.hardmode_patches:
+                    if patch.y in range(macro_row_idx_min, macro_row_idx_max):
+                        if do_copy:
+                            self.copy_buffer.macro_patches.append(
+                                copy.deepcopy(patch)
+                            )
+                        if do_clear:
+                            actions.append(
+                                GuiAction(
+                                    type="patch", refresh=["row", "patches"],
+                                    remove=True,
+                                    macro_row_idx=patch.y,
+                                    patch=patch
+                                )
+                            )
         elif self.get_stage_placement_type() == "object":
             for obj in level.objects:
                 if obj.x * micro_width >= self.select_rect[0] and obj.x * micro_width < self.select_rect[2]:
@@ -1570,9 +1668,9 @@ class Gui:
                     obj = mmdata.Object(self.data)
                     obj.x = objx
                     obj.y = objy
-                    obj.flipx = self.flipx
-                    obj.flipy = self.flipy
-                    obj.drop = self.drop
+                    obj.flipx = self.flipx()
+                    obj.flipy = self.flipy()
+                    obj.drop = self.drop()
                     obj.gid = self.object_select_gid
                     
                     self.apply_action(GuiAction(
@@ -1783,10 +1881,6 @@ class Gui:
         self.add_menu_command(editmenu, "Clear Selection", partial(self.copycut_selection, False, True), "Delete")
         self.add_menu_command(editmenu, "Clear Stage", partial(self.clear_stage), None)
         editmenu.add_separator()
-        self.add_menu_command(editmenu, "Flip Object X", lambda: self.ctl(flipx=not self.flipx), "X")
-        self.add_menu_command(editmenu, "Flip Object Y", lambda: self.ctl(flipy=not self.flipy), "Y")
-        self.add_menu_command(editmenu, "Place Object Drop", lambda: self.ctl(drop=not self.drop), "K")
-        editmenu.add_separator()
         self.add_menu_command(editmenu, "Macro Tiles...", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
         self.add_menu_command(editmenu, "Med Tiles...", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
         self.add_menu_command(editmenu, "Mods...", lambda: self.subwindowctl(GuiMod), "Ctrl+Shift+D")
@@ -1872,7 +1966,7 @@ class Gui:
         
         object_canvas = tk.Canvas(selector_objects_frame, width=objwidth, height=screenheight, bg="black")
         self.attach_scrollbar(object_canvas, selector_objects_frame)
-        object_canvas.pack(side=tk.RIGHT, fill=tk.Y, expand=True)
+        object_canvas.pack(fill=tk.Y, expand=True)
         object_canvas.bind("<Button-1>", partial(self.on_object_click, False))
         object_canvas.bind("<Button-3>", partial(self.on_object_click, True))
         object_canvas.bind("<Double-Button-1>", partial(self.on_object_click, True))
@@ -1888,6 +1982,22 @@ class Gui:
         self.stage_mirror_cover_images = [[None for x in range(level_width // med_width)] for y in range(level_height // macro_height)]
         self.object_select_images = [None for y in range(0x100)]
         
+        # object canvas checkboxes
+        objects_flags_frame = tk.Frame(selector_objects_frame)
+        objects_flags_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.v_flipx = tk.BooleanVar()
+        tk.Checkbutton(objects_flags_frame, text="flip X", underline=5, variable=self.v_flipx, command=self.refresh_object_select).grid(row=0, sticky="W")
+        self.v_flipy = tk.BooleanVar()
+        tk.Checkbutton(objects_flags_frame, text="flip Y", underline=5, variable=self.v_flipy, command=self.refresh_object_select).grid(row=1, sticky="W")
+        self.v_drop = tk.BooleanVar()
+        self.objects_select_check_drop = tk.Checkbutton(objects_flags_frame, text="drop (K)", underline=6, variable=self.v_drop, command=self.refresh_object_select)
+        self.objects_select_check_drop.grid_forget()
+
+        # hotkeys for the above.
+        self.add_hotkey(lambda: self.ctl(flipx=not self.flipx()), "X")
+        self.add_hotkey(lambda: self.ctl(flipy=not self.flipy()), "Y")
+        self.add_hotkey(lambda: self.ctl(drop=not self.drop()), "K")
+
         # stage topbar
         musiclabel = tk.Label(stage_topbar, text="Music: ")
         musiclabel.grid(column=0, row=0)
@@ -1895,9 +2005,23 @@ class Gui:
         self.musicdropdown = None
         self.stage_topbar.pack_forget()
         
+        # bottom bar
+        bottom_frame = tk.Frame(self.window)
+        bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        bottom_alt_bar = tk.Frame(bottom_frame)
+        bottom_alt_bar.pack(side=tk.TOP, fill=tk.X)
+
+        # usage
+        self.level_usage_bar = GuiUsageBar(bottom_frame, self, text="Level Data", height=20)
+        self.level_usage_bar.pack(fill=tk.X)
+
+        self.alt_usage_bar = GuiUsageBar(bottom_alt_bar, self, text="Ext. Data", height=20)
+        self.alt_usage_bar.pack(fill=tk.X)
+        self.alt_usage_bar.pack_forget()
+
         # bottom label
-        self.label = tk.Label(self.window, width=40)
-        self.label.pack(side=tk.BOTTOM, fill=tk.X)
+        self.label = tk.Label(bottom_frame, width=40)
+        self.label.pack(fill=tk.X)
         
         self.window.config(menu=menu)
         
@@ -1907,6 +2031,15 @@ class Gui:
 
         self.refresh_copy_menus()
     
+    def flipx(self):
+        return self.v_flipx.get()
+
+    def flipy(self):
+        return self.v_flipy.get()
+    
+    def drop(self):
+        return self.v_drop.get()
+
     # this is quite expensive... progress bar? coroutine?
     def refresh_chr(self):
         if self.data is None:
@@ -2110,7 +2243,7 @@ class Gui:
         # set scrollable region
         self.object_canvas.configure(scrollregion=(0, 0, objwidth * self.zoom(), len(self.placable_objects) * objheight * self.zoom() - self.zoom()))
 
-        flip_idx = (2 if self.flipy else 0) + (1 if self.flipx else 0) + (4 if self.drop else 0)
+        flip_idx = (2 if self.flipy() else 0) + (1 if self.flipx() else 0) + (4 if self.drop() else 0)
 
         for i in range(len(self.placable_objects)):
             gid = self.placable_objects[i]
@@ -2129,6 +2262,12 @@ class Gui:
             if img is None:
                 img = self.blank_image
             self.object_canvas.itemconfig(self.object_select_images[i], image=img)
+        
+        # object drop
+        if self.data.mapper_extension:
+            self.objects_select_check_drop.grid(row=2, sticky="W")
+        else:
+            self.objects_select_check_drop.grid_forget()
         
     def refresh_selection_rect(self):
         # clear previous
@@ -2344,12 +2483,6 @@ class Gui:
                 else:
                     offset = obj_data["offset"] if "offset" in obj_data else (0, 0)
                     offset = (offset[0] * self.zoom() - (img.width() // 2), offset[1] * self.zoom() + 8 * self.zoom() - (img.height()))
-                
-                # offset object slightly for drop
-                # (for the benefit of crates.)
-                if obj.drop:
-                    offset[0] += 4
-                    offset[1] += 4
 
                 # add image
                 self.elts_objects.append(
@@ -2366,6 +2499,11 @@ class Gui:
                 # add crosshairs
                 x = obj.x * micro_width * self.zoom()
                 y = obj.y * micro_height * self.zoom()
+                # offset object slightly for drop
+                # (for the benefit of crates.)
+                if obj.drop:
+                    x += 4 * self.zoom()
+                    y += 4 * self.zoom()
                 colstr = objcrosscol["drop" if obj.drop else obj.compressible()]
                 r = 3 * self.zoom() # radius
                 
@@ -2522,7 +2660,7 @@ class Gui:
             bits_used = int(ps_.length_bytes() * 8 + os_.length_bits())
             bytes_used = int((bits_used) / 8)
             bits_used = int(bits_used % 8)
-            str += "Level: " + HB(bytes_used) + "." + HB(bits_used * 2)[1] + " bytes; "
+            str += "Level: " + HB(bytes_used) + "." + HB(bits_used * 2)[1] + " bytes"
             
             # total level space
             total_level_length = 0
@@ -2532,11 +2670,10 @@ class Gui:
             if self.data.mapper_extension:
                 max_level_length = 0x4000
             
-            if total_level_length <= max_level_length:
-                str += "Total Remaining: " + HX(max_level_length - total_level_length) + " of " + HX(max_level_length) + " bytes"
-            else:
-                str += "OVERLIMIT: " + HX(total_level_length - max_level_length) + " past " + HX(max_level_length) + " bytes"
-                color = "red"
+            self.level_usage_bar.configure(
+                usage=total_level_length,
+                max=max_level_length
+            )
 
             # unitile patch data
             if self.data.mapper_extension:
@@ -2546,17 +2683,17 @@ class Gui:
                     # add 2 for the pointer at the start, which is not part of the stream
                     unitile_size += level.length_unitile_bytes() + 8
                 
-                str += " | Level Med-Tile patches: " + HX(self.level.length_unitile_bytes() + 8)
-                
-                str += " bytes; Total remaining: "
-                if unitile_size <= unitile_max:
-                    str += HX(unitile_max - unitile_size) + " free of " + HX(unitile_max) + " bytes"
-                else:
-                    str += HX(unitile_size - unitile_max) + " OVERLIMIT past " + HX(unitile_max) + " bytes"
-                    color = "red"
+                str += "; Level Ext.: " + HX(self.level.length_unitile_bytes() + 8) + " bytes"
+                self.alt_usage_bar.pack(fill=tk.X)
+                self.alt_usage_bar.configure(
+                    usage=unitile_size,
+                    max=unitile_max
+                )
+            else:
+                self.alt_usage_bar.pack_forget()
 
             
-        self.label.configure(text=str, fg=color, anchor=tk.W, font=("TkFixedFont", 7, "normal"))
+        self.label.configure(text=str, fg=color, anchor=tk.W, font=("TkFixedFont", 9, "normal"))
     
     def run(self):
         self.window.mainloop()

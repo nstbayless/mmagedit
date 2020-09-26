@@ -17,6 +17,7 @@ class UnitileStream:
         self.i = 0
         self.complete = False
         self.region_starts = [-1, -1, -1, -1]
+        self.prev_byte = None
     
     def length_bits(self):
         assert(self.complete)
@@ -42,12 +43,16 @@ class UnitileStream:
         assert(not self.complete)
         assert(patch.get_i() >= self.i)
         
+        # skip empty patches.
+        if patch.get_flags() == 0xE0:
+            return
+        
         # force alignment to a region boundary
         region_boundaries = [0, 0x100, 0x200, 0x300]
         j = -1
         for region_boundary in region_boundaries:
             j += 1
-            if patch.get_i() > region_boundary and self.i < region_boundary:
+            if patch.get_i() >= region_boundary and self.i < region_boundary and patch.med_tile_idx is not None:
                 up = UnitilePatch()
                 up.med_tile_idx = None
                 up.x = region_boundary % 0x10
@@ -57,26 +62,39 @@ class UnitileStream:
             if self.i == region_boundary and self.region_starts[j] == -1:
                 self.region_starts[j] = len(self.entries)
         
-        # optional single-unit 'advance'
-        if patch.get_i() == self.i + 1:
-            self.entries.append(self.as_bits(3, 8))
-            self.i += 1
-        
         # write 'advance' tokens
         while patch.get_i() > self.i:
-            idiff = min(patch.get_i() - self.i, 0x100)
+            idiff = min(patch.get_i() - self.i, 0x41)
             assert(idiff > 0)
+            if idiff >= 0x20 and idiff < 0x41:
+                idiff = 0x1F
+            if (idiff | 0xE0) == 0xFE and self.prev_byte == None:
+                # prevent writing EOS byte, #$FE.
+                idiff -= 1
+            if idiff == 0x1D:
+                # prevent writing 0x1D, which is code for 0x41
+                idiff -= 1
             self.i += idiff
-            self.entries.append( self.as_bits(1, 8) + self.as_bits(idiff - 1, 8) )
+            if idiff == 0x41:
+                idiff = 0x1D
+            if self.prev_byte is None:
+                self.entries.append([1] * 3 + self.as_bits(idiff, 5))
+            else:
+                self.entries[-2] = self.prev_byte[:3] + self.as_bits(idiff, 5)
+                self.prev_byte = None
         
         # write patch byte
         if patch.med_tile_idx is not None:
-            self.entries.append(self.as_bits(2 | patch.get_flags(), 8) + self.as_bits(patch.med_tile_idx, 8))
+            self.entries.append(self.as_bits(patch.get_flags(), 8))
+            self.entries.append(self.as_bits(patch.med_tile_idx, 8))
+            self.prev_byte = self.entries[-2]
+        else:
+            self.prev_byte = None
     
     def finalize(self):
         assert(not self.complete)
         self.complete = True
-        self.entries.append( self.as_bits(0, 8) )
+        self.entries.append( self.as_bits(0xFE, 8) )
 
 # represents the bit sequence for hard mode patches in a stage
 class PatchStream:
@@ -507,6 +525,8 @@ class Level:
             us.add_patch(patch)
         
         us.finalize()
+        
+        print(us.entries)
         
         return us
         
@@ -2155,7 +2175,7 @@ class MMData:
                 elif not parsing_globals_complete:
                     config = json.loads(globalstr)
                     assert(len(config["spawnable"]) == 0x10)
-                    assert(len(config["spawnable-ext"]) == 0x10)
+                    assert(len(config["spawnable-ext"]) >= 0xF)
                     if "spawnable" in config and "spawnable-ext" in config:
                         self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
                         if len(self.spawnable_objects) > 0x1F:

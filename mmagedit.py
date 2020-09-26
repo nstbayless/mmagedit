@@ -57,14 +57,23 @@ if "-o" in sys.argv[2:-1]:
 if "-e" in sys.argv[2:-1]:
     gui = False
     exportnes = sys.argv[sys.argv.index("-e") + 1]
+    if not exportnes.endswith(".nes"):
+        print("Error: exported ROM must have .nes extension.")
+        sys.exit(1)
     
 if "-p" in sys.argv[2:-1]:
     gui = False
     outpatch = sys.argv[sys.argv.index("-p") + 1]
+    if not outpatch.endswith(".nes"):
+        print("Error: exported IPS must have .ips extension.")
+        sys.exit(1)
 
 if "-b" in sys.argv[2:-1]:
     gui = False
     outbps = sys.argv[sys.argv.index("-b") + 1]
+    if not outbps.endswith(".bps"):
+        print("Error: exported BPS must have .bps extension.")
+        sys.exit(1)
     
 if "--export-images" in sys.argv[2:]:
     gui = False

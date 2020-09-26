@@ -95,13 +95,14 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 
 ## TODO
 
-- display space remaining more neatly
-- more obvious "object flip" checkbox
+- selection:
+    - checkboxes to select what layers to copy/paste to/from
+    - can select individual macro tiles, or whole rows
+    - macro-patch copy/pasting
 - edit mouse bindings
 - mod to make game over respawn from start of level instead of world
 - GUI string editor
 - GUI title screen editor
-- research how relics are stored
 - objects with normal/hard/hell flags
 - objects as drops
 - adjust level size?

@@ -2681,9 +2681,9 @@ class Gui:
                 unitile_max = src.mappermages.unitile_table_range[1] - src.mappermages.unitile_table_range[0]
                 for level in self.data.levels:
                     # add 2 for the pointer at the start, which is not part of the stream
-                    unitile_size += level.length_unitile_bytes() + 8
+                    unitile_size += level.length_unitile_bytes() + 10 + level.length_object_drops_bytes()
                 
-                str += "; Level Ext.: " + HX(self.level.length_unitile_bytes() + 8) + " bytes"
+                str += "; Level Ext.: " + HX(self.level.length_unitile_bytes() + 10 + self.level.length_object_drops_bytes()) + " bytes"
                 self.alt_usage_bar.pack(fill=tk.X)
                 self.alt_usage_bar.configure(
                     usage=unitile_size,

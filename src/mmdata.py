@@ -439,14 +439,55 @@ class Level:
                         v.flag_normal = v.flag_normal or u.flag_normal
                         v.flag_hard = v.flag_hard or u.flag_hard
                         v.flag_hell = v.flag_hell or u.flag_hell
+    
+    def length_object_drops_bytes(self):
+        length = 0
+        for obj in self.objects:
+            if obj.drop:
+                length += 4
+        # ending byte
+        if length > 0:
+            length += 1
+        return length
+
+    # returns error, new ram output location
+    def commit_drop_objects(self, ram):
+        rom = self.data.ram_to_rom(ram)
+        
+        table_start = src.mappermages.unitile_table_range[0]
+        # zero out the table
+        for j in range(2):
+            rom_table_location = self.data.ram_to_rom(table_start + self.level_idx + constants.level_count * j)
+            self.data.write_byte(rom_table_location, 0)
+        
+        if self.length_object_drops_bytes() > 0:
+            for j in range(2):
+                rom_table_location = self.data.ram_to_rom(table_start + self.level_idx + constants.level_count * j)
+                v = ram - 3
+                w = (v & 0x00ff) if j == 0 else ((v & 0xff00) >> 8)
+                self.data.write_byte(rom_table_location, w)
+            bs = BitStream(self.data.bin, rom)
+            for obj in self.objects:
+                if obj.drop:
+                    bs.write_bits(obj.x * 8, 8)
+                    bs.write_bits((obj.y * 8) & 0xff, 8)
+                    screen = (((obj.y * 8) - 0x18) // 256) + 0xFC
+                    assert(screen >= 0xFB and screen < 0x100)
+                    bs.write_bits(screen, 8)
+                    bs.write_bits(obj.gid, 8)
+            bs.write_bits(1, 8) # eof
+        
+        return True, ram + self.length_object_drops_bytes()
 
     # returns error, new ram output location
     def commit_unitile(self, ram):
         rom = self.data.ram_to_rom(ram)
         
+        table_start = src.mappermages.unitile_table_range[0] + 2 * constants.level_count
+        
         # zero out the table
         for j in range(4):
-            rom_table_location = self.data.ram_to_rom(src.mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * j)
+            rom_table_location = self.data.ram_to_rom(table_start + 8 * self.level_idx + 2 * j)
             self.data.write_word(rom_table_location, 0)
         
         # write unitile data sequence
@@ -458,7 +499,7 @@ class Level:
             for i in range(len(us.entries)):
                 if i in us.region_starts:
                     idx = us.region_starts.index(i)
-                    rom_table_location = self.data.ram_to_rom(src.mappermages.unitile_table_range[0] + 8 * self.level_idx + 2 * idx)
+                    rom_table_location = self.data.ram_to_rom(table_start + 8 * self.level_idx + 2 * idx)
                     self.data.write_word(rom_table_location, bs.offset - rom + ram)
                 entry = us.entries[i]
                 bs.write_bits_list(entry)
@@ -525,8 +566,6 @@ class Level:
             us.add_patch(patch)
         
         us.finalize()
-        
-        print(us.entries)
         
         return us
         
@@ -1414,7 +1453,7 @@ class MMData:
         
         # write levels
         level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
-        unitile_location = src.mappermages.unitile_table_range[0] + 8 * constants.level_count
+        unitile_location = src.mappermages.unitile_table_range[0] + 10 * constants.level_count
         for level in self.levels:
             # write level data
             result, level_ram_location = level.commit(level_ram_location)
@@ -1426,6 +1465,13 @@ class MMData:
                 result, unitile_location = level.commit_unitile(unitile_location)
                 
                 if not result:
+                    self.errors += ["Failed to write unitile data."]
+                    return False
+                
+                result, unitile_location = level.commit_drop_objects(unitile_location)
+                
+                if not result:
+                    self.errors += ["Failed to write object drop data."]
                     return False
             
         # level bounds check

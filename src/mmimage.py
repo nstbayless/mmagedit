@@ -91,7 +91,10 @@ def produce_micro_tile_images(data, world, hard=False):
     for palette_idx in range(4):
         minitile_images_paletted = []
         for i in range(0x100):
-            palette = world.palettes[palette_idx + (4 if hard else 0)] if world is not None else constants.bg_palettes[palette_idx]
+            if type(world) is type([]):
+                palette = world[palette_idx]
+            else:
+                palette = world.palettes[palette_idx + (4 if hard else 0)] if world is not None else constants.bg_palettes[palette_idx]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
                 for x in range(8):
@@ -100,7 +103,7 @@ def produce_micro_tile_images(data, world, hard=False):
                         rgb = constants.palette_rgb[palette[col_idx]]
                         
                         # hidden block effect
-                        if world is not None and i in constants.hidden_micro_tiles and palette_idx in world.hidden_tile_palettes():
+                        if world is not None and type(world) is not type([]) and i in constants.hidden_micro_tiles and palette_idx in world.hidden_tile_palettes():
                             if (x + y) % 2 == 1:
                                 rgb = constants.hidden_colour
                         
@@ -120,10 +123,8 @@ def produce_title_screen(data):
         x = (i % 0x20) * 0x8
         y = (i // 0x20) * 0x8
         tile = data.title_screen.table[i - 0x20]
-        
-        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
-        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
-        palette_idx = 0 if palette_i >= len(data.title_screen.palette_idxs) or palette_i < 0 else (data.title_screen.palette_idxs[palette_i] >> (2 * (palette_sub_i))) & 0x3
+
+        palette_idx = data.title_screen.get_palette_idx(x // 8, y // 8)
         
         # we remap the 0 palette because it fades in, so the initial value would be invisible.
         palette = constants.title_red_palette if palette_idx == 0 else data.title_screen.palettes[palette_idx]

@@ -28,8 +28,8 @@ Left-clicking, middle-clicking (or ctrl-clicking), shift-clicking, and right-cli
 
 - Left Click: places a tile, tile patch, or object
 - Right Click: removes a tile, tile patch, or object
-- Middle Click / Ctrl Click: edits the mirror position (seam position). Only available when a tile is selected, and never on hard mode.
-- Shift Click: drag to select a rectangle.
+- Middle Click / Ctrl Click: edits the mirror position (seam position). Not available on hard mode.
+- Shift Click: drag to select a rectangle (for copying/cutting/deleting/pasting)
 
 ## Launching (Ubuntu)
 
@@ -97,13 +97,10 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 
 - selection:
     - checkboxes to select what layers to copy/paste to/from
-    - can select individual macro tiles, or whole rows
     - macro-patch copy/pasting
-- edit mouse bindings
+- export single image
 - mod to make game over respawn from start of level instead of world
 - GUI string editor
-- GUI title screen editor
 - objects with normal/hard/hell flags
-- objects as drops
 - adjust level size?
 - adjust level direction/orientation?

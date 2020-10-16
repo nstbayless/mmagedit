@@ -1028,7 +1028,13 @@ class Music:
 class TitleScreen:
     def __init__(self, data):
         self.data = data
-        
+    
+    def size(self):
+        # hacky implementation
+        # writes to data and then checks the bitstream.
+        # FIXME: not sure why adding 4 is necessary...
+        return self.write()[1] - self.data.ram_to_rom(constants.ram_range_title_screen[0]) + 4
+    
     def write(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
         table = self.table + self.palette_idxs
@@ -1092,8 +1098,42 @@ class TitleScreen:
         # bounds check
         if bs.offset + (bs.bitoffset / 8) > self.data.ram_to_rom(constants.ram_range_title_screen[1]):
             self.data.errors += ["title screen exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_title_screen[1])) + ")" ]
-            return False
-        return True
+            return False, math.ceil(bs.offset + (bs.bitoffset / 8))
+        return True, math.ceil(bs.offset + (bs.bitoffset / 8))
+    
+    def get_tile(self, x, y):
+        idx = x + y * 32
+        if idx < 0 or idx >= len(self.table):
+            return 0
+        else:
+            return self.table[idx]
+    
+    def set_tile(self, x, y, t):
+        idx = x + y * 32
+        if idx < 0 or idx >= len(self.table):
+            pass
+        else:
+            self.table[idx] = t
+            
+    def get_palette_idx(self, x, y):
+        y += 1
+        x *= 0x8
+        y *= 0x8
+        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
+        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
+        return 0 if palette_i >= len(self.palette_idxs) or palette_i < 0 else (self.palette_idxs[palette_i] >> (2 * (palette_sub_i))) & 0x3
+        
+    def set_palette_idx(self, x, y, palette_idx):
+        y += 1
+        x *= 0x8
+        y *= 0x8
+        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
+        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
+        if palette_i < len(self.palette_idxs) and palette_i >= 0:
+            mask = 0x3 << (palette_sub_i * 2)
+            b = palette_idx << (palette_sub_i * 2)
+            self.palette_idxs[palette_i] &= ~mask
+            self.palette_idxs[palette_i] |= b & mask
     
     def read(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))

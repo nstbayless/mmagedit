@@ -151,6 +151,7 @@ class GuiMicroGrid(tk.Canvas):
         self.selection_idx = None
         self.maxh = 0
         self.copy_buffer = None
+        self.linecol = linecol
         
         if "dims" in kwargs:
             dims = kwargs.pop("dims")
@@ -169,7 +170,10 @@ class GuiMicroGrid(tk.Canvas):
         scroll = True
         if "scroll" in kwargs:
             scroll = kwargs.pop("scroll")
-            
+        
+        if "linecol" in kwargs:
+            self.linecol = kwargs.pop("linecol")
+        
         tk.Canvas.__init__(self, parent, **kwargs)
         self.calcdims()
         
@@ -209,6 +213,8 @@ class GuiMicroGrid(tk.Canvas):
             dims = kwargs.pop("dims")
             self.w = dims[0]
             self.h = dims[1]
+        if "linecol" in kwargs:
+            self.linecol = kwargs.pop("linecol")
         tk.Canvas.configure(self, **kwargs)
         self.calcdims()
         
@@ -271,12 +277,12 @@ class GuiMicroGrid(tk.Canvas):
             for x in range(self.w // self.chunkdim[0]):
                 px = (x + 1) * micro_width * self.chunkdim[0] * self.core.zoom() + x
                 self.clear_elts.append(
-                    self.create_line(px, 0, px, ph, fill=linecol)
+                    self.create_line(px, 0, px, ph, fill=self.linecol)
                 )
                 for y in range(self.h // self.chunkdim[1]):
                     py = (y + 1) * micro_height * self.chunkdim[1] * self.core.zoom() + y
                     self.clear_elts.append(
-                        self.create_line(0, py, pw, py, fill=linecol)
+                        self.create_line(0, py, pw, py, fill=self.linecol)
                     )
             
         chunkdim = self.chunkdim if self.chunkdim is not None else (1, 1)
@@ -358,6 +364,117 @@ class GuiSubWindow:
     def ctl(self, kwargs):
         pass
 
+# screen editor
+class GuiScreenEditor(GuiSubWindow):
+    def __init__(self, core):
+        super().__init__(core, "Screen Editor")
+        self.screen = core.data.title_screen
+        self.w = 256
+        self.h = 224
+        self.palette_idx = 0
+        self.menu_commands = dict()
+        self.window.bind("<Key>", self.on_keypress)
+        self.init()
+        self.refresh()
+    
+    def ctl(self, kwargs):
+        if "screen" in kwargs:
+            self.screen = kwargs.pop()
+            self.refresh()
+
+    def init(self):
+        self.select_canvas = GuiMicroGrid(self.window, self.core, height=8 * 16 * self.core.zoom() + 16, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False, linecol="black")
+        self.select_canvas.pack(side=tk.RIGHT)
+        
+        self.place_canvas = GuiMicroGrid(self.window, self.core, height=self.h * self.core.zoom(), dims=(self.w // micro_width, self.h // micro_height), scroll=False, cb=self.on_place_click)
+        self.place_canvas.pack()
+        
+        self.usage_bar = GuiUsageBar(self.window, self.core, text="Screen Data", height=20)
+        self.usage_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        self.menu = tk.Menu(self.window)
+        self.cmenu = tk.Menu(self.menu, tearoff=0)
+        for i in range(4):
+            si = str(i+1)
+            cmd = partial(self.set_palette_idx, i)
+            self.cmenu.add_command(label="Palette " + si, command=cmd, accelerator=si)
+            self.add_hotkey(cmd, si)
+        self.menu.add_cascade(label="Palettes", menu=self.cmenu)
+        self.window.config(menu=self.menu)
+    
+    def on_keypress(self, event):
+        for acc, command in self.menu_commands.items():
+            if acc is None:
+                continue
+            acc = acc.lower()
+            if event.char is not None and acc == event.char.lower():
+                command()
+                return
+            if event.keysym is not None and acc == event.keysym.lower():
+                command()
+                return
+        # fall through
+        self.core.on_keypress(event)
+    
+    def add_hotkey(self, command, accelerator):
+        self.menu_commands[accelerator] = command
+        
+    def set_palette_idx(self, idx):
+        self.palette_idx = clamp_hoi(idx, 0, 4)
+        self.refresh()
+    
+    def get_selected_palette_idx(self):
+        return self.palette_idx
+
+    def refresh(self):
+        max = constants.ram_range_title_screen[1] - constants.ram_range_title_screen[0]
+        usage = self.screen.size()
+        self.usage_bar.configure(
+            usage=usage,
+            max=max 
+        )
+        
+        # set tiles in screen
+        for x in range(self.w // micro_width):
+            for y in range(self.h // micro_height):
+                palette_idx = self.screen.get_palette_idx(x, y)
+                img = self.core.screen_micro_images[palette_idx][self.screen.get_tile(x, y)]
+                self.place_canvas.set_tile_image(x, y, img)
+        
+        # set tiles in palette
+        for x in range(16):
+            for y in range(16):
+                img = self.core.screen_micro_images[self.get_selected_palette_idx()][x + 16 * y]
+                self.select_canvas.set_tile_image(x, y, img)
+        
+    def on_select_click(self, idx, edit):
+        if idx < 256:
+            self.select_canvas.selection_idx = idx
+        self.select_canvas.refresh()
+        
+    def on_place_click(self, idx, edit):
+        tile = self.select_canvas.selection_idx if not edit else 0
+        if tile is None:
+            return
+        
+        x = idx % (self.w // micro_width)
+        y = idx // (self.w // micro_width)
+            
+        # TODO - switch to actions system (for undo)
+        self.core.apply_action(GuiAction(
+            type="screen", refresh=["screen"],
+            context=GuiScreenEditor,
+            screen=self.screen,
+            x=x,
+            y=y,
+            palette_idx=self.get_selected_palette_idx() if not edit else None,
+            prev_palette_idx=None, # fill in later
+            tile=tile,
+            prev_tile=None # fill in later
+        ))
+        
+        self.refresh()
+        
 # select mods to enable
 class GuiMod(GuiSubWindow):
     def __init__(self, core):
@@ -402,7 +519,6 @@ class GuiMod(GuiSubWindow):
                         prev_value=not enabled
                     ))
         
-
 # 16x16 macro-tile editor
 class GuiMedEdit(GuiSubWindow):
     palette_var_counter = 0
@@ -601,7 +717,6 @@ class GuiMedEdit(GuiSubWindow):
             ))
     
     def on_select_click(self, idx, edit):
-        world = self.core.data.worlds[self.world_idx]
         if idx < 256:
             self.select_canvas.selection_idx = idx
         self.select_canvas.refresh()
@@ -806,7 +921,7 @@ class Gui:
     def __init__(self):
         self.data = None
         self.subwindows = dict()
-        self.mouse_button_actions = ["place", "seam", "remove", "seam", "select"] # left, middle, right, ctrl, shift
+        self.mouse_button_actions = ["place", "seam", "remove", "seam", "select", "eyedropper"] # left, middle, right, ctrl, shift, shift+right
         self.file = {"hack": None, "rom": None, "image": None, "ips": None, "bps": None}
         self.dirty = False
         self.undo_buffer = []
@@ -1000,7 +1115,7 @@ class Gui:
             return
             
         if not force:
-            if tkinter.messagebox.askyesno("Warning", "Zooming logic is currently in beta. It may take several seconds to process this request. Continue?\n\n(Ctrl+Alt+" + str(zoom_idx + 1) + " to zoom without seeing this dialogue box.)") is False:
+            if tkinter.messagebox.askyesno("Warning", "Zooming logic is currently in beta. It may take several seconds to process this request. Additionally, subwindows may take a long time to close. Continue?\n\n(Ctrl+Alt+" + str(zoom_idx + 1) + " to zoom without seeing this dialogue box.)") is False:
                 return
         
         # close subwindows
@@ -1118,6 +1233,19 @@ class Gui:
         
     def about(self):
         tkinter.messagebox.showinfo(constants.mmname, constants.mminfo)
+        
+    def usage(self):
+        tkinter.messagebox.showinfo(constants.mmname + " - Usage", """
+Mouse controls:
+
+- Left Click: place stage element.
+- Right Click: remove stage element.
+- Middle Click / Ctrl Click: edit seam (mirror) position.
+- Shift Click: drag to select.
+- Shift Right Click: eyedropper.
+
+Please remember to save frequently and make backups.
+""".strip())
     
     # handles a kepyress event
     def on_keypress(self, event):
@@ -1191,6 +1319,8 @@ class Gui:
             self.subwindowctl(GuiMacroEdit, world_idx=action.world_idx, macro_tile_idx=action.macro_tile_idx)
         elif action.context == GuiMedEdit:
             self.subwindowctl(GuiMedEdit, world_idx=action.world_idx, med_tile_idx=action.med_tile_idx)
+        elif action.context == GuiScreenEditor:
+            self.subwindowctl(GuiScreenEditor, screen=action.screen)
 
         level = self.level
 
@@ -1247,6 +1377,25 @@ class Gui:
                 self.ctl(drop=False)
             else:
                 self.data.mods[action.mod_name] = action.prev_value if undo else action.new_value
+        if action.type == "screen":
+            x = action.x
+            y = action.y
+            screen = action.screen
+            
+            # fill in undo
+            if not undo and action.prev_tile is None:
+                action.prev_tile = screen.get_tile(x, y)
+                if action.palette_idx is not None:
+                    action.prev_palette_idx = screen.get_palette_idx(x, y)
+            
+            palette_idx = action.prev_palette_idx if undo else action.palette_idx
+            tile = action.prev_tile if undo else action.tile
+
+            # apply tile/palette
+            screen.set_tile(x, y, tile)
+            if palette_idx is not None:
+                screen.set_palette_idx(x, y, palette_idx)
+
         if action.type == "unitile":
             # unitile (med-tile patch) -- requires mapper extension
             # action.x
@@ -1606,10 +1755,67 @@ class Gui:
 
         self.refresh_selection_rect()
         self.refresh_copy_menus()
+    
+    def get_tiles_at(self, x, y):
+        y = clamp_hoi(y, 0, level_height)
+        x = clamp_hoi(x, 0, level_width)
+                    
+        level = self.level
+        # med-tile
+        macro_y = clamp_hoi(level_height - y, 0, level_height) // macro_height
+        med_y = clamp_hoi(level_height - y, 0, level_height) // med_height
+        med_tile_rows, macro_tile_idxs = level.produce_med_tiles(self.hard, range(macro_y, macro_y + 1))
+        med_x = clamp_hoi(x, 0, level_width) // med_width
+        med_tile_row = med_tile_rows[med_y % 2]
+        med_tile_idx = med_tile_row[med_x]
         
+        # micro-tile
+        micro_x = clamp_hoi(x, 0, level_width) // micro_width
+        micro_y = clamp_hoi(level_height - y, 0, level_height) // micro_height
+        med_tile = level.world.get_med_tile(med_tile_idx)
+        idx = 2 * (micro_y % 2) + (micro_x % 2)
+        micro_tile_idx = med_tile[idx]
+        
+        # macro-tile
+        macro_row = level.macro_rows[macro_y] if macro_y in range(len(level.macro_rows)) else None
+        if macro_row is not None:
+            seam_x = macro_row.seam * med_width
+            macro_col_x = (max(int(x - seam_x + level_width), 0) % level_width) // macro_width
+            if macro_col_x >= 4:
+                macro_col_x = 7 - macro_col_x
+            macro_idx = clamp_hoi(macro_col_x, 0, 4)
+            macro_tile_idx = macro_tile_idxs[macro_idx]
+        else:
+            # not sure what causes this sometimes.
+            macro_tile_idx = None
+        
+        return macro_tile_idx, med_tile_idx, micro_tile_idx
+    
     def on_stage_motion(self, event):
+        # determine what's in the element id label
+        if self.level is not None:
+            y = self.get_event_y(event, self.stage_canvas, level_height * self.zoom()) / self.zoom()
+            x = event.x / self.zoom()
+            y = clamp_hoi(y, 0, level_height)
+            x = clamp_hoi(x, 0, level_width)
+            
+            macro_tile_idx, med_tile_idx, micro_tile_idx = self.get_tiles_at(x, y)
+            
+            # set label
+            self.element_id_label.configure(
+                text="X:" + HB(x) + ", Y:" + HX(y // 256) + HB(y % 256) +
+                ", Macro:" + (".." if macro_tile_idx is None else HB(macro_tile_idx)) + ", Med:" + HB(med_tile_idx) +
+                ", Micro:" + HB(micro_tile_idx)
+            )
+        
+    def on_stage_leave(self, event):
+        self.element_id_label.configure(text="")
+        
+    def on_stage_drag(self, event):
         y = self.get_event_y(event, self.stage_canvas, level_height * self.zoom()) / self.zoom()
         x = event.x / self.zoom()
+        
+        # select drag
         if self.select_rect is not None:
             self.set_selection(
             [
@@ -1633,12 +1839,20 @@ class Gui:
         
         ctrl = event.state & 4 != 0
         shift = event.state & 1 != 0
-        action = self.mouse_button_actions[3 if ctrl else 4 if shift else button - 1]
+        action_idx = button - 1
+        if ctrl:
+            action_idx = 3
+        if shift:
+            action_idx = 4
+            if button == 3:
+                # shift+right-click
+                action_idx = 5
+        action = self.mouse_button_actions[action_idx]
         
         y = self.get_event_y(event, self.stage_canvas, level_height * self.zoom()) / self.zoom()
         x = event.x / self.zoom()
         
-        if shift:
+        if action == "select":
             self.set_selection([x, y, x, y])
         else:
             self.set_selection(None)
@@ -1662,6 +1876,14 @@ class Gui:
                                 remove=True,
                                 object=obj
                             ))
+                            break
+                
+                if action == "eyedropper":
+                    for obj in level.objects:
+                        object_data = constants.object_data[obj.gid]
+                        if obj.x == objx and obj.y == objy:
+                            self.object_select_gid = obj.gid
+                            self.refresh_object_select()
                             break
                     
                 if action == "place":
@@ -1712,6 +1934,10 @@ class Gui:
                         prev_med_tile_idx=None # fill this in on application.
                     ))
                 
+                if action == "eyedropper":
+                    macro_tile_idx, med_tile_idx, micro_tile_idx = self.get_tiles_at(x, y)
+                    self.unitile_select_id = med_tile_idx
+                
             # tile adjustment
             if self.get_stage_placement_type() in ["macro-tile", "macro-patch"] or (action == "seam" and not place_duplicates):
                 macro_row_idx = clamp_hoi(constants.macro_rows_per_level - int(y / macro_height) - 1, 0, constants.macro_rows_per_level)
@@ -1722,60 +1948,66 @@ class Gui:
                     macro_col_x = 7 - macro_col_x
                 macro_idx = clamp_hoi(macro_col_x, 0, 4)
                 
-                if self.hard:
-                    # place macro tile hard-mode patch
-                    
-                    # remove existing patch if applicable
-                    if action == "place" or action == "remove":
-                        for patch in level.hardmode_patches:
-                            if patch.x == macro_idx and patch.y == macro_row_idx:
-                                self.apply_action(GuiAction(
-                                    type="patch", refresh=["row", "patches"],
-                                    remove=True,
-                                    macro_row_idx=macro_row_idx,
-                                    patch=patch
-                                ))
-                                break
-                    
-                    # add a patch
-                    if action == "place" and self.macro_tile_select_id != 0:
-                        patch = mmdata.HardPatch()
-                        patch.i = self.macro_tile_select_id - 0x2f
-                        patch.x = macro_idx
-                        patch.y = macro_row_idx
-                        self.apply_action(GuiAction(
-                            type="patch", refresh=["row", "patches"],
-                            remove=False,
-                            macro_row_idx=macro_row_idx,
-                            patch=patch
-                        ))
-                    
-                    self.refresh_patch_rects()
+                if action == "eyedropper":
+                    macro_tile_idx, med_tile_idx, micro_tile_idx = self.get_tiles_at(x, y)
+                    if macro_tile_idx is not None:
+                        self.macro_tile_select_id = macro_tile_idx
+                        
                 else:
-                    # set macro tile
-                    if action == "place":
-                        self.apply_action(GuiAction(
-                            type="tile", refresh=["row"],
-                            macro_row_idx=macro_row_idx,
-                            macro_idx=macro_idx,
-                            tile=self.macro_tile_select_id,
-                            prev_tile=macro_row.macro_tiles[macro_idx]
-                        ))
-                    elif action == "remove":
-                        self.apply_action(GuiAction(
-                            type="tile", refresh=["row"],
-                            macro_row_idx=macro_row_idx,
-                            macro_idx=macro_idx,
-                            tile=0,
-                            prev_tile=macro_row.macro_tiles[macro_idx]
-                        ))
-                    elif action == "seam":
-                        self.apply_action(GuiAction(
-                            type="seam", refresh=["row", "patches"],
-                            macro_row_idx=macro_row_idx,
-                            prev_seam=macro_row.seam,
-                            seam=int(max(0, (x + micro_width - 2) / med_width)) % (level_width // med_width)
-                        ))
+                    if self.hard:
+                        # place macro tile hard-mode patch
+                        
+                        # remove existing patch if applicable
+                        if action == "place" or action == "remove":
+                            for patch in level.hardmode_patches:
+                                if patch.x == macro_idx and patch.y == macro_row_idx:
+                                    self.apply_action(GuiAction(
+                                        type="patch", refresh=["row", "patches"],
+                                        remove=True,
+                                        macro_row_idx=macro_row_idx,
+                                        patch=patch
+                                    ))
+                                    break
+                        
+                        # add a patch
+                        if action == "place" and self.macro_tile_select_id != 0:
+                            patch = mmdata.HardPatch()
+                            patch.i = self.macro_tile_select_id - 0x2f
+                            patch.x = macro_idx
+                            patch.y = macro_row_idx
+                            self.apply_action(GuiAction(
+                                type="patch", refresh=["row", "patches"],
+                                remove=False,
+                                macro_row_idx=macro_row_idx,
+                                patch=patch
+                            ))
+                        
+                        self.refresh_patch_rects()
+                    else:
+                        # set macro tile
+                        if action == "place":
+                            self.apply_action(GuiAction(
+                                type="tile", refresh=["row"],
+                                macro_row_idx=macro_row_idx,
+                                macro_idx=macro_idx,
+                                tile=self.macro_tile_select_id,
+                                prev_tile=macro_row.macro_tiles[macro_idx]
+                            ))
+                        elif action == "remove":
+                            self.apply_action(GuiAction(
+                                type="tile", refresh=["row"],
+                                macro_row_idx=macro_row_idx,
+                                macro_idx=macro_idx,
+                                tile=0,
+                                prev_tile=macro_row.macro_tiles[macro_idx]
+                            ))
+                        elif action == "seam":
+                            self.apply_action(GuiAction(
+                                type="seam", refresh=["row", "patches"],
+                                macro_row_idx=macro_row_idx,
+                                prev_seam=macro_row.seam,
+                                seam=int(max(0, (x + micro_width - 2) / med_width)) % (level_width // med_width)
+                            ))
     
     def subwindowctl(self, type, **kwargs):
         # check if subwindow has closed
@@ -1884,6 +2116,7 @@ class Gui:
         self.add_menu_command(editmenu, "Macro Tiles...", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
         self.add_menu_command(editmenu, "Med Tiles...", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
         self.add_menu_command(editmenu, "Mods...", lambda: self.subwindowctl(GuiMod), "Ctrl+Shift+D")
+        self.add_menu_command(editmenu, "Screen...", lambda: self.subwindowctl(GuiScreenEditor), "Ctrl+Shift+T")
         menu.add_cascade(label="Edit", menu=editmenu)
         
         viewmenu = tk.Menu(menu, tearoff=0)
@@ -1922,6 +2155,7 @@ class Gui:
         
         helpmenu = tk.Menu(menu, tearoff=0)
         self.add_menu_command(helpmenu, "About", self.about, None)
+        self.add_menu_command(helpmenu, "Mouse Button Mappings", self.usage, None)
         menu.add_cascade(label="Help", menu=helpmenu)
         
         # containers
@@ -1954,9 +2188,11 @@ class Gui:
         stage_canvas.bind("<Button-1>", partial(self.on_stage_click, 1))
         stage_canvas.bind("<Button-2>", partial(self.on_stage_click, 2))
         stage_canvas.bind("<Button-3>", partial(self.on_stage_click, 3))
-        stage_canvas.bind("<B1-Motion>", partial(self.on_stage_motion))
-        stage_canvas.bind("<B2-Motion>", partial(self.on_stage_motion))
-        stage_canvas.bind("<B3-Motion>", partial(self.on_stage_motion))
+        stage_canvas.bind("<B1-Motion>", partial(self.on_stage_drag))
+        stage_canvas.bind("<B2-Motion>", partial(self.on_stage_drag))
+        stage_canvas.bind("<B3-Motion>", partial(self.on_stage_drag))
+        stage_canvas.bind("<Motion>", partial(self.on_stage_motion))
+        stage_canvas.bind("<Leave>", partial(self.on_stage_leave))
         stage_canvas.bind("<ButtonRelease-1>", partial(self.on_stage_release))
         stage_canvas.bind("<ButtonRelease-2>", partial(self.on_stage_release))
         stage_canvas.bind("<ButtonRelease-3>", partial(self.on_stage_release))
@@ -2001,6 +2237,12 @@ class Gui:
         # stage topbar
         musiclabel = tk.Label(stage_topbar, text="Music: ")
         musiclabel.grid(column=0, row=0)
+        
+        subframe = tk.Frame(stage_topbar, width=100)
+        subframe.grid(column=2, row=0)
+        self.element_id_label = tk.Label(subframe, text="", width=len("X:00, Y:000, Macro:XX, Med:XX, Micro:XX"), anchor=tk.W)
+        self.element_id_label.pack()
+        
         self.stage_topbar = stage_topbar
         self.musicdropdown = None
         self.stage_topbar.pack_forget()
@@ -2073,6 +2315,7 @@ class Gui:
         # micro-tile images
         # list [world][palette_idx][id]
         self.micro_images = [[[None for id in range(0x100)] for palette_idx in range(8)] for world in self.data.worlds]
+        self.screen_micro_images = [[None for id in range(0x100)] for palette_idx in range(4)]
         for world_idx in range(len(self.data.worlds)):
             world = self.data.worlds[world_idx]
             images = [mmimage.produce_micro_tile_images(self.data, world, hard) for hard in [False, True]]
@@ -2081,6 +2324,17 @@ class Gui:
                     img = images[palette_idx // 4][palette_idx % 4][id]
                     imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()), method=Image.NEAREST)
                     self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=imgzoom)
+    
+        # screen tiles (e.g. for title screen)
+        palettes = self.data.title_screen.palettes
+        palettes[0] = constants.title_red_palette # remap to faded-in red colour
+        images = mmimage.produce_micro_tile_images(self.data, palettes)
+        for palette_idx in range(4):
+            for id in range(0x100):
+                img = images[palette_idx][id]
+                imgzoom = ImageOps.fit(img, (img.width * self.zoom(), img.height * self.zoom()), method=Image.NEAREST)
+                self.screen_micro_images[palette_idx][id] = ImageTk.PhotoImage(image=imgzoom)
+                    
     
     def select_stage(self, stage_idx, hard=False):
         if self.data is None:

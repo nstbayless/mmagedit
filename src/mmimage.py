@@ -132,10 +132,10 @@ def produce_title_screen(data):
         chr_to_img(data, tile * 0x10, img, palette, (x, y))
     return img
 
-def export_images(data, path="."):
+def export_images(data, path=".", only=None):
     if not os.path.exists(path):
         os.path.makedirs(path)
-    
+
     # export chr
     outfile = "mm-chr.png"
     print("exporting", outfile)

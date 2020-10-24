@@ -379,7 +379,9 @@ class GuiScreenEditor(GuiSubWindow):
     
     def ctl(self, kwargs):
         if "screen" in kwargs:
-            self.screen = kwargs.pop()
+            self.screen = kwargs.pop("screen")
+            self.refresh()
+        elif "refresh" in kwargs:
             self.refresh()
 
     def init(self):
@@ -941,6 +943,7 @@ class Gui:
         self.stage_idx = 0
         self.hard = False
         self.zoom_idx = 0
+        self.scroll_seam_accumulator = 0
         
         # preferences
         self.macro_tile_select_width = 4
@@ -1171,12 +1174,41 @@ class Gui:
             canvas.bind("<Button-5>", fn)
     
     def on_mousewheel(self, canvas, event):
+        delta = 0
         if event.num == 5:
-            canvas.yview_scroll(+2, "units")
+            delta = 2
         elif event.num == 4:
-            canvas.yview_scroll(-2, "units")
+            delta = -2
         else:
-            canvas.yview_scroll(-1*(event.delta/120), "units")
+            delta = -1*(event.delta/120)
+        
+        if delta != 0:
+            if canvas == self.stage_canvas and event.state & 1:
+                if not self.hard:
+                    # adjust seam.
+                    self.scroll_seam_accumulator += delta / 2
+                    if self.scroll_seam_accumulator >= 1:
+                        self.scroll_seam_accumulator = 0
+                        diff = 1
+                    elif self.scroll_seam_accumulator <= -1:
+                        self.scroll_seam_accumulator = 0
+                        diff = -1
+                    else:
+                        return
+                    y = self.get_event_y(event, self.stage_canvas, level_height * self.zoom()) / self.zoom()
+                    y = clamp_hoi(y, 0, level_height)
+                    macro_y = clamp_hoi(level_height - y, 0, level_height) // macro_height
+                    if self.level:
+                        macro_row = self.level.macro_rows[macro_y]
+                        self.apply_action(GuiAction(
+                            type="seam", refresh=["row", "patches"],
+                            macro_row_idx=macro_y,
+                            prev_seam=macro_row.seam,
+                            seam=int(macro_row.seam + 0x10 + diff) & 0xf
+                        ))
+            else:
+                # scroll window.
+                canvas.yview_scroll(delta, "units")
         
     def ctl(self, **kw):
         if "flipx" in kw:
@@ -1240,7 +1272,7 @@ Mouse controls:
 
 - Left Click: place stage element.
 - Right Click: remove stage element.
-- Middle Click / Ctrl Click: edit seam (mirror) position.
+- Middle Click / Ctrl Click / Shift Scroll: edit seam (mirror) position.
 - Shift Click: drag to select.
 - Shift Right Click: eyedropper.
 
@@ -1492,6 +1524,8 @@ Please remember to save frequently and make backups.
             self.refresh_objects()
         elif "objects" in refresh:
             self.refresh_objects()
+        if "screen" in refresh:
+            self.subwindowctl(GuiScreenEditor, refresh=True, open=False)
         if "patches" in refresh:
             self.refresh_patch_rects()
         if "macro" in refresh:

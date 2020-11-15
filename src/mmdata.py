@@ -1368,6 +1368,10 @@ class MMData:
             self.mods["no_relic_4"] = False
             self.mapper_extension = False
             
+            self.pause_text = [self.read_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i)) for i in range(5)]
+            self.pause_text_offset = self.read_byte(self.ram_to_rom(constants.ram_pause_text_offset))
+            
+            
             # read number of lives
             self.default_lives = self.read_byte(self.ram_to_rom(constants.ram_default_lives))
             
@@ -1478,6 +1482,11 @@ class MMData:
         # write chest table
         for i in range(min(constants.ram_chest_table, len(self.chest_objects))):
             self.write_byte(self.ram_to_rom(constants.ram_chest_table + i), self.chest_objects[i])
+        
+        # write pause text
+        self.write_byte(self.ram_to_rom(constants.ram_pause_text_offset), self.pause_text_offset)
+        for i in range(5):
+            self.write_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i), self.pause_text[i])
         
         # write object-specific data
         for cfg in self.object_config:
@@ -1691,6 +1700,10 @@ class MMData:
             out()
             out('  # these med-tiles will be replaced with the given med-tiles when mirrored, and vice versa')
             out('  "mirror-pairs":', json_list(self.mirror_pairs, lambda i : '"' + hb(i) + '"') + ",")
+            out()
+            out('  # pause text')
+            out('  "pause-text":', "[", " ,".join(['"' + hb(i) + '"' for i in self.pause_text]), "],")
+            out('  "pause-text-x": "' + hb(self.pause_text_offset) + "\",")
             out()
             out('  # some special mods that can be applied')
             out('  "mods": {')
@@ -2346,6 +2359,12 @@ class MMData:
                         self.mirror_pairs = []
                         for pair in config["mirror-pairs"]:
                             self.mirror_pairs.append([int(i, 16) for i in pair])
+                    if "pause-text" in config:
+                        self.pause_text = []
+                        for c in config["pause-text"]:
+                            self.pause_text.append(int(c, 16))
+                    if "pause-text-x" in config:
+                        self.pause_text_offset = int(config["pause-text-x"], 16)
                     if "mods" in config:
                         for mod in config["mods"]:
                             if mod == "mapper-extension":

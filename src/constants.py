@@ -47,6 +47,8 @@ text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
 ram_range_music = [0x8000, 0x860A]
 ram_range_levels = [0xdaec, 0xe6c3]
 ram_range_text = [0xEC67, 0xEE67]
+ram_range_uncompressed_text = [0xEE67, 0xEE67+5] # pause text
+ram_pause_text_offset = 0xBAD3
 
 # ~ special mods ~
 # the source for these hacks: https://github.com/nstbayless/mm-patches

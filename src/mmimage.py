@@ -11,16 +11,35 @@ try:
 except ImportError as e:
     available = False
     raise e
-    
-def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
+
+def chr_to_array(data, chr_ram):
+    arr = [[0 for x in range(8)] for y in range(8)]
     for y in range(8):
-        l = data.read_byte(data.chr_to_rom(chr_address + y))
-        u = data.read_byte(data.chr_to_rom(chr_address + y + 8))
+        l = data.read_byte(data.chr_to_rom(chr_ram + y))
+        u = data.read_byte(data.chr_to_rom(chr_ram + y + 8))
         for x in range(8):
             bl = (l >> (7 - x)) & 0x1
             bu = (u >> (7 - x)) & 0x1
+            arr[y][x] = (bu << 1) | (bl)
+    return arr
+
+def array_to_chr(data, chr_ram, arr):
+    for k in range(2):
+        for y in range(8):
+            a = data.chr_to_rom(chr_ram + y + 8*k)
+            v = 0
+            for x in range(8):
+                b = (arr[y][x] >> k) & 1
+                v <<= 1
+                v |= b
+            data.write_byte(a, v)
+
+def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
+    arr =  chr_to_array(data, chr_address)
+    for y in range(8):
+        for x in range(8):
             
-            col_idx = (bu << 1) | (bl)
+            col_idx = arr[y][x]
             col = palette[col_idx]
             colrgb = constants.palette_rgb[col]
             
@@ -85,7 +104,39 @@ def produce_object_images(data, semi=False):
         object_images.append(None)
     
     return object_images
-    
+
+def set_chr_rom_from_image_path(data, path):
+    return set_chr_rom_from_image(data, Image.open(path))
+
+def set_chr_rom_from_image(data, img):
+    pixs = list(img.getdata())
+    for b in range(2):
+        for ya in range(0x10):
+            for xa in range(0x10):
+                # chr image tile data to array
+                arr = [[0 for x in range(8)] for y in range(8)]
+                for y in range(0x8):
+                    for x in range(0x8):
+                        i = b * 0x80 + x + 0x100 * y + 0x800 * ya + 0x8 * xa
+                        if i >= len(pixs):
+                            continue
+                        pix = pixs[i]
+                        v = float(pix[0] + pix[1] + pix[2]) / float(0x300)
+
+                        # convert intensity to a 0-4 value, through a highly bespoke and stupid formula.
+                        pal = 3
+                        if v < 0.1:
+                            pal = 0
+                        elif v < 0.24:
+                            pal = 1
+                        elif v < 0.7:
+                            pal = 2
+                        
+                        arr[y][x] = pal
+                
+                # apply to rom data.
+                array_to_chr(data, b * 0x1000 + ya * 0x100 + xa * 0x10, arr)
+
 def produce_micro_tile_images(data, world, hard=False):
     minitile_images = []
     for palette_idx in range(4):
@@ -97,9 +148,11 @@ def produce_micro_tile_images(data, world, hard=False):
                 palette = world.palettes[palette_idx + (4 if hard else 0)] if world is not None else constants.bg_palettes[palette_idx]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
+                address = i * 0x10
+                arr = chr_to_array(data, address)
                 for x in range(8):
                     for y in range(8):
-                        col_idx = data.micro_tiles[i][x][y]
+                        col_idx = arr[y][x]
                         rgb = constants.palette_rgb[palette[col_idx]]
                         
                         # hidden block effect

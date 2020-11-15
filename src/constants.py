@@ -34,9 +34,10 @@ ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square
 
 title_screen_tile_count = 0x340
 title_screen_palette_idx_count = 0x1b
-ram_range_title_screen = [0xc5a2, 0xc6ae]
+ram_range_title_screen = [0xc5a2, 0xC712]
 ram_range_title_screen_palette = [0xc737, 0xc737 + 0x9]
 
+# default text lookup if no table provided.
 text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
 
 # space available
@@ -175,7 +176,7 @@ music_opcodes = [
     
     # F - orchestrate
     # sets all $4C6 for triangle, counterpoint, and lead to the given args
-    {"name": "orch", "argc":[1, 1, 1], "doc": "orchestrates triangle, counteropint, and lead respectively. Details unknown."},
+    {"name": "orch", "argc":[1, 1, 1], "doc": "orchestrates triangle, counterpoint, and lead respectively. Details unknown."},
 ]
 
 # wait commands (0x0-0x7 inclusive) are followed by a second "postfix" opcode byte.

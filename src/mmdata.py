@@ -1028,6 +1028,8 @@ class Music:
 class TitleScreen:
     def __init__(self, data):
         self.data = data
+        self.table = []
+        self.palette_idxs = []
     
     def size(self):
         # hacky implementation
@@ -1174,6 +1176,7 @@ class TextData:
     def __init__(self, data):
         self.data = data
         self.text = []
+        self.table = constants.text_lookup
     
     def read(self):
         for i in range(29):
@@ -1196,11 +1199,11 @@ class TextData:
                 elif b == 2:
                     # rare two-byte character
                     b = bs.read_bits(5)
-                    text += constants.text_lookup[b + 0x1a]
+                    text += self.table[b + 0x1a]
                 elif b == 3:
                     text += "%"
                 else:
-                    text += constants.text_lookup[b - 4]
+                    text += self.table[b - 4]
         
     def write(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
@@ -1214,8 +1217,8 @@ class TextData:
                 elif t == "%" or t == "\n":
                     bs.write_bits(3, 5)
                 else:
-                    if t in constants.text_lookup:
-                        i = constants.text_lookup.index(t)
+                    if t in self.table:
+                        i = self.table.index(t)
                         if i <= 0x1b:
                             # common character
                             assert(i + 4 < 0x20)
@@ -1319,7 +1322,6 @@ class MMData:
             
             self.levels = []
             self.spawnable_objects = []
-            self.micro_tiles = [] # 8x8 list of 2bits
             self.macro_tiles = [] # array of [tl, tr, bl, br]
             self.med_tiles = [] # array of [tl, tr, bl, br]
             self.worlds = []
@@ -1366,23 +1368,6 @@ class MMData:
             for cfg in self.object_config:
                 if cfg is not None:
                     cfg.read()
-                
-            # read micro-tile chr (not stored in format; only for visualization)
-            # FIXME: don't do this; mmimage should read from chr rom directly. It has a function for that already.
-            for t in range(0x100):
-                chr = []
-                for i in range(8):
-                    chr.append([0] * 8)
-                for y in range(8):
-                    l = (t << 4) | y
-                    u = l | (0x08)
-                    for x in range(8):
-                        
-                        a = (self.read_byte(self.chr_to_rom(u)) >> (7 - x)) & 0x1
-                        b = (self.read_byte(self.chr_to_rom(l)) >> (7 - x)) & 0x1
-                        
-                        chr[x][y] = (a << 1) | b
-                self.micro_tiles.append(chr)
                 
             # read global med-tile types (how 16x16 tiles can be composed of 8x8 tiles)
             med_corner_ptrs = [0, 0, 0, 0]
@@ -1642,7 +1627,7 @@ class MMData:
         return "[" + ", ".join('"' + self.get_object_name(gid) + '"' for gid in spawnable) + "]"
         
     # write data to a human-readable hack.txt file
-    def stat(self, fname=None):
+    def stat(self, fname=None, oall=False):
         out=print
         file = None        
         try:
@@ -1734,6 +1719,16 @@ class MMData:
             
             out("-- global --")
             
+            # text data
+            out()
+            out("# text data")
+            out("short " + self.text.table[:24])
+            out("long " + self.text.table[24:])
+            out()
+            for text in self.text.text:
+                out(">" + text + "<")
+            
+            # sprite palettes
             out()
             out("# sprite palettes")
             for i in range(4):
@@ -1741,13 +1736,30 @@ class MMData:
                 for j in range(3):
                     s += HX(self.sprite_palettes[i][j + 1]) + " "
                 out(s)
-            
-            # text data
-            out()
-            out("# text data")
-            for text in self.text.text:
-                out(">" + text + "<")
-            
+
+            if oall or self.is_dirty("chr"):
+                out()
+                out("# chr-rom")
+                out("# This is the graphics data. Each line is an 8x8 tile or sprite,")
+                out("# Comprising 8 low-order pixel data bytes, then 8 high-order.")
+                out("# Each pixel is described by two bits: one low, and one high.")
+                out("# First come the background tiles (CRB), then the sprites (CRS).")
+                out()
+                for i in range(0x200):
+                    if i == 0x100:
+                        # nice and pretty and neat
+                        out()
+                    
+                    if oall or self.is_dirty("chr", chr_idx=i):
+                        s = "CRB " if i < 0x100 else "CRS "
+                        s += HB(i & 0xff) + ":"
+                        for j in range(0x10):
+                            if j % 0x8 == 0:
+                                # nice, pretty, neat.
+                                s += "  "
+                            s += " " + HB(self.read_byte(self.chr_to_rom(i * 0x10 + j)))
+                        out(s)
+
             # med-tiles
             out()
             out("# 16x16 med-tile data, common to all worlds")
@@ -1955,6 +1967,25 @@ class MMData:
             if file is not None:
                 file.close()
         return False
+    
+    def byte_is_dirty(self, address):
+        if self.mapper_extension:
+            if address > 0x4010:
+                return self.orgbin[address] != self.bin[address + mappermages.EXTENSION_LENGTH]
+        return self.orgbin[address] != self.bin[address]
+        
+    def is_dirty(self, *args, **kwargs):
+        if "chr" in kwargs or "chr" in args:
+            if "chr_idx" in kwargs:
+                chr_idx = kwargs["chr_idx"]
+                for i in range(0x10):
+                    if self.byte_is_dirty(self.chr_to_rom(i + chr_idx * 0x10)):
+                        return True
+                return False
+            for i in range(0x200):
+                if self.is_dirty("chr", chr_idx=i):
+                    return True
+            return False
             
     # read data from a human-readable hack.txt file
     def parse(self, file):
@@ -2110,6 +2141,12 @@ class MMData:
                             else:
                                 palette = world.palettes[palette_idx]
                             palette[i] = col
+
+                    if directive == "CRB" or directive == "CRS":
+                        idx = int(tokens[1][:2], 16) + (0x100 if directive == "CRS" else 0)
+                        for j in range(0x10):
+                            if j < len(tokens):
+                                self.write_byte(self.chr_to_rom(idx * 0x10 + j), int(tokens[j + 2], 16))
                     
                     if directive == "m":
                         tile_idx = int(tokens[1].replace(":", ""), 16)
@@ -2238,6 +2275,12 @@ class MMData:
                             self.errors += ["Hack uses an older version of MMagEdit. Please be wary of errors or artifacts caused by updating."]
                     
                     # text        
+                    if directive == "short":
+                        for i in range(len(tokens[1])):
+                            self.text.table = self.text.table[:i] + tokens[1][i] + self.text.table[i+1:]
+                    if directive == "long":
+                        for i in range(len(tokens[1])):
+                            self.text.table = self.text.table[:i + 24] + tokens[1][i] + self.text.table[i+25:]
                     if directive[0] == ">":
                         text = line.split(">")[1].split("<")[0]
                         self.text.text.append(text)
@@ -2260,9 +2303,9 @@ class MMData:
                     globalstr += line + "\n"
                 elif not parsing_globals_complete:
                     config = json.loads(globalstr)
-                    assert(len(config["spawnable"]) == 0x10)
-                    assert(len(config["spawnable-ext"]) >= 0xF)
                     if "spawnable" in config and "spawnable-ext" in config:
+                        assert(len(config["spawnable"]) == 0x10)
+                        assert(len(config["spawnable-ext"]) >= 0xF)
                         self.spawnable_objects = [constants.object_names_to_gid[name] for name in config["spawnable"] + config["spawnable-ext"]]
                         if len(self.spawnable_objects) > 0x1F:
                             self.spawnable_objects = self.spawnable_objects[:0x1F]
@@ -2270,9 +2313,10 @@ class MMData:
                         self.chest_objects = [constants.object_names_to_gid[name] for name in config["chest-objects"]]
                     if "lives" in config:
                         self.default_lives = int(config["lives"])
-                    self.mirror_pairs = []
-                    for pair in config["mirror-pairs"]:
-                        self.mirror_pairs.append([int(i, 16) for i in pair])
+                    if "mirror-pairs" in config:
+                        self.mirror_pairs = []
+                        for pair in config["mirror-pairs"]:
+                            self.mirror_pairs.append([int(i, 16) for i in pair])
                     if "mods" in config:
                         for mod in config["mods"]:
                             if mod == "mapper-extension":

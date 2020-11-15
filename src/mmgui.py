@@ -382,7 +382,10 @@ class GuiScreenEditor(GuiSubWindow):
             self.screen = kwargs.pop("screen")
             self.refresh()
         elif "refresh" in kwargs:
-            self.refresh()
+            if "refx" in kwargs and "refy" in kwargs:
+                self.refresh(kwargs["refx"], kwargs["refy"], False)
+            else:
+                self.refresh()
 
     def init(self):
         self.select_canvas = GuiMicroGrid(self.window, self.core, height=8 * 16 * self.core.zoom() + 16, dims=(16, 16), chunkdim=(1, 1), cb=self.on_select_click, scroll=False, linecol="black")
@@ -428,7 +431,7 @@ class GuiScreenEditor(GuiSubWindow):
     def get_selected_palette_idx(self):
         return self.palette_idx
 
-    def refresh(self):
+    def refresh(self, fx=None, fy=None, palette=True):
         max = constants.ram_range_title_screen[1] - constants.ram_range_title_screen[0]
         usage = self.screen.size()
         self.usage_bar.configure(
@@ -439,15 +442,18 @@ class GuiScreenEditor(GuiSubWindow):
         # set tiles in screen
         for x in range(self.w // micro_width):
             for y in range(self.h // micro_height):
-                palette_idx = self.screen.get_palette_idx(x, y)
-                img = self.core.screen_micro_images[palette_idx][self.screen.get_tile(x, y)]
-                self.place_canvas.set_tile_image(x, y, img)
+                if x == fx or fx is None:
+                    if y == fy or fy is None:
+                        palette_idx = self.screen.get_palette_idx(x, y)
+                        img = self.core.screen_micro_images[palette_idx][self.screen.get_tile(x, y)]
+                        self.place_canvas.set_tile_image(x, y, img)
         
         # set tiles in palette
-        for x in range(16):
-            for y in range(16):
-                img = self.core.screen_micro_images[self.get_selected_palette_idx()][x + 16 * y]
-                self.select_canvas.set_tile_image(x, y, img)
+        if palette:
+            for x in range(16):
+                for y in range(16):
+                    img = self.core.screen_micro_images[self.get_selected_palette_idx()][x + 16 * y]
+                    self.select_canvas.set_tile_image(x, y, img)
         
     def on_select_click(self, idx, edit):
         if idx < 256:
@@ -1478,6 +1484,10 @@ Please remember to save frequently and make backups.
                 acc["macro_tile_idxs"].add(action.macro_tile_idx)
             if r == "med":
                 acc["med_tile_idxs"].add(action.med_tile_idx)
+            if r == "screen":
+                for x in range(-1, 2):
+                    for y in range(-1, 2):
+                        acc["screen_coords"].add((action.x + x, action.y + y))
 
         # recurse:
         for a in action.children:
@@ -1511,8 +1521,10 @@ Please remember to save frequently and make backups.
             "refresh": set(),
             "macro_row_idxs": set(),
             "macro_tile_idxs": set(),
-            "med_tile_idxs": set()
+            "med_tile_idxs": set(),
+            "screen_coords": set()
         }
+        
         self.apply_action_helper(action, undo, acc)
 
         refresh = acc["refresh"]
@@ -1525,7 +1537,8 @@ Please remember to save frequently and make backups.
         elif "objects" in refresh:
             self.refresh_objects()
         if "screen" in refresh:
-            self.subwindowctl(GuiScreenEditor, refresh=True, open=False)
+            for coords in acc["screen_coords"]:
+                self.subwindowctl(GuiScreenEditor, refresh=True, open=False, refx=coords[0], refy=coords[1], refpalette=False)
         if "patches" in refresh:
             self.refresh_patch_rects()
         if "macro" in refresh:
@@ -2150,7 +2163,7 @@ Please remember to save frequently and make backups.
         self.add_menu_command(editmenu, "Macro Tiles...", lambda: self.subwindowctl(GuiMacroEdit, world_idx=self.level.world_idx), "Ctrl+M")
         self.add_menu_command(editmenu, "Med Tiles...", lambda: self.subwindowctl(GuiMedEdit, world_idx=self.level.world_idx), "Ctrl+Shift+M")
         self.add_menu_command(editmenu, "Mods...", lambda: self.subwindowctl(GuiMod), "Ctrl+Shift+D")
-        self.add_menu_command(editmenu, "Screen...", lambda: self.subwindowctl(GuiScreenEditor), "Ctrl+Shift+T")
+        #self.add_menu_command(editmenu, "Screen...", lambda: self.subwindowctl(GuiScreenEditor), "Ctrl+Shift+T")
         menu.add_cascade(label="Edit", menu=editmenu)
         
         viewmenu = tk.Menu(menu, tearoff=0)

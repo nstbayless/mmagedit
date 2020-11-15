@@ -23,6 +23,7 @@ def usage():
     print("-b: export to bps patch")
     print("--deps: check dependencies")
     print("--export-images: creates image sheet for levels")
+    print("--set-chr: sets chr rom (graphics data) to the data in the given image file.")
 
 if "--help" in sys.argv or "-h" in sys.argv:
     usage()
@@ -43,13 +44,17 @@ infile=""
 exportnes=""
 outpatch=""
 outbps=""
+chrin=""
 gui = True
 
 expimage = False
 
 if "-i" in sys.argv[2:-1]:
     infile = sys.argv[sys.argv.index("-i") + 1]
-    
+
+if "--set-chr" in sys.argv[2:-1]:
+    chrin = sys.argv[sys.argv.index("--set-chr") + 1]
+
 if "-o" in sys.argv[2:-1]:
     gui = False
     outfile = sys.argv[sys.argv.index("-o") + 1]
@@ -137,6 +142,12 @@ if filepath is not None:
         tprev = mmdata.title_screen.table
         mmdata.parse(infile)
         tnew = mmdata.title_screen.table
+    
+    if chrin != "":
+        if not src.mmimage.available:
+            print("--set-chr requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
+        else:
+            src.mmimage.set_chr_rom_from_image_path(mmdata, chrin)
 
     if exportnes != "":
         result = result and mmdata.write(exportnes)

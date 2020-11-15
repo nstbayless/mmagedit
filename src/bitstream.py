@@ -1,3 +1,5 @@
+import math
+
 class BitStream:
     def __init__(self, bin, offset):
         self.bin = bin
@@ -7,6 +9,12 @@ class BitStream:
     def skip_bits(self, n):
         for i in range(n):
             self.read_bit()
+            
+    def get_first_unread_byte(self):
+        return math.ceil(self.offset + (self.bitoffset / 8))
+    
+    def get_next_byte_to_read(self):
+        return self.offset
     
     def read_bit(self):
         byte = self.bin[self.offset] & (1 << (7 - self.bitoffset))

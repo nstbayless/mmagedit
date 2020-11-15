@@ -1029,7 +1029,10 @@ class TitleScreen:
     def __init__(self, data):
         self.data = data
         self.table = []
+        self.palettes = []
         self.palette_idxs = []
+        self.ptr_offset_z = 8
+        self.ptr_count_z = 5
     
     def size(self):
         # hacky implementation
@@ -1039,7 +1042,7 @@ class TitleScreen:
     
     def write(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
-        table = self.table + self.palette_idxs
+        table = self.table[0] + self.palette_idxs[0] + self.table[1] + self.palette_idxs[1]
         
         # Lempel-Ziv compression, more or less
         
@@ -1047,34 +1050,35 @@ class TitleScreen:
         i = 0
         while i < len(table):
             # search for longest prefix
-            best_prefix = (0, 0)
-            for j in range(max(0, i - 256), i):
+            best_prefix = (0, 0) # (start, length)
+            for j in range(max(0, i - (1 << self.ptr_offset_z)), i):
                 assert(j < i)
-                l = common_prefix_length(table[i:], table[j:], min(len(table) - i, 0x20))
+                l = common_prefix_length(table[i:], table[j:], min(len(table) - i, (1 << self.ptr_count_z)))
                 if l > best_prefix[1]:
                     best_prefix = (j, l)
             
             # discard if too short
+            # 1 is always too short, because it could be done as a new byte instead (8 bits)
             if best_prefix[1] <= 1:
                 best_prefix = (0, 0)
             
-            # discard if enough zeros to not make it worth it
-            if best_prefix[1] < 8 + 5 + 3:
+            # consider discarding if enough zeros to not make it worth it...
+            if best_prefix[1] <= 2 + self.ptr_count_z + self.ptr_offset_z:
                 altsize = 0
-                for t in table[best_prefix[0]:best_prefix[0]+best_prefix[1]]:
+                for t in table[best_prefix[0]:best_prefix[0] + best_prefix[1]]:
                     altsize += (1 if t == 0 else 8)
-                if altsize < 8 + 5 + 3:
+                if altsize <= 2 + self.ptr_count_z + self.ptr_offset_z:
                     best_prefix = (0, 0)
             
             # how long is the following chain of zeros?
             best_zeros = common_prefix_length(table[i:], [0] * 0x100, min(len(table) - i, 0x100))
             
             # which compression should we use for the following substring?
-            if best_zeros < 8 + 5 + 3 and best_zeros >= best_prefix[1] and best_zeros > 0:
+            if best_zeros <= 2 + self.ptr_count_z + self.ptr_offset_z and best_zeros >= best_prefix[1] and best_zeros > 0:
                 for j in range(best_zeros):
                     bs.write_bit(0)
                     i += 1
-            elif best_zeros > 8 + 5 + 3 + 1 and best_zeros > best_prefix[1] and i > 0 and table[i - 1] != 0:
+            elif best_zeros > 2 + self.ptr_count_z + self.ptr_offset_z + 2 and best_zeros > best_prefix[1] and i > 0 and table[i - 1] != 0:
                 # permits good RLE compression on next pass.
                 bs.write_bit(0)
                 i += 1
@@ -1084,10 +1088,10 @@ class TitleScreen:
                 bs.write_bit(1)
                 
                 # location difference
-                bs.write_bits(i - best_prefix[0] - 1, 8)
+                bs.write_bits(i - best_prefix[0] - 1, self.ptr_offset_z)
                 
                 # length
-                bs.write_bits(best_prefix[1] - 1, 5)
+                bs.write_bits(best_prefix[1] - 1, self.ptr_count_z)
                 
                 i += best_prefix[1]
             else:
@@ -1099,78 +1103,102 @@ class TitleScreen:
         
         # bounds check
         if bs.offset + (bs.bitoffset / 8) > self.data.ram_to_rom(constants.ram_range_title_screen[1]):
-            self.data.errors += ["title screen exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_title_screen[1])) + ")" ]
+            self.data.errors += ["screen data exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_title_screen[1])) + ")" ]
             return False, math.ceil(bs.offset + (bs.bitoffset / 8))
         return True, math.ceil(bs.offset + (bs.bitoffset / 8))
     
-    def get_tile(self, x, y):
+    def get_tile(self, x, y, k=0):
         idx = x + y * 32
-        if idx < 0 or idx >= len(self.table):
+        if idx < 0 or idx >= len(self.table[k]):
             return 0
         else:
             return self.table[idx]
     
-    def set_tile(self, x, y, t):
+    def set_tile(self, x, y, t, k=0):
         idx = x + y * 32
-        if idx < 0 or idx >= len(self.table):
+        if idx < 0 or idx >= len(self.table[k]):
             pass
         else:
             self.table[idx] = t
             
-    def get_palette_idx(self, x, y):
-        y += 1
+    def get_palette_idx(self, x, y, k=0):
+        #y += 1
         x *= 0x8
         y *= 0x8
-        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
-        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
-        return 0 if palette_i >= len(self.palette_idxs) or palette_i < 0 else (self.palette_idxs[palette_i] >> (2 * (palette_sub_i))) & 0x3
+        if k == 0:
+            palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
+            palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
+        else:
+            y -= 0x8 # unknown where this comes from.
+            x += 0x20 # also unknown
+            palette_i = (x // 0x20) % 8 + (y // 0x20) * 8
+            palette_sub_i = ((x // 0x10) % 2) + 2 * (((y) // 0x10) % 2)
+        return 0 if palette_i >= len(self.palette_idxs[k]) or palette_i < 0 else (self.palette_idxs[k][palette_i] >> (2 * (palette_sub_i))) & 0x3
         
-    def set_palette_idx(self, x, y, palette_idx):
-        y += 1
+    def set_palette_idx(self, x, y, palette_idx, k=0):
+        #y += 1
         x *= 0x8
         y *= 0x8
-        palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
-        palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
-        if palette_i < len(self.palette_idxs) and palette_i >= 0:
+        if k == 0:
+            palette_i = (x // 0x20) % 8 + ((y + 0x8) // 0x20) * 8 - 0x1d
+            palette_sub_i = ((x // 0x10) % 2) + 2 * (((y + 0x8) // 0x10) % 2)
+        else:
+            y -= 0x8 # unknown where this comes from.
+            x += 0x20 # also unknown
+            palette_i = (x // 0x20) % 8 + (y // 0x20) * 8
+            palette_sub_i = ((x // 0x10) % 2) + 2 * (((y) // 0x10) % 2)
+        if palette_i < len(self.palette_idxs[k]) and palette_i >= 0:
             mask = 0x3 << (palette_sub_i * 2)
             b = palette_idx << (palette_sub_i * 2)
-            self.palette_idxs[palette_i] &= ~mask
-            self.palette_idxs[palette_i] |= b & mask
+            self.palette_idxs[k][palette_i] &= ~mask
+            self.palette_idxs[k][palette_i] |= b & mask
     
     def read(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen[0]))
-        self.table = []
+        table = []
         
         # Lempel-Ziv decompression, more or less
-        while len(self.table) < constants.title_screen_tile_count + constants.title_screen_palette_idx_count: # FIXME: this is the wrong condition.
+        # FIXME: does this loop have the right condition?
+        while bs.get_next_byte_to_read() < self.data.ram_to_rom(constants.ram_range_title_screen[1]):
+            """
+            format (bitstream):
+             0 -- blank
+             11SSSSSSSSCCCCC
+            """
             isblank = bs.read_bits(1) == 0
             if isblank:
-                self.table.append(0)
+                table.append(0)
             else:
                 ispointer = bs.read_bits(1) == 1
                 if ispointer:
-                    sub = bs.read_bits(8) + 1
-                    count = bs.read_bits(5) + 1
+                    sub = bs.read_bits(self.ptr_offset_z) + 1
+                    count = bs.read_bits(self.ptr_count_z) + 1
                     for i in range(count):
-                        if len(self.table) <= sub:
-                            self.table.append(0)
+                        if len(table) <= sub:
+                            table.append(0)
                         else:
-                            self.table.append(self.table[-sub])
+                            table.append(table[-sub])
                 else:
                     b = bs.read_bits(8)
-                    self.table.append(b)
+                    table.append(b)
         
-        self.palette_idxs = self.table[-constants.title_screen_palette_idx_count:]
-        self.table = self.table[0:-constants.title_screen_palette_idx_count]
+        # interpret
+        self.palette_idxs = [None] * 2
+        self.table = [None] * 2
+        self.palette_idxs[0] = table[constants.title_screen_tile_count:constants.title_screen_tile_count + constants.title_screen_palette_idx_count[0]]
+        self.table[0] = table[:constants.title_screen_tile_count]
+        self.palette_idxs[1] = table[-constants.title_screen_palette_idx_count[1]:]
+        self.table[1] = table[constants.title_screen_tile_count + constants.title_screen_palette_idx_count[0]:-constants.title_screen_palette_idx_count[1]]
         
         # palettes
-        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen_palette[0]))
-        self.palettes = []
-        for i in range(4):
-            palette = [0xf]
-            for j in range(3):
-                palette.append(bs.read_bits(6))
-            self.palettes.append(palette)
+        self.palettes = [[], []]
+        for k in range(2):
+            bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_title_screen_palette[k][0]))
+            for i in range(4):
+                palette = [0xf]
+                for j in range(3):
+                    palette.append(bs.read_bits(6))
+                self.palettes[k].append(palette)
 
 class TextData:
     def __init__(self, data):
@@ -1686,7 +1714,7 @@ class MMData:
             out("# __ is equivalent to 00.")
             out()
             for i in range(0, len(self.title_screen.table), 0x20):
-                row = self.title_screen.table[i:(i+0x20)]
+                row = self.title_screen.table[0][i:(i+0x20)]
                 s = "T "
                 
                 for j in row:
@@ -1698,8 +1726,8 @@ class MMData:
                 
             out()
             out("# palette indices")
-            for i in range(0, len(self.title_screen.palette_idxs), 0x8):
-                row = self.title_screen.palette_idxs[max(i - 0x5, 0):min(i + 0x3, len(self.title_screen.palette_idxs))]
+            for i in range(0, len(self.title_screen.palette_idxs[0]), 0x8):
+                row = self.title_screen.palette_idxs[0][max(i - 0x5, 0):min(i + 0x3, len(self.title_screen.palette_idxs[0]))]
                 s = "P "
                 for j in row:
                     s += HB(j) + " "
@@ -2048,8 +2076,9 @@ class MMData:
                         
                         if tokens[1] == "title":
                             title_screen = self.title_screen
-                            title_screen.table = []
-                            title_screen.palette_idxs = []
+                            title_screen.table[0] = []
+                            title_screen.palette_idxs[0] = []
+                            screen_idx = 0
                         
                         if tokens[1] == "song":
                             song_idx = int(tokens[2], 16)
@@ -2082,15 +2111,15 @@ class MMData:
                         
                     # title screen is a bit different
                     elif title_screen is not None:
-                        if tokens[0] == "T":
+                        if tokens[screen_idx] == "T":
                             for token in tokens[1:]:
                                 if token == "__":
-                                    title_screen.table.append(0)
+                                    title_screen.table[screen_idx].append(0)
                                 else:
-                                    title_screen.table.append(int(token, 16))
+                                    title_screen.table[screen_idx].append(int(token, 16))
                         if tokens[0] == "P":
                             for token in tokens[1:]:
-                                title_screen.palette_idxs.append(int(token, 16))
+                                title_screen.palette_idxs[screen_idx].append(int(token, 16))
                         continue
                             
                     # music code is different
@@ -2326,16 +2355,18 @@ class MMData:
                     parsing_globals_complete = True
                     
             # correct title screen
-            while len(self.title_screen.table) < constants.title_screen_tile_count:
-                self.title_screen.table.append(0)
-            if len(self.title_screen.table) > constants.title_screen_tile_count:
-                self.errors += ["title screen has too many tiles."]
-                return False
-            while len(self.title_screen.palette_idxs) < constants.title_screen_palette_idx_count:
-                self.title_screen.palette_idxs.append(0)
-            if len(self.title_screen.palette_idxs) > constants.title_screen_palette_idx_count:
-                self.errors += ["title screen has too many palette idxs."]
-                return False
+            for k in range(2):
+                screen_name = ["title screen", "ending screen"][k]
+                while len(self.title_screen.table[k]) < constants.title_screen_tile_count:
+                    self.title_screen.table[k].append(0)
+                if len(self.title_screen.table[k]) > constants.title_screen_tile_count:
+                    self.errors += [screen_name + " has too many tiles."]
+                    return False
+                while len(self.title_screen.palette_idxs[k]) < constants.title_screen_palette_idx_count[k]:
+                    self.title_screen.palette_idxs[k].append(0)
+                if len(self.title_screen.palette_idxs[k]) > constants.title_screen_palette_idx_count[k]:
+                    self.errors += [screen_name + " has too many palette idxs."]
+                    return False
             return True
         return False
                         

@@ -33,9 +33,12 @@ ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait comman
 ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
 
 title_screen_tile_count = 0x340
-title_screen_palette_idx_count = 0x1b
-ram_range_title_screen = [0xc5a2, 0xC712]
-ram_range_title_screen_palette = [0xc737, 0xc737 + 0x9]
+title_screen_palette_idx_count = [0x1b, 0x1b]
+ram_range_title_screen = [0xc5a2, 0xC737]
+ram_range_title_screen_palette = [
+    [0xc737, 0xc737 + 0x9],
+    [0xc740, 0xc740 + 0x9]
+]
 
 # default text lookup if no table provided.
 text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"

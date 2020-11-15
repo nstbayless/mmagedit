@@ -170,17 +170,17 @@ def produce_micro_tile_images(data, world, hard=False):
         minitile_images.append(minitile_images_paletted)
     return minitile_images
 
-def produce_title_screen(data):
+def produce_title_screen(data, k):
     img = Image.new('RGB', (256, 224), color = 'black')
-    for i in range(0x20, len(data.title_screen.table) + 0x20):
+    for i in range(0x20, len(data.title_screen.table[k]) + 0x20):
         x = (i % 0x20) * 0x8
         y = (i // 0x20) * 0x8
-        tile = data.title_screen.table[i - 0x20]
+        tile = data.title_screen.table[k][i - 0x20]
 
-        palette_idx = data.title_screen.get_palette_idx(x // 8, y // 8)
+        palette_idx = data.title_screen.get_palette_idx(x // 8, y // 8, k)
         
         # we remap the 0 palette because it fades in, so the initial value would be invisible.
-        palette = constants.title_red_palette if palette_idx == 0 else data.title_screen.palettes[palette_idx]
+        palette = constants.title_red_palette if palette_idx == 0 and k == 0 else data.title_screen.palettes[k][palette_idx]
         
         chr_to_img(data, tile * 0x10, img, palette, (x, y))
     return img
@@ -200,7 +200,13 @@ def export_images(data, path=".", only=None):
     outfile = "mm-title.png"
     print("exporting", outfile)
     outfile = os.path.join(path, outfile)
-    produce_title_screen(data).save(outfile)
+    produce_title_screen(data, 0).save(outfile)
+    
+    # export ending
+    outfile = "mm-ending.png"
+    print("exporting", outfile)
+    outfile = os.path.join(path, outfile)
+    produce_title_screen(data, 1).save(outfile)
 
     # export levels
     for level in data.levels:

@@ -32,7 +32,7 @@ ram_music_table = 0xdaa3 # music for each level
 ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait command waits for.
 ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
 
-title_screen_tile_count = 0x340
+title_screen_tile_count = [0x340, 382]
 title_screen_palette_idx_count = [0x1b, 0x1b]
 ram_range_title_screen = [0xc5a2, 0xC737]
 ram_range_title_screen_palette = [

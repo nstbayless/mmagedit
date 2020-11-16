@@ -1160,11 +1160,6 @@ class TitleScreen:
         # Lempel-Ziv decompression, more or less
         # FIXME: does this loop have the right condition?
         while bs.get_next_byte_to_read() < self.data.ram_to_rom(constants.ram_range_title_screen[1]):
-            """
-            format (bitstream):
-             0 -- blank
-             11SSSSSSSSCCCCC
-            """
             isblank = bs.read_bits(1) == 0
             if isblank:
                 table.append(0)
@@ -1185,10 +1180,10 @@ class TitleScreen:
         # interpret
         self.palette_idxs = [None] * 2
         self.table = [None] * 2
-        self.palette_idxs[0] = table[constants.title_screen_tile_count:constants.title_screen_tile_count + constants.title_screen_palette_idx_count[0]]
-        self.table[0] = table[:constants.title_screen_tile_count]
+        self.palette_idxs[0] = table[constants.title_screen_tile_count[0]:constants.title_screen_tile_count[0] + constants.title_screen_palette_idx_count[0]]
+        self.table[0] = table[:constants.title_screen_tile_count[0]]
         self.palette_idxs[1] = table[-constants.title_screen_palette_idx_count[1]:]
-        self.table[1] = table[constants.title_screen_tile_count + constants.title_screen_palette_idx_count[0]:-constants.title_screen_palette_idx_count[1]]
+        self.table[1] = table[constants.title_screen_tile_count[0] + constants.title_screen_palette_idx_count[0]:-constants.title_screen_palette_idx_count[1]]
         
         # palettes
         self.palettes = [[], []]
@@ -1701,7 +1696,7 @@ class MMData:
             out('  # these med-tiles will be replaced with the given med-tiles when mirrored, and vice versa')
             out('  "mirror-pairs":', json_list(self.mirror_pairs, lambda i : '"' + hb(i) + '"') + ",")
             out()
-            out('  # pause text')
+            out('  # pause text position and pause text (must be 5 characters exactly; use 00 or 01 to end it early)')
             out('  "pause-text":', "[", " ,".join(['"' + hb(i) + '"' for i in self.pause_text]), "],")
             out('  "pause-text-x": "' + hb(self.pause_text_offset) + "\",")
             out()
@@ -2376,9 +2371,9 @@ class MMData:
             # correct title screen
             for k in range(2):
                 screen_name = ["title screen", "ending screen"][k]
-                while len(self.title_screen.table[k]) < constants.title_screen_tile_count:
+                while len(self.title_screen.table[k]) < constants.title_screen_tile_count[k]:
                     self.title_screen.table[k].append(0)
-                if len(self.title_screen.table[k]) > constants.title_screen_tile_count:
+                if len(self.title_screen.table[k]) > constants.title_screen_tile_count[k]:
                     self.errors += [screen_name + " has too many tiles."]
                     return False
                 while len(self.title_screen.palette_idxs[k]) < constants.title_screen_palette_idx_count[k]:

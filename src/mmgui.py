@@ -2373,7 +2373,7 @@ Please remember to save frequently and make backups.
                     self.micro_images[world_idx][palette_idx][id] = ImageTk.PhotoImage(image=imgzoom)
     
         # screen tiles (e.g. for title screen)
-        palettes = self.data.title_screen.palettes
+        palettes = self.data.title_screen.palettes[0]
         palettes[0] = constants.title_red_palette # remap to faded-in red colour
         images = mmimage.produce_micro_tile_images(self.data, palettes)
         for palette_idx in range(4):

@@ -145,7 +145,10 @@ def produce_micro_tile_images(data, world, hard=False):
             if type(world) is type([]):
                 palette = world[palette_idx]
             else:
-                palette = world.palettes[palette_idx + (4 if hard else 0)] if world is not None else constants.bg_palettes[palette_idx]
+                if world is None:
+                    palette = constants.bg_palettes[palette_idx]
+                else:
+                    palette = world.palettes[palette_idx + (4 if hard else 0)]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
                 address = i * 0x10

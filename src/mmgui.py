@@ -9,8 +9,6 @@ import src.mappermages
 from functools import partial
 import math
 
-available = True
-
 try:
     from PIL import Image, ImageDraw, ImageOps, ImageTk
     import tkinter as tk

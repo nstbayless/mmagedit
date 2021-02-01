@@ -2,9 +2,16 @@ import sys
 from array import array
 from src.mmdata import MMData
 import os
+gui_available=False
+img_available=False
 try:
     import src.mmimage
+    img_available=True
+except ImportError as e:
+    pass
+try:
     import src.mmgui
+    gui_available=True
 except ImportError as e:
     pass
     
@@ -30,10 +37,10 @@ if "--help" in sys.argv or "-h" in sys.argv:
     sys.exit()
     
 if "--deps" in sys.argv:
-    if not src.mmimage.available:
+    if not img_available:
         print("Not available: image")
         sys.exit(1)
-    elif not src.mmgui.available:
+    elif not gui_available:
         print("Not available: gui")
         sys.exit(1)
     print("All modules available.")
@@ -69,7 +76,7 @@ if "-e" in sys.argv[2:-1]:
 if "-p" in sys.argv[2:-1]:
     gui = False
     outpatch = sys.argv[sys.argv.index("-p") + 1]
-    if not outpatch.endswith(".nes"):
+    if not outpatch.endswith(".ips"):
         print("Error: exported IPS must have .ips extension.")
         sys.exit(1)
 
@@ -95,7 +102,7 @@ if filepath is not None and not filepath.endswith(".nes"):
     sys.exit()
 
 if gui:
-    if not src.mmgui.available:
+    if not gui_available:
         print("gui requires tkinter and PIL (Pillow) to be available, including PIL.ImageTk.")
     else:
         gui = src.mmgui.Gui()
@@ -144,7 +151,7 @@ if filepath is not None:
         tnew = mmdata.title_screen.table
     
     if chrin != "":
-        if not src.mmimage.available:
+        if not img_available:
             print("--set-chr requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
         else:
             src.mmimage.set_chr_rom_from_image_path(mmdata, chrin)
@@ -159,7 +166,7 @@ if filepath is not None:
         result = result and mmdata.write_bps(outbps)
 
     if expimage:
-        if not src.mmimage.available:
+        if not img_available:
             print("Image export requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
         else:
             src.mmimage.export_images(mmdata)

@@ -119,6 +119,7 @@ class PatchStream:
         assert(position > self.position)
         while True:
             diff = position - self.position - 1
+            assert(diff >= 0)
             if diff < 0x10:
                 self.entries[-1] |= diff
                 self.entries.append(patch.i << 4)
@@ -1176,7 +1177,7 @@ class TitleScreen:
                 else:
                     b = bs.read_bits(8)
                     table.append(b)
-        
+
         # interpret
         self.palette_idxs = [None] * 2
         self.table = [None] * 2
@@ -1714,33 +1715,35 @@ class MMData:
             out()
             
             # title screen
-            out("-- title --")
-            out("# data for the title screen")
-            out("# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.")
-            out()
-            out("# tiles")
-            out("# __ is equivalent to 00.")
-            out()
-            for i in range(0, len(self.title_screen.table), 0x20):
-                row = self.title_screen.table[0][i:(i+0x20)]
-                s = "T "
-                
-                for j in row:
-                    if j == 0:
-                        s += "__ "
-                    else:
+            for k in range(2):
+                out(["-- title --", "-- ending --"][k])
+                out("# data for the title screen and ending screen")
+                out("# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.")
+                out()
+                name = ["title screen", "ending screen"][k]
+                out("# tiles for", name)
+                out("# __ is equivalent to 00.")
+                out()
+                for i in range(0, len(self.title_screen.table[k]), 0x20):
+                    row = self.title_screen.table[k][i:(i+0x20)]
+                    s = "T "
+                    
+                    for j in row:
+                        if j == 0:
+                            s += "__ "
+                        else:
+                            s += HB(j) + " "
+                    out(s)
+                    
+                out()
+                out("# palette indices for", name)
+                for i in range(0, len(self.title_screen.palette_idxs[k]), 0x8):
+                    row = self.title_screen.palette_idxs[k][max(i - 0x5, 0):min(i + 0x3, len(self.title_screen.palette_idxs[k]))]
+                    s = "P "
+                    for j in row:
                         s += HB(j) + " "
-                out(s)
-                
-            out()
-            out("# palette indices")
-            for i in range(0, len(self.title_screen.palette_idxs[0]), 0x8):
-                row = self.title_screen.palette_idxs[0][max(i - 0x5, 0):min(i + 0x3, len(self.title_screen.palette_idxs[0]))]
-                s = "P "
-                for j in row:
-                    s += HB(j) + " "
-                out(s)
-            out()
+                    out(s)
+                out()
             
             # config data
             for gid in range(len(self.object_config)):
@@ -2087,6 +2090,12 @@ class MMData:
                             title_screen.table[0] = []
                             title_screen.palette_idxs[0] = []
                             screen_idx = 0
+
+                        if tokens[1] == "ending":
+                            title_screen = self.title_screen
+                            title_screen.table[1] = []
+                            title_screen.palette_idxs[1] = []
+                            screen_idx = 1
                         
                         if tokens[1] == "song":
                             song_idx = int(tokens[2], 16)
@@ -2119,7 +2128,7 @@ class MMData:
                         
                     # title screen is a bit different
                     elif title_screen is not None:
-                        if tokens[screen_idx] == "T":
+                        if tokens[0] == "T":
                             for token in tokens[1:]:
                                 if token == "__":
                                     title_screen.table[screen_idx].append(0)

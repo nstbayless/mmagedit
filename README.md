@@ -36,8 +36,8 @@ Left-clicking, middle-clicking (or ctrl-clicking), shift-clicking, and right-cli
 To launch with python3 on Ubuntu Linux, first make sure the dependencies are met:
 
 ```
-sudo apt-get install python-imaging-tk
-sudo python3 -m pip install PIL
+sudo apt-get install python3-tk python3-pil.imagetk
+sudo python3 -m pip install pillow
 ```
 
 Simply run `mmagedit.py` in python:

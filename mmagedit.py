@@ -30,6 +30,7 @@ def usage():
     print("-b: export to bps patch")
     print("--deps: check dependencies")
     print("--export-images: creates image sheet for levels")
+    print("--brx: breakpoint on byte edit")
     print("--set-chr: sets chr rom (graphics data) to the data in the given image file.")
 
 if "--help" in sys.argv or "-h" in sys.argv:
@@ -91,7 +92,10 @@ if "--export-images" in sys.argv[2:]:
     gui = False
     expimage = True
 
-bin = array('B')
+if "--brx" in sys.argv[2:]:
+    src.mmdata.breakpoint_on_byte_edit = True
+
+bin = array('B')    
 
 filepath = None
 if len(sys.argv) > 1:

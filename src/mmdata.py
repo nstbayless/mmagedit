@@ -9,6 +9,8 @@ import src.bps
 import src.mappermages
 import copy
 
+breakpoint_on_byte_edit = False
+
 # this is used for the optional single-med-tile patching mod
 # represents the bit sequence for the patches
 class UnitileStream:
@@ -98,37 +100,51 @@ class UnitileStream:
 
 # represents the bit sequence for hard mode patches in a stage
 class PatchStream:
-    def __init__(self):
+    def __init__(self, data):
         self.entries = []
         self.position = None
+        self.data = data
     
     def length_bytes(self):
         return len(self.entries)
-    
-    def add_patch(self, patch):
-        position = patch.y * 4 + patch.x
+
+    def advance_patch(self, position):
         if self.position is None:
-            # start of stream
             self.position = 0
-            if position != 0:
-                self.entries = [0]
-            else:
-                self.entries = [patch.i << 4]
-                return
-        
-        assert(position > self.position)
+            self.entries = []
+        if position == self.position:
+            return
+        if len(self.entries) == 0:
+            self.entries = [0]
+        assert (position > self.position)
         while True:
+            assert (position >= self.position)
+            if position == self.position:
+                return
             diff = position - self.position - 1
+            prevz = self.entries[-1] & 0xf0 == 0
             assert(diff >= 0)
-            if diff < 0x10:
+            if diff < 0x0f or (diff == 0x0f and not prevz):
+                assert(diff >= 0 and diff <= 0x0f)
                 self.entries[-1] |= diff
-                self.entries.append(patch.i << 4)
                 self.position = position
                 break
             else:
-                self.position += 0x10
-                self.entries[-1] |= 0x0f
-                self.entries.append(0)
+                if (position - self.position == 0x0f) or len(self.entries) == 1:
+                    # need to avoid 
+                    self.entries[-1] |= 0x0e
+                    self.position += 0x0f
+                else:
+                    self.entries[-1] |= 0x0f
+                    self.position += 0x10
+                
+                if position > self.position:
+                    self.entries.append(0)
+    
+    def add_patch(self, patch):
+        position = patch.y * 4 + patch.x
+        self.advance_patch(position)
+        self.entries.append(patch.i << 4)
 
 # represents the bit sequence for the object data in a level
 class ObjectStream:
@@ -540,11 +556,14 @@ class Level:
         return True, ram + self.length_bytes()
         
     def produce_patches_stream(self):
-        ps = PatchStream()
+        ps = PatchStream(self.data)
         
         # add objects to stream sorted by y and x position.
         for patch in sorted(self.hardmode_patches, key=lambda patch : patch.y * 4 + patch.x):
             ps.add_patch(patch)
+        
+        if ps.position < 0x80:
+            ps.advance_patch(0x80)
         
         return ps
         
@@ -1301,11 +1320,18 @@ class MMData:
         val = clamp_hoi(val, 0, 0x10)
         b = self.bin[addr + (offset // 2)]
         if offset % 2 == 0:
-            self.bin[addr + (offset // 2)] = (b & 0x0f) | (val << 4)
+            b = (b & 0x0f) | (val << 4)
         else:
-            self.bin[addr + (offset // 2)] = (b & 0xf0) | val
+            b = (b & 0xf0) | val
+        
+        self.write_byte(self, addr + (offset // 2), b)
         
     def write_byte(self, addr, b):
+        if self.bin[addr] != b:
+            if breakpoint_on_byte_edit:
+                print("(brx) change on byte", HX(addr) + ":", HB(self.bin[addr]), "->", HB(b))
+                breakpoint()
+                pass
         self.bin[addr] = b
     
     def write_word(self, addr, w):
@@ -1534,9 +1560,9 @@ class MMData:
             
         # level bounds check
         ram_level_end = 0xC000 if self.mapper_extension else constants.ram_range_levels[1]
-        if level_ram_location > ram_level_end:
-            self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
-            return False
+        #if level_ram_location > ram_level_end:
+        #    self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
+        #    return False
         
         if self.mapper_extension:
             if unitile_location > src.mappermages.unitile_table_range[1]:

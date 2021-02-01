@@ -81,9 +81,9 @@ To create a hack.txt file to begin with:
 python3 mmagedit.py base.nes -o hack.txt
 ```
 
-### CLI-Only features
+### Text-Only features
 
-Some capabilities of MMagEdit are limited to the CLI simply because they have not yet been added to the GUI. This is a non-exhaustive list.
+Some capabilities of MMagEdit are limited to the text file simply because they have not yet been added to the GUI. This is a non-exhaustive list.
 
 - Editing text
 - Editing music
@@ -92,6 +92,8 @@ Some capabilities of MMagEdit are limited to the CLI simply because they have no
 - Editing the title screen
 - Adjusting world palette colours
 - Adjusting the world med-tile self-symmetry index
+
+To edit any of these aspects of the hack, please open the hack text file directly in a text editor such as notepad.
 
 ## TODO
 

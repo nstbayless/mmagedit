@@ -7,3 +7,4 @@ mm-*.png
 *.ips
 *.bps
 .vscode/
+!examples/

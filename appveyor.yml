@@ -10,7 +10,7 @@ install:
     - C:\\Python35\\python.exe -c "from tkinter import ttk"
 
 build_script:
-    - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+    - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;examples;."
     - move dist\\mmagedit mmagedit
 
 after_build:

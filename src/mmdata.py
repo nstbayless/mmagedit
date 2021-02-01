@@ -1560,9 +1560,9 @@ class MMData:
             
         # level bounds check
         ram_level_end = 0xC000 if self.mapper_extension else constants.ram_range_levels[1]
-        #if level_ram_location > ram_level_end:
-        #    self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
-        #    return False
+        if level_ram_location > ram_level_end:
+            self.errors += ["level space exceeded (" + HX(level_ram_location) + " > " + HX(ram_level_end) + ")"]
+            return False
         
         if self.mapper_extension:
             if unitile_location > src.mappermages.unitile_table_range[1]:
@@ -2113,8 +2113,10 @@ class MMData:
                         
                         if tokens[1] == "title":
                             title_screen = self.title_screen
-                            title_screen.table[0] = []
-                            title_screen.palette_idxs[0] = []
+                            if fmt != 202010160900:
+                                # (this version had a broken title screen save)
+                                title_screen.table[0] = []
+                                title_screen.palette_idxs[0] = []
                             screen_idx = 0
 
                         if tokens[1] == "ending":
@@ -2154,6 +2156,9 @@ class MMData:
                         
                     # title screen is a bit different
                     elif title_screen is not None:
+                        if fmt == 202010160900:
+                            # (this version had a broken title screen save)
+                            continue
                         if tokens[0] == "T":
                             for token in tokens[1:]:
                                 if token == "__":

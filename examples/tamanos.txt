@@ -1,0 +1,115 @@
+# Micro Mages Hack File
+
+# This file can be opened using MMagEdit, available here:
+# https://github.com/nstbayless/mmagedit
+
+format 202010160900
+
+-- config --
+
+{
+  # pause text
+  "pause-text": [ "dd", "e2", "df", "e1", "00" ],
+  "pause-text-x": "65",
+  "mods": {
+      "screen-lz-7b-offset": true
+  }
+}
+
+-- title --
+# data for the title screen
+# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.
+
+# tiles
+# __ is equivalent to 00.
+
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
+T __ __ __ __ __ __ C6 CE CE CE CA __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __
+T __ __ __ __ __ __ 39 __ 23 __ C2 CC C4 D1 C6 C2 C4 __ C2 CC C4 D1 C6 CC C4 __ __ __ __ __ __ __
+T __ __ __ __ __ __ __ C8 23 __ __ __ 23 D0 23 __ 23 __ __ __ 23 D0 C5 C4 __ __ __ __ __ __ __ __
+T __ __ __ __ __ __ __ C9 23 __ CE CA 23 __ 23 __ 23 __ CE CA 23 __ __ C5 C4 __ __ __ __ __ __ __
+T __ __ __ __ __ __ __ C8 23 __ C5 C4 C3 __ C3 __ C3 __ C5 C4 C3 __ CC C4 C3 CF __ __ __ __ __ __ 
+T __ __ __ __ __ __ __ CD C3 __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __
+T __ C6 CE CE CE CA __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __
+T __ 39 __ 23 __ C6 CC C4 D1 C6 C2 C4 C2 C4 __ C6 CC C4 D1 C6 C2 C4 __ C6 CC C4 D1 C6 CC C4 __ __ 
+T __ __ C8 23 D0 23 __ 23 D0 23 __ 23 __ 23 D0 23 __ 23 D0 23 __ 23 D0 23 __ 23 D0 C5 C4 __ __ __ 
+T __ __ C9 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ 23 __ __ C5 C4 __ __ 
+T __ __ C8 23 __ C5 C2 C5 __ C3 __ C3 __ C3 __ C5 C2 C5 __ C3 __ C3 __ C5 C4 C3 __ CC C4 C3 CF __ 
+T __ __ CD C3 __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 4B 4B __ __ __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 4B __ 42 44 __ 4B __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ A3 __ 35 57 4B A3 __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 99 __ A3 99 35 57 A3 A3 __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ C2 88 8C C2 88 __ __ 66 __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 0A 0B 6A 0A 0B 6A 6A 61 98 __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 2C 61 __ 2C 61 __ __ 58 __ __ __ __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 2E 61 __ 2E 61 __ __ 99 __ __ __ __
+T 88 97 __ 90 97 __ 90 97 __ 63 88 97 __ 90 97 __ 90 97 __ B8 BB 65 B8 BB 65 __ __ __ 66 __ __ __ 
+T __ 88 97 63 __ 65 97 __ 63 __ __ 88 97 63 __ 65 97 __ B8 5F 65 B8 BB __ __ __ __ __ __ 67 __ 63 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ B8 AE 65 68 66 __ __ __ __ __ __ __ __ 67 __ 
+T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
+
+# palette indices
+P 00 00 00 
+P 00 00 00 00 00 A8 AA 00 
+P F0 F0 F0 F0 F0 AA AA EE 
+P FF FF 7F 5F 57 55 55 5D 
+
+-- global --
+
+# text data
+
+short KOSəATINMLXHYC,UQP-.W!ɬ:
+long ERGʔ@X123456789
+
+> CHXIɬATWA<
+>  %  <
+>@ 2O19 MORPHCAT GAMES<
+>TILIXAM    % 1 2 3 4%       %IPSəTLAKLI<
+>KAWAK ISKAM%YAKA KOPA%NAYKA TAMANOS<
+>KOPIT HIHI<
+>WəXT%KOPIT<
+>  KWININ%%<
+>STONHAWS <
+> . . . .<
+>TWAX-MAN YAKA TAYM-%LAMULA MIɬAYT KOPA UKUK%HAWS. NAMISHITɬ%MAYKA TRAY QəL HIHI<
+>MAYKA: TAYI!!%%<
+>ɬUCHMAN PRINS: WUP!%%<
+>MAYKA: ɬUSH NSAYKA%%KILAPAY KOPA NSAYKA%%ILIHI.<
+> KOPIT<
+>ɬUSH MAMUK! TRAY%UKUK IPSəTLAKLI: 7 1 9 5<
+>IPSəTLAKLI: <
+>PILTəN HIHI<
+>HAYASHANQATI...  LAKIT%%TAMANOS-TILIXAM ɬATWA PUS%%MAMUK HILP ɬUSH ɬUCHMAN%%PRINS KOPA MASACHI STONHAWS<
+>MA-SI KO-PA TU-LO HI-HI <
+>MAY-KA HILP NAY-KA%HA-YU MA-SI! <
+>QAX-TI AN-QA-TI IXT%NAY-KA KəL-TE-SKU-LI <
+>HI-LU QAN-CHI M-SAY-KA%PA-ɬACH ..WUP <
+>AYS-TU-TUSH, A-NA <
+>KWA-NI-SAM MAY-KA%KO-PIT-TəM-TəM U-MAʔ <
+>MAY-KA TA-TIS KA-MUKSH <
+>TRET Tə-NəS PIS <
+>MAY-KA MA-KUK MəK-MəK%PI NAY-KA ..WUP <
+>SHAN-TI WəXT <
+
+# chr-rom
+# This is the graphics data. Each line is an 8x8 tile or sprite,
+# Comprising 8 low-order pixel data bytes, then 8 high-order.
+# Each pixel is described by two bits: one low, and one high.
+# First come the background tiles (CRB), then the sprites (CRS).
+
+CRB CA:   00 FE FC F8 F0 E0 C0 80   FF 00 00 00 00 00 00 00
+CRB CE:   00 FF FF FF FF FF FF FF   FF 00 00 00 00 00 00 00
+CRB D2:   00 00 38 3C 04 06 0C 00   00 38 04 02 02 00 00 00
+CRB D9:   00 E6 EC F8 F8 FC EE E6   00 E6 EC F8 F8 FC EE E6
+CRB DC:   00 7C E6 02 FE E2 F6 7C   00 7C E6 02 FE E2 F6 7C
+CRB E2:   00 60 60 60 60 60 7E 7E   00 60 60 60 60 60 7E 7E
+CRB E3:   00 EE 6C 38 38 38 6C EE   00 EE 6C 38 38 38 6C EE
+CRB E7:   00 00 00 00 00 30 30 60   00 00 00 00 00 30 30 60
+CRB E9:   00 7C F6 E2 E2 E4 EE 76   00 7C F6 E2 E2 E4 EE 76
+CRB EF:   00 60 68 F8 F0 60 7E 7E   00 60 68 F8 F0 60 7E 7E
+CRB F1:   00 FE E0 E0 F8 E0 E0 FE   00 FE E0 E0 F8 E0 E0 FE
+CRB F2:   00 FC E6 E6 FE E4 E6 E6   00 FC E6 E6 FE E4 E6 E6
+CRB F3:   00 7C F2 E0 E6 E2 F2 7C   00 7C F2 E0 E6 E2 F2 7C
+CRB F4:   00 7C E6 C6 0C 18 18 18   00 7C E6 C6 0C 18 18 18

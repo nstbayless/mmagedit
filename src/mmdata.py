@@ -1479,8 +1479,13 @@ class MMData:
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
     def commit(self):
+        print("committing")
+        # restore bin to original.
+        self.bin = bytearray(self.orgbin)
+
         # possibly add extra banks
         if self.mapper_extension:
+            print("mapper extension...")
             self.commit_bank_extension()
         
         # write number of lives
@@ -1693,6 +1698,9 @@ class MMData:
             if fname is not None:
                 file = open(fname, "w")
                 out = functools.partial(stat_out, file)
+            
+            self.commit()
+
             out("# Micro Mages Hack File")
             out()
             out("# This file can be opened using MMagEdit, available here:")
@@ -2035,8 +2043,10 @@ class MMData:
     
     def byte_is_dirty(self, address):
         if self.mapper_extension:
-            if address > 0x4010:
-                return self.orgbin[address] != self.bin[address + mappermages.EXTENSION_LENGTH]
+            if address > 0x4010 and address <= 0x4010 + src.mappermages.EXTENSION_LENGTH:
+                return True # byte nonexistent in orgbin
+            if address > 0x4010 + src.mappermages.EXTENSION_LENGTH:
+                return self.orgbin[address - src.mappermages.EXTENSION_LENGTH] != self.bin[address]
         return self.orgbin[address] != self.bin[address]
         
     def is_dirty(self, *args, **kwargs):

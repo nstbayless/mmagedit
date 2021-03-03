@@ -1,8 +1,8 @@
 from src.util import *
 
-mmname = "MMagEdit V1.19"
+mmname = "MMagEdit V1.20"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202101311931
+mmfmt = 202103031528
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 

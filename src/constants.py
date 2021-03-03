@@ -6,7 +6,7 @@ mmfmt = 202103031528
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.19: 31 January 2021
+Version 1.20: 03 February 2021
 
 Special thanks to Julius and Leaf_It.
 

@@ -562,7 +562,7 @@ class Level:
         for patch in sorted(self.hardmode_patches, key=lambda patch : patch.y * 4 + patch.x):
             ps.add_patch(patch)
         
-        if ps.position < 0x80:
+        if ps.position is None or ps.position < 0x80:
             ps.advance_patch(0x80)
         
         return ps

@@ -1,0 +1,109 @@
+$c0:c1  points to level data.
+
+level data: 4 bytes for a 32x256 row, expressed as 4 macro tiles (mirrored into 8). The least bit of each macro-tile contributes to a 4-bit number expressing the seam position.
+
+--
+
+put a breakpoint at $f600 for when mirror copying occurs.
+
+-- object data --
+
+00 - none
+04 - flag
+05 - barrel thrower
+06 - glowy eye
+07 - goat
+
+09 - skull ghost
+0a - bone thrower skeleton
+0b - pitchfork tosser
+0c - snake
+0d - little ghost?
+0e - little skeleton
+0f - diamond 1 ?
+
+10 - barrel
+11 - star (disappears?)
+12 - bat
+13 - little ghost 2
+14 - goblin
+15 - diamond 2 ?
+16 - active-bat
+17 - points orb?
+18 - jumping eyeball
+19 - grinder
+1a - fan (horizontal)
+1b - electric discharge
+1c - exit door?
+1d - trampoline
+1e - sword (projectile)
+1f - fan (vertical)
+
+20 - feather (pickup)
+21 - player
+28 - torch?
+34 - smoke cloud (poof)
+36 - relic
+38 - pitchfork (projectile)
+
+--
+
+-- medtile data --
+top-left: pointer at ROM x7893 = $AF30
+top-right: pointer at ROM x7895 = $AF7C
+bottom-left: pointer at ROM x7897 = $AF14
+bottom-right: pointer at ROM x7899 = $B060
+
+-- minitiles --
+00 - empty
+01 - empty
+02 - lava
+03,04 - platform
+05 - hook
+06 - chaintop
+07 - chain
+09 - crate
+
+11 - skull
+
+--
+
+rom offset x3653: 32-tile data (A)
+
+--med-tiles--
+00 - 0F crates (tiles in binary).
+10 - destructible block
+11 - unopened chest (left side only?)
+12 - opened chest (both sides)
+13 - skulls
+14-18 - background
+19 - platform
+1a - blue tube?
+1b - death
+1c - fake tile
+20-2f - blocks
+30-3b - background blocks (dark purple)
+3c-3d - exit blocks
+40-47 - backgrounds
+48,49 - skulls
+4a,4b - angled chains
+4c,4d - blocks
+4e,4f - backgruonds (dark purple)
+
+62 - water
+63+ madness
+
+RAM values:
+
+player-1-yspeed:
+	int: 02A0
+	frac: 02c0
+player-1-xspeed:
+	int: 0260
+	frac: 280
+	
+ROM offsets
+
+BOUNCE ROUTINE
+55e6: (5 bytes) int yspeed value (LDA/A9) then (STA/9D)
+5617: (5 bytes) frac yspeed value (LDA/A9) then (STA/99)

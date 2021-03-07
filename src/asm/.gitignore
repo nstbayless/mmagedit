@@ -1,0 +1,10 @@
+*.nes
+*.nl
+*.deb
+*.log
+*.ips
+*.zip
+*.obj
+inc-*
+*.cdl
+patches/

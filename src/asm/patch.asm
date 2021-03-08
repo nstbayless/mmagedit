@@ -267,8 +267,8 @@ ifdef UNITILE
         CMP $2
         BCC skip_one_tile_if_applicable
         BEQ apply_if_matches
-    jmp_to_unitile_calc_epilogue:
         PLA
+    jmp_to_unitile_calc_epilogue:
         JMP unitile_calc_epilogue ; already past us.. no need to bother continuing
     
     apply_if_matches:

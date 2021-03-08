@@ -20,8 +20,9 @@ def unpack_int(string):
 def apply(patchpath, filepath):
     patchfile = open(patchpath, 'rb')
     ofile = open(filepath, "w")
-    ofile.write(
-    "PATCHES = [\n"
+    ofile.write("""# This file was auto-generated. Please run :/src/asm/build.sh
+
+PATCHES = [\n"""
     )
     patch_size = os.path.getsize(patchpath)
 
@@ -58,7 +59,7 @@ def apply(patchpath, filepath):
                     ofile.write(" ")
                 first = False
                 ofile.write(hb(d))
-            ofile.write("\n    \"\"")
+            ofile.write("\n    \"\"\".strip().replace(\"\\n\",\"  \")+\"")
         else:
             for d in data:
                 if not first:

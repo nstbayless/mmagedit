@@ -85,6 +85,16 @@ do
         exit 1
     fi
     echo
+
+    # create python file
+    if [ ! -d "../asmpy" ]
+    then
+        mkdir "../asmpy"
+    fi
+
+    python3 ./ips-to-python.py "$outfile.ips" "../asmpy/${outfile//-/_}.py"
+
+    echo
     
     # apply ips patch
     chmod a+x flips/flips-linux

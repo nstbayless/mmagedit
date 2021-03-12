@@ -1,12 +1,24 @@
 from src.util import *
 
-mmname = "MMagEdit V1.20"
+mmname = "MMagEdit v1.21"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202103031528
+mmfmt = 202103121330
+
+# this function is used as a "hello world" by libmmagedit to verify library integrity
+def get_version_and_date():
+    sf = str(mmfmt)
+    year = sf[0:4]
+    month = int(sf[4:6])
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    assert len(months) == 12
+    assert month in range(0, 12)
+    day = sf[6:8]
+    return mmname + ": " + day + " " + months[month] + " " + year
+
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-Version 1.20: 03 February 2021
+""" + get_version_and_date() + """
 
 Special thanks to Julius and Leaf_It.
 

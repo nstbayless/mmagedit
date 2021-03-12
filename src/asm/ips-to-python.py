@@ -10,7 +10,7 @@ def hb(a):
     str = hex(a)[2:]
     if (len(str) < 2):
          str = "0" + str
-    return str
+    return str.upper()
 
 def unpack_int(string):
     """Read an n-byte big-endian integer from a byte string."""

@@ -4,6 +4,9 @@ INCLUDE "defs.asm"
 
 ; addresses
 
+ifdef MAPPERMAGES
+    INCLUDE "mappermages.asm"
+endif
 
 ; ------------------------------------------------------------------------------
 BANK 0

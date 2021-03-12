@@ -8,3 +8,4 @@ mm-*.png
 *.bps
 .vscode/
 !examples/
+*.txt

@@ -54,11 +54,14 @@ outpatch=""
 outbps=""
 chrin=""
 gui = True
-
+zoom_idx=0
 expimage = False
 
 if "-i" in sys.argv[2:-1]:
     infile = sys.argv[sys.argv.index("-i") + 1]
+
+if "--zoom" in sys.argv[2:-1]:
+    zoom_idx = int(sys.argv[sys.argv.index("--zoom") + 1])
 
 if "--set-chr" in sys.argv[2:-1]:
     chrin = sys.argv[sys.argv.index("--set-chr") + 1]
@@ -110,13 +113,19 @@ if gui:
         print("gui requires tkinter and PIL (Pillow) to be available, including PIL.ImageTk.")
     else:
         gui = src.mmgui.Gui()
+
+        # set the zoom
+        if zoom_idx != 0:
+            gui.set_zoom(max(min(zoom_idx, 3), 0), True) # force zoom
         
         # read the rom
         if filepath != "" and filepath is not None:
+            print("Opening ROM:", filepath, flush=True)
             gui.fio_direct(filepath, "rom")
             
             # read a hack file
             if infile != "":
+                print("applying hack:", infile, flush=True)
                 gui.fio_direct(infile, "hack")
         else:
             # load whatever nes file is in the folder.
@@ -127,16 +136,20 @@ if gui:
             if len(nesfiles) > 1:
                 gui.showinfo("Multiple .nes files found in the editor folder. Please ensure there is exactly one .nes file there to be opened by default.")
             elif len(nesfiles) == 1:
+                print("Opening ROM:", nesfiles[0], flush=True)
                 gui.fio_direct(nesfiles[0], "rom")
 
         # refresh the display if a rom file was successfully loaded.
         if gui.data:
+            print("Initializing display...", flush=True)
             gui.refresh_all()
             
         # mainloop (blocks)
+        print("Launching GUI...", flush=True)
         gui.run()
         
     # user doesn't want other things to happen after the gui is closed.
+    print("Closing.", flush=True)
     sys.exit()
 
 # directly load data and operate on it

@@ -1,26 +1,39 @@
 # This file was auto-generated. Please run :/src/asm/build.sh
 
 PATCHES = [
+    (0x4481, bytearray.fromhex("4C 64 DB")),
+
+    (0x44a7, bytearray.fromhex("4C 50 DB EA")),
+
     (0x5b46, bytearray.fromhex("""
-        a0 00 b1 00 a8 e6 00 d0 02 e6 01 98 60 8a 48 98
-        48 a5 00 48 a5 01 48 a5 02 48 a5 03 48 a5 04 48
-        a5 05 48 a5 bc 0a a8 b9 d0 da 85 00 38 a5 c0 e5
-        00 4a 4a 0a 85 00 c6 00 c6 00 ad c9 05 4a 4a 4a
-        4a 29 01 05 00 85 02 a9 00 85 03 85 04 a5 bc 0a
-        0a 85 00 a5 02 4a 4a 4a 4a 29 03 85 04 05 00 0a
-        a8 b9 48 dc 85 00 b9 49 dc 85 01 05 00 f0 28 20
-        36 db c9 00 f0 7a c9 01 f0 67 c9 03 f0 5f 29 e0
-        aa a5 03 4a 4a 4a 4a 85 05 a5 04 0a 0a 0a 0a 05
-        05 c5 02 90 42 f0 03 4c 26 dc 8a f0 16 24 6f 50
-        06 29 20 d0 32 f0 0c 10 06 29 40 d0 2a f0 04 29
-        80 d0 24 a5 02 48 0a 0a 0a 0a 85 02 38 a9 f0 e5
-        02 85 02 a5 03 29 0f 18 65 02 aa 68 85 02 20 36
-        db 9d 00 06 4c a5 db 20 36 db 4c a5 db a9 00 f0
-        03 20 36 db 38 65 03 85 03 90 84 e6 04 4c a5 db
+        25 30 85 30 A5 CE 85 0B A5 31 38 E5 18 C5 CD B0
+        02 E6 0B A9 F8 25 31 85 31 60 A9 F0 20 36 DB 20
+        86 DB 90 03 4C A1 C4 A5 7F 29 0F 4C 9B C4 A9 F8
+        20 36 DB 20 86 DB 90 03 4C 91 C4 A5 7F 4A 4C 74
+        C4 B1 08 48 E6 08 D0 02 E6 09 68 60 A4 0A 18 60
+        84 0A A4 BC B9 D1 DC 85 08 B9 DE DC 85 09 F0 EC
+        A0 00 20 77 DB 20 77 DB 20 77 DB 20 77 DB C9 01
+        F0 DA C5 30 D0 EC 20 77 DB C5 31 D0 E8 20 77 DB
+        C5 0B D0 E4 20 77 DB A4 0A 20 4D 8B 38 60 A0 00
+        B1 00 A8 E6 00 D0 02 E6 01 98 60 8A 48 98 48 A5
+        00 48 A5 01 48 A5 02 48 A5 03 48 A5 04 48 A5 05
+        48 A5 BC 0A A8 B9 D0 DA 85 00 38 A5 C0 E5 00 4A
+        4A 0A 85 00 C6 00 C6 00 AD C9 05 4A 4A 4A 4A 29
+        01 05 00 85 02 A9 00 85 03 85 04 A5 BC 0A 0A 85
+        00 A5 02 4A 4A 4A 4A 29 03 85 04 05 00 0A A8 B9
+        EB DC 85 00 B9 EC DC 85 01 05 00 F0 22 20 C4 DB
+        C9 FE F0 7C 48 29 E0 AA A5 03 4A 4A 4A 4A 85 05
+        A5 04 0A 0A 0A 0A 05 05 C5 02 90 47 F0 04 68 4C
+        B6 DC 8A F0 1A C9 E0 F0 42 24 6F 50 06 29 20 D0
+        37 F0 0C 10 06 29 40 D0 2F F0 04 29 80 D0 29 A5
+        02 48 0A 0A 0A 0A 85 02 38 A9 F0 E5 02 85 02 A5
+        03 29 0F 18 65 02 AA 68 85 02 20 C4 DB 9D 00 06
+        4C A1 DC 8A C9 E0 F0 03 20 C4 DB 68 29 1F C9 1D
+        D0 02 A9 41 18 65 03 85 03 90 82 E6 04 4C 33 DC
         68 85 05 68 85 04 68 85 03 68 85 02 68 85 01 68
-        85 00 68 a8 68 aa a5 d2 29 03 60
+        85 00 68 A8 68 AA A5 D2 29 03 60
     """.strip().replace("\n","  ")+"")),
 
-    (0x7630, bytearray.fromhex("20 43 db ea")),
+    (0x7630, bytearray.fromhex("20 D1 DB EA")),
 
 ]

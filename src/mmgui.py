@@ -928,7 +928,7 @@ class Gui:
         self.data = None
         self.subwindows = dict()
         self.mouse_button_actions = ["place", "seam", "remove", "seam", "select", "eyedropper"] # left, middle, right, ctrl, shift, shift+right
-        self.file = {"hack": None, "rom": None, "image": None, "ips": None, "bps": None}
+        self.file = {"hack": None, "rom": None, "image": None, "ips": None, "bps": None, "chr": None}
         self.dirty = False
         self.undo_buffer = []
         self.redo_buffer = []
@@ -989,6 +989,8 @@ class Gui:
             promptfn = partial(promptfn, filetypes=[("NES Rom", ".nes")])
         if type == "hack":
             promptfn = partial(promptfn, filetypes=[("MMagEdit Hack", ".txt")])
+        if type == "chr":
+            promptfn = partial(promptfn, filetypes=[("CHR ROM image dump", ".png")])
         if save:
             if type == "image":
                 promptfn = partial(tkinter.filedialog.askdirectory, mustexist=True)
@@ -1042,13 +1044,17 @@ class Gui:
             # cannot load rom twice
             if type == "rom" and not save and self.data is not None:
                 return False
-            
-            # cannot load image
-            if type == "image" and not save:
-                return False
                 
             # cannot load ips
             if type == "ips" and not save:
+                return False
+
+            # cannot load image
+            if type == "image" and not save:
+                return False
+
+            # cannot save chr (save image instead)
+            if type == "chr" and save:
                 return False
             
             # cannot load bps
@@ -1078,6 +1084,12 @@ class Gui:
             if type == "image" and save:
                 self.file[type] = path
                 rval = mmimage.export_images(self.data, path)
+                self.errorbox(rval)
+                return rval
+
+            if type == "chr" and not save:
+                self.file[type] = path
+                rval = mmimage.set_chr_rom_from_image_path(mmdata, path)
                 self.errorbox(rval)
                 return rval
                 
@@ -2123,6 +2135,9 @@ Please remember to save frequently and make backups.
         self.filemenu = filemenu
         self.menu_base_rom = self.add_menu_command(filemenu, "Load Base ROM...", partial(self.fio_prompt, "rom", False), "Ctrl+Shift+R")
         self.menu_fio = [self.add_menu_command(filemenu, "Open Hack...", partial(self.fio_prompt, "hack", False), "Ctrl+O")]
+        self.menu_fio += [
+            self.add_menu_command(filemenu, "Import CHR...", partial(self.fio_prompt, "chr", False), "Ctrl+R")
+        ]
         filemenu.add_separator()
         self.menu_fio += [
             self.add_menu_command(filemenu, "Save Hack", partial(self.fio_prompt, "hack", True, True), "Ctrl+S"),

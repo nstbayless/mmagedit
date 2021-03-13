@@ -228,6 +228,20 @@ class Object:
         if self.x % 2 == 0:
             return False
         return True
+    
+    def serialize_json(self):
+        return {
+            "x": self.x,
+            "y": self.y,
+            "gid": self.gid,
+            "flip-x": self.flipx,
+            "flip-y": self.flipy,
+            "compressed": self.compressed
+            # TODO: drop
+        }
+
+    def deserialize_json(self, j):
+        return True
 
 class HardPatch:
     def __init__(self):
@@ -298,6 +312,27 @@ class Level:
         self.objects = []
         self.hardmode_patches = []
         self.unitile_patches = []
+    
+    def serialize_json(self):
+        return {
+            ".world-idx": self.world_idx,
+            ".world-sublevel": self.world_sublevel,
+            ".name": self.get_name(),
+            "macro-rows": [
+                {
+                    "seam": macro_row.seam,
+                    "macro-tiles": macro_row.macro_tiles
+                } for macro_row in self.macro_rows
+            ],
+            "objects": [
+                obj.serialize_json() for obj in self.objects
+            ],
+            # TODO: hardmode patches
+            # TODO: unitile patches
+        }
+
+    def deserialize_json(self, j):
+        return True
     
     def get_name(self, hard=False):
         s = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
@@ -646,6 +681,18 @@ class World:
         self.total_length = None
         self.max_symmetry_idx = 0
         self.palettes = []
+    
+    def serialize_json(self):
+        return {
+            "max-symmetry-idx": self.max_symmetry_idx,
+            "macro-tiles": self.macro_tiles,
+            "med-tiles": self.med_tiles,
+            "med-tile-palette-idxs": self.med_tile_palettes,
+            "bg-palettes": self.palettes,
+        }
+    
+    def deserialize_json(self, j):
+        return True
         
     def mirror_tile(self, t):
         if t == 0x11:
@@ -2448,9 +2495,46 @@ class MMData:
             return True
         return False
     
+    def serialize_json(self):
+        return {
+            "format": constants.mmfmt,
+            "config": {
+                "lives": self.default_lives,
+                "spwanable": self.spawnable_objects[:0x10],
+                "spawnable-ext": self.spawnable_objects[0x10:],
+                "chest-objects": self.chest_objects,
+                "mirror-pairs": self.mirror_pairs,
+                "pause-text": self.pause_text,
+                "pause-text-x": self.pause_text_offset,
+                "mods": self.mods,
+                "mapper-extension": self.mapper_extension
+            },
+            # TODO: "screens": self.title_screen.serialize_json(),
+            # TODO: global object data
+            "text-table-short": self.text.table[:24],
+            "text-table-long": self.text.table[24:],
+            "text": self.text.text,
+            "sprite-palettes": self.sprite_palettes,
+            # TODO: chr
+            "worlds-common": {
+                "med-tiles": self.med_tiles[:constants.global_med_tiles_count],
+                "macro-tiles": self.macro_tiles[:constants.global_macro_tiles_count]
+            },
+            "worlds": [
+                world.serialize_json() for world in self.worlds
+            ],
+            "levels": [
+                level.serialize_json() for level in self.levels
+            ]
+            # TODO: songs and music
+        }
+        
+    def deserialize_json(self, j):
+        return True
+
     def serialize_json_str(self):
-        return "{}"
+        return json.dumps(self.serialize_json())
 
     # returns False if error
     def deserialize_json_str(self, jsonstr):
-        return True
+        return self.deserialize_json(json.loads(jsonstr))

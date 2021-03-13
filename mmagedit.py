@@ -34,10 +34,14 @@ def usage():
     print("-e: export to rom")
     print("-p: export to ips patch")
     print("-b: export to bps patch")
-    print("--deps: check dependencies")
     print("--export-images: creates image sheet for levels")
-    print("--brx: breakpoint on byte edit")
     print("--set-chr: sets chr rom (graphics data) to the data in the given image file.")
+    print("")
+    print("debug options:")
+    print("")
+    print("--deps: check dependencies")
+    print("--brx: breakpoint on byte edit")
+    print("--json: serialize data to json")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -63,6 +67,7 @@ def main():
     gui = True
     zoom_idx=0
     expimage = False
+    dojson = "--json" in sys.argv
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -105,6 +110,9 @@ def main():
     if "--brx" in sys.argv[2:]:
         src.mmdata.breakpoint_on_byte_edit = True
 
+    if dojson:
+        gui = False
+
     bin = array('B')    
 
     filepath = None
@@ -127,7 +135,7 @@ def main():
             
             # read the rom
             if filepath != "" and filepath is not None:
-                print("Opening ROM:", filepath, flush=True)
+                print("Opening ROM: " + filepath, flush=True)
                 gui.fio_direct(filepath, "rom")
                 
                 # read a hack file
@@ -160,7 +168,8 @@ def main():
         sys.exit()
 
     # directly load data and operate on it
-    if filepath is not None:
+    elif filepath is not None:
+        # data in -------------------------
         mmdata = MMData()
         
         if not mmdata.read(filepath):
@@ -179,6 +188,13 @@ def main():
                 print("--set-chr requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
             else:
                 src.mmimage.set_chr_rom_from_image_path(mmdata, chrin)
+
+        # data out ---------------------------
+
+        if dojson:
+            j = mmdata.serialize_json_str()
+            result = result and j != "null"
+            print(j)
 
         if exportnes != "":
             result = result and mmdata.write(exportnes)

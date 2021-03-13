@@ -21,6 +21,7 @@ if not as_lib:
         pass
     
 from src import constants
+from src import util
 
 def usage():
     print(constants.mmname)

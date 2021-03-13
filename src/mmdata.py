@@ -1342,6 +1342,20 @@ class MMData:
         for b in bytes:
             self.write_byte(rom, b)
             rom += 1
+
+    def errors_string(self):
+        errors = self.errors
+        self.errors = []
+        if len(errors) == 0:
+            return None
+        elif len(errors) == 1:
+            return errors[0]
+        else:
+            s = "The following errors occurred:"
+            for err in errors:
+                s += "\n  - " + err;
+            return s;
+
     
     def read(self, file):
         self.errors = []
@@ -2433,4 +2447,10 @@ class MMData:
                     return False
             return True
         return False
-                        
+    
+    def serialize_json_str(self):
+        return "{}"
+
+    # returns False if error
+    def deserialize_json_str(self, jsonstr):
+        return True

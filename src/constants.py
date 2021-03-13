@@ -18,7 +18,7 @@ def get_version_and_date():
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
-""" + get_version_and_date() + """
+""" + get_version_and_date() + """.
 
 Special thanks to Julius and Leaf_It.
 

@@ -24,6 +24,7 @@
 typedef int error_code_t;
 
 // indicates string should contain valid json.
+// if string contains only "null", check for an error with mmagedit_get_error
 typedef const char* json_t;
 
 // All returned strings are valid references until the next library call is made.
@@ -58,6 +59,16 @@ mmagedit_load_rom(const char* path_to_rom);
 external error_code_t
 mmagedit_load_hack(const char* path_to_hack);
 
+// write a rom.
+external error_code_t
+mmagedit_write_rom(const char* path_to_rom);
+
+// write a hack file
+// if "all" is false, certain details will be withheld from the hack file if they
+// have not been changed from the base ROM, including CHR data.
+external error_code_t
+mmagedit_write_hack(const char* path_to_hack, bool all);
+
 // returns a json string containing all the data in the current state of the hack
 external json_t
 mmagedit_get_state();
@@ -68,12 +79,16 @@ external error_code_t
 mmagedit_apply_state(json_t);
 
 // if an error occured previously, use this to get its error description.
+// if no errors have occurred, this returns an empty string.
 external const char*
 mmagedit_get_error();
 
 // set log level (default is 0 -- print nothing)
-// highest is 5 (print trivial debug info)
 // (this can be set before init)
+#define LOG_NONE 0
+#define LOG_ERROR 3
+#define LOG_TRIVIAL 5
+
 external void
 mmagedit_set_log_level(int loglevel);
 
@@ -88,4 +103,3 @@ mmagedit_hw_get_int();
 // this should return the string "Hello, World!"
 external const char*
 mmagedit_hw_get_str();
-

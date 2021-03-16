@@ -12,30 +12,8 @@ except ImportError as e:
     available = False
     raise e
 
-def chr_to_array(data, chr_ram):
-    arr = [[0 for x in range(8)] for y in range(8)]
-    for y in range(8):
-        l = data.read_byte(data.chr_to_rom(chr_ram + y))
-        u = data.read_byte(data.chr_to_rom(chr_ram + y + 8))
-        for x in range(8):
-            bl = (l >> (7 - x)) & 0x1
-            bu = (u >> (7 - x)) & 0x1
-            arr[y][x] = (bu << 1) | (bl)
-    return arr
-
-def array_to_chr(data, chr_ram, arr):
-    for k in range(2):
-        for y in range(8):
-            a = data.chr_to_rom(chr_ram + y + 8*k)
-            v = 0
-            for x in range(8):
-                b = (arr[y][x] >> k) & 1
-                v <<= 1
-                v |= b
-            data.write_byte(a, v)
-
 def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
-    arr =  chr_to_array(data, chr_address)
+    arr = data.chr_to_array(chr_address)
     for y in range(8):
         for x in range(8):
             
@@ -135,7 +113,7 @@ def set_chr_rom_from_image(data, img):
                         arr[y][x] = pal
                 
                 # apply to rom data.
-                array_to_chr(data, b * 0x1000 + ya * 0x100 + xa * 0x10, arr)
+                data.array_to_chr(b * 0x1000 + ya * 0x100 + xa * 0x10, arr)
 
 def produce_micro_tile_images(data, world, hard=False):
     minitile_images = []
@@ -152,7 +130,7 @@ def produce_micro_tile_images(data, world, hard=False):
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
                 address = i * 0x10
-                arr = chr_to_array(data, address)
+                arr = data.chr_to_array(address)
                 for x in range(8):
                     for y in range(8):
                         col_idx = arr[y][x]

@@ -1403,6 +1403,53 @@ class MMData:
                 s += "\n  - " + err;
             return s;
 
+    # read chr data at offet into an array
+    def chr_to_array(data, chr_ram):
+        arr = [[0 for x in range(8)] for y in range(8)]
+        for y in range(8):
+            l = data.read_byte(data.chr_to_rom(chr_ram + y))
+            u = data.read_byte(data.chr_to_rom(chr_ram + y + 8))
+            for x in range(8):
+                bl = (l >> (7 - x)) & 0x1
+                bu = (u >> (7 - x)) & 0x1
+                arr[y][x] = (bu << 1) | (bl)
+        return arr
+
+    # write chr data from array at offset
+    def array_to_chr(data, chr_ram, arr):
+        for k in range(2):
+            for y in range(8):
+                a = data.chr_to_rom(chr_ram + y + 8*k)
+                v = 0
+                for x in range(8):
+                    b = (arr[y][x] >> k) & 1
+                    v <<= 1
+                    v |= b
+                data.write_byte(a, v)
+    
+    def set_chr_from_bin(self):
+        # array indices:
+        # chr[page][image][y][x]
+        self.chr = [
+            [
+                self.chr_to_array(b * 0x1000 + img * 0x10)
+                for img in range(0x100)
+            ] for b in range(2)
+        ]
+
+    def chr_row_to_short(self, row):
+        num = 0
+        for pix in row:
+            num <<= 2
+            num |= pix
+        return num
+
+    def chr_short_to_row(self, short):
+        row = []
+        for i in range(8):
+            row = [short & 3] + row
+            short >>= 2
+        return row
     
     def read(self, file):
         self.errors = []
@@ -1454,6 +1501,8 @@ class MMData:
             self.pause_text = [self.read_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i)) for i in range(5)]
             self.pause_text_offset = self.read_byte(self.ram_to_rom(constants.ram_pause_text_offset))
             
+            # read CHR
+            self.set_chr_from_bin()
             
             # read number of lives
             self.default_lives = self.read_byte(self.ram_to_rom(constants.ram_default_lives))
@@ -2500,7 +2549,7 @@ class MMData:
             "format": constants.mmfmt,
             "config": {
                 "lives": self.default_lives,
-                "spwanable": self.spawnable_objects[:0x10],
+                "spawnable": self.spawnable_objects[:0x10],
                 "spawnable-ext": self.spawnable_objects[0x10:],
                 "chest-objects": self.chest_objects,
                 "mirror-pairs": self.mirror_pairs,
@@ -2515,7 +2564,16 @@ class MMData:
             "text-table-long": self.text.table[24:],
             "text": self.text.text,
             "sprite-palettes": self.sprite_palettes,
-            # TODO: chr
+            "chr": [
+                [
+                    [
+                        self.chr_row_to_short(row)
+                        for row in img
+                    ]
+                    for img in page
+                ]
+                for page in self.chr
+            ],
             "worlds-common": {
                 "med-tiles": self.med_tiles[:constants.global_med_tiles_count],
                 "macro-tiles": self.macro_tiles[:constants.global_macro_tiles_count]

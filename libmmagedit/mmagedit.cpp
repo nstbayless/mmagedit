@@ -28,29 +28,26 @@ namespace
 		}
 	}
 
-	// used to hold string references that are
-	// returned by library functions.
-	std::string g_static_string_out;
-
-	std::string g_error = "";
-
-	template <typename S=const char*, typename T=error_code_t>
-	inline T error(S _error, T code)
+	PyObject* PyString(const char* s)
 	{
-		g_error = _error;
-
-		log("mmdata error: " + std::string(_error), LOG_ERROR);
-
-		return code;
+		return PyUnicode_FromString(s);
 	}
 
-	template <typename S=const char*, typename T=error_code_t>
-	inline T error(S _error)
+	template<typename... T>
+	decltype(PyObject_CallMethodObjArgs(nullptr, nullptr))
+	PyObject_CallMethodObjArgsString(
+		PyObject* obj,
+		const char* attr,
+		T... args
+	)
 	{
-		return error(_error, 1);
+		PyObject* attrstr = PyString(attr);
+		defer_decref(attrstr);
+
+		return PyObject_CallMethodObjArgs(obj, attrstr, args...);
 	}
 
-	std::string PyObject_ToString(PyObjectBorrowed* po)
+	std::string PyObject_AsString(PyObjectBorrowed* po)
 	{
 		if (po)
 		{
@@ -79,23 +76,84 @@ namespace
 		}
 	}
 
-	PyObject* PyString(const char* s)
+	// traceback module
+	PyObject* g_traceback;
+
+	// used to hold string references that are
+	// returned by library functions.
+	std::string g_static_string_out;
+
+	std::string g_error = "";
+
+	template <typename S=const char*, typename T=error_code_t>
+	inline T error(S _error, T code)
 	{
-		return PyUnicode_FromString(s);
+		g_error = _error;
+
+		log("mmdata error: " + std::string(_error), LOG_ERROR);
+
+		return code;
 	}
 
-	template<typename... T>
-	decltype(PyObject_CallMethodObjArgs(nullptr, nullptr))
-	PyObject_CallMethodObjArgsString(
-		PyObject* obj,
-		const char* attr,
-		T... args
-	)
+	template <typename S=const char*, typename T=error_code_t>
+	inline T error(S _error)
 	{
-		PyObject* attrstr = PyString(attr);
-		defer_decref(attrstr);
+		return error(_error, 1);
+	}
 
-		return PyObject_CallMethodObjArgs(obj, attrstr, args...);
+	// return an error code if python has thrown an exception.
+	#define check_error_python(errcode) \
+		 if (check_error_python_impl()) return errcode;
+
+	// check in advance of running a function if the python error is already triggered, and if so,
+	// report that.
+	#define precheck_error_python(errcode) \
+		if (check_error_python_impl("A python error has occurred before entering the libmagedit function. This is an internal library error and should be reported to the developer.")) return errcode;
+
+	#define postcheck_error_python(errcode) \
+		if (check_error_python_impl("A python error has occurred before the libmagedit function exited. This is an internal library error and should be reported to the developer.")) return errcode;
+
+	inline int check_error_python_impl(std::string message_prelude="")
+	{
+		PyObject* ptype = nullptr;
+		PyObject* pvalue = nullptr;
+		PyObject* pbt = nullptr;
+
+		if (PyErr_Occurred())
+		{
+			PyErr_Fetch(&ptype, &pvalue, &pbt);
+			// an error has occurred
+			std::string s;
+			s = message_prelude + "A python exception occurred.";
+			
+			if (g_traceback)
+			{
+				PyErr_NormalizeException(&ptype, &pvalue, &pbt);
+				PyErr_SetExcInfo(ptype, pvalue, pbt);
+				PyObject* exc_str = PyObject_CallMethodObjArgsString(g_traceback, "format_exc", args_end);
+				defer_decref(exc_str);
+				if (exc_str)
+				{
+					s += "\n" + PyObject_AsString(exc_str);
+				}
+				else
+				{
+					s += " (unable to decode exception details)";
+				}
+			}
+			else
+			{
+				Py_XDECREF(ptype);
+				Py_XDECREF(pvalue);
+				Py_XDECREF(pbt);
+			}
+
+			PyErr_Clear();
+
+			return error(s);
+		}
+
+		return 0;
 	}
 
 	PyObject *g_globals, *g_locals;
@@ -105,14 +163,41 @@ namespace
 
 	// MMData instance
 	PyObject* g_data;
+
+	PyObjectBorrowed* get_world(world_idx_t idx)
+	{
+		if (idx < 0) return nullptr;
+		PyObjectBorrowed* world_array = PyObject_GetAttrString(g_data, "worlds");
+		if (!world_array)
+		{
+			return nullptr;
+		}
+
+		if (idx < PyList_Size(world_array))
+		{
+			return PyList_GetItem(world_array, idx);
+		}
+
+		return nullptr;
+	}
+}
+
+int
+mmagedit_get_error_occurred()
+{
+	return g_error.length() > 0;
+}
+
+void mmagedit_clear_error()
+{
+	g_error = "";
 }
 
 const char*
 mmagedit_get_error()
 {
-	g_static_string_out = g_error;
-	g_error = "";
-	return g_static_string_out.c_str();
+	defer(mmagedit_clear_error());
+	return store_string(g_error);
 }
 
 void mmagedit_set_log_level(int l)
@@ -146,13 +231,26 @@ int mmagedit_init(const char* path_to_mmagedit)
 		return error("Unable to create globals/locals dicts");
 	}
 
+	g_traceback = PyImport_ImportModule("traceback");
+	check_error_python(-1);
+	if (!g_traceback) return error("unable to access traceback module.");
+
 	// run mmagedit.py
 	FILE* f = fopen(path_to_mmagedit, "r");
 	defer(fclose(f));
 
 	log("loading mmagedit...");
-	PyRun_File(f, path_to_mmagedit, Py_file_input, g_globals, g_locals);
+	PyObject* run_rv = PyRun_File(f, path_to_mmagedit, Py_file_input, g_globals, g_locals);
+	defer_decref(run_rv);
+	check_error_python(-1);
+
 	log("done.");
+
+	if (!run_rv)
+	{
+		PyErr_Print();
+		return error("A python exception occurred while loading mmagedit.");
+	}
 
 	// retrieve important locals
 	g_constants = PyDict_GetItemString(g_locals, "constants");
@@ -168,8 +266,10 @@ int mmagedit_init(const char* path_to_mmagedit)
 	defer_decref(args);
 
 	g_data = PyObject_Call(MMData, args, nullptr);
+	check_error_python(-1);
 	if (!g_data) return error("unable to create MMData instance");
 
+	postcheck_error_python(1);
 	return 0;
 }
 
@@ -187,20 +287,25 @@ int mmagedit_end()
 const char*
 mmagedit_get_name_version_date()
 {
+	precheck_error_python("");
+
 	PyObjectBorrowed* fn = PyObject_GetAttrString(g_constants, "get_version_and_date");
 
 	PyObject* args = PyTuple_New(0);
 	defer_decref(args);
 
 	PyObject* result = PyObject_Call(fn, args, nullptr);
+	check_error_python("");
 	defer_decref(result);
 
-	return store_string(PyObject_ToString(result));
+	return store_string(PyObject_AsString(result));
 }
 
 unsigned long int
 mmagedit_get_version_int()
 {
+	precheck_error_python(0);
+
 	static_assert(
 		sizeof(
 			decltype(PyNumber_AsSsize_t(nullptr, nullptr))
@@ -220,11 +325,12 @@ mmagedit_get_version_int()
 static error_code_t _check_error_mmdata_impl()
 {
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "errors_string", args_end);
+	check_error_python(1);
 	defer_decref(result);
 
 	if (result && result != Py_None)
 	{
-		return error(PyObject_ToString(result));
+		return error(PyObject_AsString(result));
 	}
 
 	return 0;
@@ -233,10 +339,13 @@ static error_code_t _check_error_mmdata_impl()
 error_code_t
 mmagedit_load_rom(const char* path_to_rom)
 {
+	precheck_error_python(1);
+
 	PyObject* rompath = PyString(path_to_rom);
 	defer_decref(rompath);
 
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "read", rompath, args_end);
+	check_error_python(1);
 	defer_decref(result);
 
 	if (!result) return error("failure to invoke mmdata.read()");
@@ -252,10 +361,13 @@ mmagedit_load_rom(const char* path_to_rom)
 error_code_t
 mmagedit_load_hack(const char* path_to_hack)
 {
+	precheck_error_python(1);
+
 	PyObject* hackpath = PyString(path_to_hack);
 	defer_decref(hackpath);
 
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "parse", hackpath, args_end);
+	check_error_python(1);
 	defer_decref(result);
 
 	if (!result) return error("failure to invoke mmdata.parse()");
@@ -271,10 +383,13 @@ mmagedit_load_hack(const char* path_to_hack)
 error_code_t
 mmagedit_write_rom(const char* path_to_rom)
 {
+	precheck_error_python(1);
+
 	PyObject* rompath = PyString(path_to_rom);
 	defer_decref(rompath);
 
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "write", rompath, args_end);
+	check_error_python(1);
 	defer_decref(result);
 
 	if (!result) return error("failure to invoke mmdata.write()");
@@ -290,6 +405,8 @@ mmagedit_write_rom(const char* path_to_rom)
 error_code_t
 mmagedit_write_hack(const char* path_to_hack, bool oall)
 {
+	precheck_error_python(1);
+
 	PyObject* hackpath = PyString(path_to_hack);
 	defer_decref(hackpath);
 
@@ -297,6 +414,7 @@ mmagedit_write_hack(const char* path_to_hack, bool oall)
 	defer_decref(pyoall);
 
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "stat", hackpath, pyoall, args_end);
+	check_error_python(1);
 	defer_decref(result);
 
 	if (!result) return error("failure to invoke mmdata.stat()");
@@ -312,15 +430,20 @@ mmagedit_write_hack(const char* path_to_hack, bool oall)
 json_t
 mmagedit_get_state()
 {
+	precheck_error_python("null");
+
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "serialize_json_str", args_end);
+	check_error_python("null");
 	defer_decref(result);
 
-	return store_string(PyObject_ToString(result));
+	return store_string(PyObject_AsString(result));
 }
 
 error_code_t
 mmagedit_apply_state(json_t json)
 {
+	precheck_error_python(1);
+	
 	PyObject* str = PyString(json);
 	defer_decref(str);
 	if (!str) return error("unable to create PyString");
@@ -334,6 +457,32 @@ mmagedit_apply_state(json_t json)
 	}
 
 	return 0;
+}
+
+medtile_idx_t
+mmagedit_get_mirror_tile_idx(world_idx_t idx, medtile_idx_t in)
+{
+	// validation
+	if (in < 0) return error("negative medtile idx forbidden.", -1);
+
+	precheck_error_python(-1);
+
+	PyObjectBorrowed* world = get_world(idx);
+	if (!world)
+	{
+		return error("No such world exists", -1);
+	}
+
+	PyObject* pyin = PyLong_FromLong(in);
+	defer_decref(pyin);
+
+	PyObject* retval = PyObject_CallMethodObjArgsString(world, "mirror_tile", pyin, args_end);
+	defer_decref(retval);
+
+	medtile_idx_t rv = PyLong_AsLong(retval);
+	if (rv < 0) return error("Invalid mirror tile return", -1);
+
+	return rv;
 }
 
 namespace
@@ -374,7 +523,11 @@ static int execmain(int argc, char** argv)
 	std::cout << mmagedit_get_version_int() << std::endl;
 	if (argc > 2) if (!mmagedit_load_rom(argv[2])) std::cout << "successfully loaded rom" << std::endl; else return 2;
 	if (argc > 3) if (!mmagedit_load_hack(argv[3])) std::cout << "successfully loaded hack" << std::endl; else return 3;
-	std::cout << mmagedit_get_state() << std::endl;
+	if (argc > 2)
+	{
+		std::cout << mmagedit_get_mirror_tile_idx(0, 2) << std::endl;
+		std::cout << mmagedit_get_state() << std::endl;
+	}
 	mmagedit_end();
 	return 0;
 }

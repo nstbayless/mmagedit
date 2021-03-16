@@ -27,6 +27,12 @@ typedef int error_code_t;
 // if string contains only "null", check for an error with mmagedit_get_error
 typedef const char* json_t;
 
+typedef int microtile_idx_t;
+typedef int medtile_idx_t;
+typedef int macrotile_idx_t;
+typedef int level_idx_t;
+typedef int world_idx_t;
+
 // All returned strings are valid references until the next library call is made.
 
 // This must be called before any other function
@@ -42,12 +48,14 @@ mmagedit_end();
 // returns e.g. "MMagedit v1.21: 12 March 2021"
 // this invokes a python function, which can be used to verify that the
 // python context is working correctly.
+// returns an empty string if an error has occurred.
 external const char*
 mmagedit_get_name_version_date();
 
 // retrieves format int from mmagedit.
 // This int is stored in the hack file, which can be used to check the version mmagedit
 // that the hack was created in.
+// returns 0 if an error occurred.
 external unsigned long int
 mmagedit_get_version_int();
 
@@ -70,6 +78,7 @@ external error_code_t
 mmagedit_write_hack(const char* path_to_hack, bool all);
 
 // returns a json string containing all the data in the current state of the hack
+// if an error occurs, the return value is the string containing "null"
 external json_t
 mmagedit_get_state();
 
@@ -78,10 +87,26 @@ mmagedit_get_state();
 external error_code_t
 mmagedit_apply_state(json_t);
 
+// get mirrored med-tile idx for given med-tile in the given world.
+// returns -1 if an error occurred.
+external medtile_idx_t
+mmagedit_get_mirror_tile_idx(world_idx_t, medtile_idx_t);
+
+// if an error occurred previously, this function will return 1.
+// Otherwise, this function returns 0.
+// mmagedit_get_error() can be used to determine the description of the error.
+external int
+mmagedit_get_error_occurred();
+
 // if an error occured previously, use this to get its error description.
 // if no errors have occurred, this returns an empty string.
+// the error is cleared after calling this function.
 external const char*
 mmagedit_get_error();
+
+// if an error has occurred, this function clears it.
+external void
+mmagedit_clear_error();
 
 // set log level (default is 0 -- print nothing)
 // (this can be set before init)

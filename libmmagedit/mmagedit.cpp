@@ -14,6 +14,8 @@ typedef PyObject PyObjectBorrowed;
 
 #define args_end nullptr
 
+#define min_version 202103161639
+
 namespace
 {
 	int g_log_level = 0;
@@ -269,6 +271,12 @@ int mmagedit_init(const char* path_to_mmagedit)
 	check_error_python(-1);
 	if (!g_data) return error("unable to create MMData instance");
 
+	auto version = mmagedit_get_version_int();
+	if (version < min_version)
+	{
+		return error("libmmagedit requires a more recent version of the library. (format " + std::to_string(version) + " is installed, but libmmagedit needs at least format " + std::to_string(min_version) + ")");
+	}
+
 	postcheck_error_python(1);
 	return 0;
 }
@@ -430,9 +438,18 @@ mmagedit_write_hack(const char* path_to_hack, bool oall)
 json_t
 mmagedit_get_state()
 {
+	return mmagedit_get_state_select("");
+}
+
+json_t
+mmagedit_get_state_select(const char* jsonpath)
+{
 	precheck_error_python("null");
 
-	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "serialize_json_str", args_end);
+	PyObject* pyjsonpath = PyString(jsonpath);
+	defer_decref(pyjsonpath);
+
+	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "serialize_json_str", pyjsonpath, args_end);
 	check_error_python("null");
 	defer_decref(result);
 
@@ -525,8 +542,7 @@ static int execmain(int argc, char** argv)
 	if (argc > 3) if (!mmagedit_load_hack(argv[3])) std::cout << "successfully loaded hack" << std::endl; else return 3;
 	if (argc > 2)
 	{
-		std::cout << mmagedit_get_mirror_tile_idx(0, 2) << std::endl;
-		std::cout << mmagedit_get_state() << std::endl;
+		std::cout << mmagedit_get_state_select(".chr[0][0:2]") << std::endl;
 	}
 	mmagedit_end();
 	return 0;

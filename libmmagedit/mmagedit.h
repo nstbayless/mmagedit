@@ -79,8 +79,20 @@ mmagedit_write_hack(const char* path_to_hack, bool all);
 
 // returns a json string containing all the data in the current state of the hack
 // if an error occurs, the return value is the string containing "null"
+// however, "null" is also a valid return value on its own  -- please use mmagedit_get_error_occured() to determine if a true error occurred.
 external json_t
 mmagedit_get_state();
+
+// as above, but selected using a jsonpath.
+// jsonpath may be of the format ".foo.bar[0].quz", etc.
+//
+// example jsonpaths:
+//   ""                                 : returns full state
+//   ".chr[0][4:23]"                    : returns only the CHR image data in page 0 (backgrounds) with indices in the range [4, 23)
+//   ".worlds[0].max-symmetry-idx"      : returns max symmetry idx for world 0
+//   ".levels[5].\".name\""             : returns ".name" field for level 5
+external json_t
+mmagedit_get_state_select(const char* jsonpath);
 
 // all the json data in this string will be applied to the current state of the hack.
 // any data which is left out of this json object will not modify the state of the hack.

@@ -7,6 +7,7 @@ import hashlib
 import src.ips
 import src.bps
 import src.mappermages
+import src.jsonpath
 import copy
 
 breakpoint_on_byte_edit = False
@@ -2544,8 +2545,8 @@ class MMData:
             return True
         return False
     
-    def serialize_json(self):
-        return {
+    def serialize_json(self, jsonpath=""):
+        return src.jsonpath.extract_json({
             "format": constants.mmfmt,
             "config": {
                 "lives": self.default_lives,
@@ -2585,13 +2586,13 @@ class MMData:
                 level.serialize_json() for level in self.levels
             ]
             # TODO: songs and music
-        }
+        }, jsonpath)
         
     def deserialize_json(self, j):
         return True
 
-    def serialize_json_str(self):
-        return json.dumps(self.serialize_json())
+    def serialize_json_str(self, jsonpath=""):
+        return json.dumps(self.serialize_json(jsonpath))
 
     # returns False if error
     def deserialize_json_str(self, jsonstr):

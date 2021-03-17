@@ -1,31 +1,15 @@
 // replacement for python.h library headers
 
 #include "stdio.h"
-
+extern "C" {
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define Py_IMPORTED_SYMBOL __declspec(dllimport)
     #define Py_EXPORTED_SYMBOL __declspec(dllexport)
     #define Py_LOCAL_SYMBOL
 #else
-/*
- * If we only ever used gcc >= 5, we could use __has_attribute(visibility)
- * as a cross-platform way to determine if visibility is supported. However,
- * we may still need to support gcc >= 4, as some Ubuntu LTS and Centos versions
- * have 4 < gcc < 5.
- */
-    #ifndef __has_attribute
-      #define __has_attribute(x) 0  // Compatibility with non-clang compilers.
-    #endif
-    #if (defined(__GNUC__) && (__GNUC__ >= 4)) ||\
-        (defined(__clang__) && __has_attribute(visibility))
-        #define Py_IMPORTED_SYMBOL __attribute__ ((visibility ("default")))
-        #define Py_EXPORTED_SYMBOL __attribute__ ((visibility ("default")))
-        #define Py_LOCAL_SYMBOL  __attribute__ ((visibility ("hidden")))
-    #else
-        #define Py_IMPORTED_SYMBOL
+    #define Py_IMPORTED_SYMBOL
         #define Py_EXPORTED_SYMBOL
         #define Py_LOCAL_SYMBOL
-    #endif
 #endif
 
 /* If no external linkage macros defined by now, create defaults */
@@ -46,9 +30,12 @@
 // function declarations
 typedef ssize_t         Py_ssize_t;
 
+struct _typeobject;
+typedef struct _typeobject PyTypeObject;
+
 typedef struct _object {
     Py_ssize_t ob_refcnt;
-    void *ob_type;
+    PyTypeObject *ob_type;
 } PyObject;
 
 
@@ -222,4 +209,90 @@ static inline void _Py_XDECREF(PyObject *op)
     }
 }
 
+
+typedef struct {
+    PyObject ob_base;
+    Py_ssize_t ob_size; /* Number of items in variable part */
+} PyVarObject;
+
+typedef void (*freefunc)(void *);
+
+struct _typeobject {
+    PyVarObject ob_base;
+    const char *tp_name; /* For printing, in format "<module>.<name>" */
+    Py_ssize_t tp_basicsize, tp_itemsize; /* For allocation */
+
+    /* Methods to implement standard operations */
+
+    freefunc tp_dealloc;
+    Py_ssize_t tp_vectorcall_offset;
+    freefunc tp_getattr;
+    freefunc tp_setattr;
+    void *tp_as_async; /* formerly known as tp_compare (Python 2)
+                                    or tp_reserved (Python 3) */
+    freefunc tp_repr;
+
+    /* Method suites for standard classes */
+
+    void *tp_as_number;
+    void *tp_as_sequence;
+    void *tp_as_mapping;
+
+    /* More standard operations (here for binary compatibility) */
+
+    freefunc tp_hash;
+    freefunc tp_call;
+    freefunc tp_str;
+    freefunc tp_getattro;
+    freefunc tp_setattro;
+
+    /* Functions to access object as input/output buffer */
+    void *tp_as_buffer;
+
+    /* Flags to define presence of optional/expanded features */
+    unsigned long tp_flags;
+};
+
+static inline int
+PyType_HasFeature(PyTypeObject *type, unsigned long feature)
+{
+    unsigned long flags;
+    flags = type->tp_flags;
+    return ((flags & feature) != 0);
+}
+
+#define Py_TPFLAGS_UNICODE_SUBCLASS     (1UL << 28)
+
 #define Py_XDECREF(op) _Py_XDECREF(_PyObject_CAST(op))
+
+#define PyType_FastSubclass(type, flag) PyType_HasFeature(type, flag)
+#define Py_TYPE(ob)             (_PyObject_CAST(ob)->ob_type)
+#define PyUnicode_Check(op) \
+                 PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_UNICODE_SUBCLASS)
+                
+#define PyRun_File(fp, p, s, g, l) \
+    PyRun_FileExFlags(fp, p, s, g, l, 0, NULL)
+
+PyAPI_FUNC(PyObject *) PyRun_FileExFlags(
+    FILE *fp,
+    const char *filename,       /* decoded from the filesystem encoding */
+    int start,
+    PyObject *globals,
+    PyObject *locals,
+    int closeit,
+    void *flags);
+
+PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
+#define Py_None (&_Py_NoneStruct)
+
+#define Py_single_input 256
+#define Py_file_input 257
+#define Py_eval_input 258
+#define Py_func_type_input 345
+
+/* Returns the result of right shifting o1 by o2 on success, or NULL on
+   failure.
+
+   This is the equivalent of the Python expression: o1 >> o2. */
+PyAPI_FUNC(PyObject *) PyNumber_Rshift(PyObject *o1, PyObject *o2);
+}

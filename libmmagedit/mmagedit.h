@@ -20,6 +20,8 @@
         externC
 #endif
 
+#include <cstdint>
+
 // nonzero indicates an error has occurred.
 typedef int error_code_t;
 
@@ -73,13 +75,13 @@ mmagedit_get_name_version_date();
 // This int is stored in the hack file, which can be used to check the version mmagedit
 // that the hack was created in.
 // returns 0 if an error occurred.
-external unsigned long int
+external uint64_t
 mmagedit_get_version_int();
 
 // This retrieves the minimum format version that libmmagedit
 // requires mmagedit to have.
 // (guaranteed no error.)
-external unsigned long int
+external uint64_t
 mmagedit_get_minimum_version_int();
 
 // load a base rom.

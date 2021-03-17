@@ -8,24 +8,32 @@ cache:
 
 install:
     - C:\\Python35\\python.exe --version
-    #- C:\\Python35\\python.exe -m pip install pyinstaller
-    #- C:\\Python35\\python.exe -m pip install Pillow
+    - C:\\Python35\\python.exe -m pip install pyinstaller
+    - C:\\Python35\\python.exe -m pip install Pillow
     # check that dependencies installed.
-    #- C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
-    #- C:\\Python35\\python.exe -c "from tkinter import ttk"
-    - SET PATH=%PATH%;C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin
+    - C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
+    - C:\\Python35\\python.exe -c "from tkinter import ttk"
+    # 64-bit DLL (requires 64-bit python39 dll, not sure where that can be found...)
+    #- SET PATH=%PATH%;C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin
+    - SET PATH=%PATH%;C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin
+    - dir C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0
+    - dir C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32
+    - dir C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin
+    - dir C:\Python39
 
 build_script:
     - cd libmmagedit
     - g++ --version
-    - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -IC:\Python39 -lpython39 -DLOCAL_PYTHON_H
+    - move C:\Python39\python39.dll libpython39.dll
+    - dir
+    - g++ -shared mmagedit.cpp -m32 -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython39 -DLOCAL_PYTHON_H
     - dir
     - cd ..
     - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
     - move dist\\mmagedit mmagedit
     - move examples mmagedit
     - move libmmagedit\libmmagedit.dll mmagedit
-    - move C:\Python39\python39.dll mmagedit
+    - move libmmagedit\libpython39.dll mmagedit
 
 after_build:
     - C:\\Python35\\python.exe mmagedit.py --help

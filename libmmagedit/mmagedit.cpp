@@ -314,24 +314,33 @@ mmagedit_get_name_version_date()
 	return store_string(PyObject_AsString(result));
 }
 
-unsigned long int
+uint64_t
 mmagedit_get_version_int()
 {
 	precheck_error_python(0);
 
-	static_assert(
-		sizeof(
-			decltype(PyNumber_AsSsize_t(nullptr, nullptr))
-		) == sizeof(unsigned long int)
-	);
+	PyObjectBorrowed* pob = PyObject_GetAttrString(g_constants, "mmfmt");
 
-	return PyNumber_AsSsize_t(
-		PyObject_GetAttrString(g_constants, "mmfmt"),
+	PyObject* p32 = PyLong_FromLong(28);
+	defer_decref(p32);
+
+	PyObject* rsh = PyNumber_Rshift(pob, p32);
+	defer_decref(rsh);
+
+	uint64_t a = PyNumber_AsSsize_t(
+		pob,
+		nullptr
+	) % (1 << 28);
+
+	uint64_t b = PyNumber_AsSsize_t(
+		rsh,
 		nullptr
 	);
+
+	return (a | (b << 28));
 }
 
-unsigned long int
+uint64_t
 mmagedit_get_minimum_version_int()
 {
 	return min_version;

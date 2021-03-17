@@ -1529,6 +1529,11 @@ class MMData:
                 for img in range(0x100)
             ] for b in range(2)
         ]
+    
+    def store_chr_in_bin(self):
+        for b, page in enumerate(self.chr):
+            for i, img in enumerate(page):
+                self.array_to_chr(b * 0x1000 + i * 0x10, img)
 
     def chr_row_to_short(self, row):
         num = 0
@@ -1690,6 +1695,9 @@ class MMData:
         if self.mapper_extension:
             print("mapper extension...")
             self.commit_bank_extension()
+        
+        # write CHR
+        self.store_chr_in_bin()
         
         # write number of lives
         self.write_byte(self.ram_to_rom(constants.ram_default_lives), self.default_lives)

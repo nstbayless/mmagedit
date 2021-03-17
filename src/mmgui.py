@@ -1089,7 +1089,7 @@ class Gui:
 
             if type == "chr" and not save:
                 self.file[type] = path
-                rval = mmimage.set_chr_rom_from_image_path(mmdata, path)
+                rval = mmimage.set_chr_rom_from_image_path(self.data, path)
                 self.errorbox(rval)
                 return rval
                 

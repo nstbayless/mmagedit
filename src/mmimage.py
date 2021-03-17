@@ -12,8 +12,8 @@ except ImportError as e:
     available = False
     raise e
 
-def chr_to_img(data, chr_address, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
-    arr = data.chr_to_array(chr_address)
+def chr_to_img(data, chrpage, chrimg, img, palette, offset=(0, 0), flipx=False, flipy=False, sprite=False, semi=False):
+    arr = data.chr[chrpage][chrimg]
     for y in range(8):
         for x in range(8):
             
@@ -37,8 +37,7 @@ def produce_chr_sheet(data):
         palette = [constants.bg_palette, constants.sprite_palette][b]
         for y in range(16):
             for x in range(16):
-                address = x * 0x10 + y * 0x100 + b * 0x1000
-                chr_to_img(data, address, img, palette, (x * 0x8 + b * 0x80, y * 0x8))
+                chr_to_img(data, b, x + y * 0x10, img, palette, (x * 0x8 + b * 0x80, y * 0x8))
     return img
 
 def produce_object_images(data, semi=False):
@@ -69,7 +68,7 @@ def produce_object_images(data, semi=False):
                     flipx = chr_idx & 0x200 != 0
                     flipy = chr_idx & 0x400 != 0
                     
-                    chr_to_img(data, chr_address, img, palette, (x, y), flipx, flipy, True, semi)
+                    chr_to_img(data, chr_address // 0x1000, (chr_address % 0x1000) // 0x10, img, palette, (x, y), flipx, flipy, True, semi)
             
             img._mm_offset = offset
             img._mm_hard = object_data["hard"] if "hard" in object_data else False
@@ -113,7 +112,8 @@ def set_chr_rom_from_image(data, img):
                         arr[y][x] = pal
                 
                 # apply to rom data.
-                data.array_to_chr(b * 0x1000 + ya * 0x100 + xa * 0x10, arr)
+                data.chr[b][ya * 0x10 + xa] = arr
+    return True
 
 def produce_micro_tile_images(data, world, hard=False):
     minitile_images = []
@@ -129,8 +129,7 @@ def produce_micro_tile_images(data, world, hard=False):
                     palette = world.palettes[palette_idx + (4 if hard else 0)]
             img = Image.new('RGB', (8, 8), color = 'black')
             if palette is not None:
-                address = i * 0x10
-                arr = data.chr_to_array(address)
+                arr = data.chr[i // 0x100][i % 0x100]
                 for x in range(8):
                     for y in range(8):
                         col_idx = arr[y][x]
@@ -163,7 +162,7 @@ def produce_title_screen(data, k):
         # we remap the 0 palette because it fades in, so the initial value would be invisible.
         palette = constants.title_red_palette if palette_idx == 0 and k == 0 else data.title_screen.palettes[k][palette_idx]
         
-        chr_to_img(data, tile * 0x10, img, palette, (x, y))
+        chr_to_img(data, tile // 0x100, tile % 0x100, img, palette, (x, y))
     return img
 
 def export_images(data, path=".", only=None):

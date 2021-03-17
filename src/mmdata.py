@@ -263,7 +263,7 @@ class Object:
             elif key == "drop":
                 self.drop = j[key]
             else:
-                self.data.errors += [f"unrecognized key \"{key}\""]
+                self.data.errors += ["unrecognized key \"" + key + "\""]
                 return False
         return True
 
@@ -409,7 +409,7 @@ class Level:
                     patches.append(hp)
                 self.hardmode_patches = patches
             else:
-                self.data.errors += [f"unrecognized key \"{key}\""]
+                self.data.errors += ["unrecognized key \"" + key + "\""]
                 return False
         return True
     
@@ -783,7 +783,7 @@ class World:
             elif key == "bg-palettes":
                 self.palettes = j[key]
             else:
-                self.data.errors += [f"unrecognized key: {key}"]
+                self.data.errors += ["unrecognized key \"" + key + "\""]
                 return False
         return True
         
@@ -2683,7 +2683,7 @@ class MMData:
     def deserialize_json(self, j):
         for key in j:
             if key.startswith("."):
-                errors += ["Cannot set '.' fields"]
+                self.errors += ["Cannot set '.' fields"]
                 return False
             elif key == "config":
                 d = j[key]
@@ -2707,7 +2707,7 @@ class MMData:
                     elif key == "mapper-extension":
                         self.mapper_extension = d[key]
                     else:
-                        errors += [f"unrecognized key \"{key}\""]
+                        self.errors += ["unrecognized key \"" + key + "\""]
                         return False
             elif key == "text-table-short":
                 if len(j[key]) != 24:
@@ -2743,7 +2743,7 @@ class MMData:
                             return False
                         self.macro_tiles = d[key]
                     else:
-                        errors += [f"unrecognized key \"{key}\""]
+                        self.errors += ["unrecognized key \"" + key + "\""]
                         return False
             elif key == "worlds":
                 for world_idx, world in enumerate(j[key]):
@@ -2756,7 +2756,7 @@ class MMData:
                         if not self.levels[level_idx].deserialize_json(level):
                             return False
             else:
-                errors += [f"unrecognized key \"{key}\""]
+                self.errors += ["unrecognized key \"" + key + "\""]
                 return False
         return True
 

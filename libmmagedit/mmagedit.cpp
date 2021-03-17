@@ -5,7 +5,12 @@
 
 #include <stdio.h>
 #include <iostream>
-#include <Python.h>
+
+#ifdef LOCAL_PYTHON_H
+	#include "py.h"
+#else
+	#include <Python.h>
+#endif
 
 typedef PyObject PyObjectBorrowed;
 

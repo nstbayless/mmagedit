@@ -1,18 +1,31 @@
 # appveyor.yml
 
+image:
+  - Visual Studio 2019
+
+cache:
+  - C:\Tools\vcpkg\
+
 install:
     - C:\\Python35\\python.exe --version
-    - C:\\Python35\\python.exe -m pip install pyinstaller
-    - C:\\Python35\\python.exe -m pip install Pillow
-    
+    #- C:\\Python35\\python.exe -m pip install pyinstaller
+    #- C:\\Python35\\python.exe -m pip install Pillow
     # check that dependencies installed.
-    - C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
-    - C:\\Python35\\python.exe -c "from tkinter import ttk"
+    #- C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
+    #- C:\\Python35\\python.exe -c "from tkinter import ttk"
+    - SET PATH=%PATH%;C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin
 
 build_script:
+    - cd libmmagedit
+    - g++ --version
+    - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -IC:\Python39 -lpython39 -DLOCAL_PYTHON_H
+    - dir
+    - cd ..
     - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
     - move dist\\mmagedit mmagedit
     - move examples mmagedit
+    - move libmmagedit\libmmagedit.dll mmagedit
+    - move C:\Python39\python39.dll mmagedit
 
 after_build:
     - C:\\Python35\\python.exe mmagedit.py --help

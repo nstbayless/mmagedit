@@ -42,6 +42,7 @@ def usage():
     print("--deps: check dependencies")
     print("--brx: breakpoint on byte edit")
     print("--json: serialize data to json")
+    print("--select .field[a].field2[b:c]: (etc) select elements of json out")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -68,9 +69,13 @@ def main():
     zoom_idx=0
     expimage = False
     dojson = "--json" in sys.argv
+    jsonpath = ""
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
+    
+    if "--select" in sys.argv[2:-1]:
+        jsonpath = sys.argv[sys.argv.index("--select") + 1]
 
     if "--zoom" in sys.argv[2:-1]:
         zoom_idx = int(sys.argv[sys.argv.index("--zoom") + 1])
@@ -192,7 +197,7 @@ def main():
         # data out ---------------------------
 
         if dojson:
-            j = mmdata.serialize_json_str()
+            j = mmdata.serialize_json_str(jsonpath)
             result = result and j != "null"
             print(j)
 

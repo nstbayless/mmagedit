@@ -213,7 +213,7 @@ class Object:
         self.flipx = False
         self.flipy = False
         self.compressed = False
-        self.drop = False # only appears as a drop.
+        self.drop = False # only appears as a drop (requires extended objects mod)
     
     # gets placing index of object
     def get_i(self):
@@ -231,17 +231,40 @@ class Object:
         return True
     
     def serialize_json(self):
-        return {
+        j = {
             "x": self.x,
             "y": self.y,
             "gid": self.gid,
             "flip-x": self.flipx,
             "flip-y": self.flipy,
-            "compressed": self.compressed
-            # TODO: drop
+            "compressed": self.compressed,
+            ".compressible": self.compressible()
         }
 
+        if self.data.has_mod("extended_objects"):
+            j["drop"] = self.drop
+
+        return j
+
     def deserialize_json(self, j):
+        for key in j:
+            if key == "x":
+                self.x = j[key]
+            elif key == "y":
+                self.y = j[key]
+            elif key == "gid":
+                self.gid = j[key]
+            elif key == "flip-x":
+                self.flipx = j[key]
+            elif key == "flip-y":
+                self.flipy = j[key]
+            elif key == "compressed":
+                self.compressed = j[key]
+            elif key == "drop":
+                self.drop = j[key]
+            else:
+                self.data.errors += [f"unrecognized key \"{key}\""]
+                return False
         return True
 
 class HardPatch:
@@ -315,7 +338,7 @@ class Level:
         self.unitile_patches = []
     
     def serialize_json(self):
-        return {
+        j = {
             ".world-idx": self.world_idx,
             ".world-sublevel": self.world_sublevel,
             ".name": self.get_name(),
@@ -328,11 +351,66 @@ class Level:
             "objects": [
                 obj.serialize_json() for obj in self.objects
             ],
-            # TODO: hardmode patches
-            # TODO: unitile patches
+            "hardmode-patches": [
+                {
+                    "x": patch.x,
+                    "y": patch.y,
+                    "i": patch.i
+                } for patch in self.hardmode_patches
+            ]
         }
 
+        if self.data.mapper_extension:
+            j["unitile-patches"] = [
+                {
+                    "x": patch.x,
+                    "y": patch.y,
+                    "med-tile": patch.med_tile_idx,
+                    "flags": patch.get_flags()
+                } for patch in self.unitile_patches
+            ]
+
+        return j
+
     def deserialize_json(self, j):
+        for key in j:
+            if key == "macro-rows":
+                for i, macro_row in enumerate(j[key]):
+                    self.macro_rows[i].seam = j[key]["seam"]
+                    self.macro_rows[i].macro_tiles = j[key]["macro-tiles"]
+            elif key == "objects":
+                objects = []
+                for obj in j[key]:
+                    if obj == None or len(obj) == 0:
+                        self.data.errors += ["all objects in .objects list must be fully-realized"]
+                    objects.append(Object(self.data))
+                    if not objects[-1].deserialize(j[key]):
+                        return False
+                self.objects = objects
+            elif key == "unitile-patches":
+                patches = []
+                for patch in j[key]:
+                    up = UnitilePatch()
+                    up.x = patch["x"]
+                    up.y = patch["y"]
+                    up.med_tile_idx = patch["med-tile"]
+                    up.set_flags(patch["flags"])
+                self.unitile_patches = patches
+            elif key == "hardmode-patches":
+                patches = []
+                for patch in j[key]:
+                    hp = HardPatch()
+                    if "x" not in patch or "y" not in patch or "i" not in patch:
+                        self.data.errors += ["invalid patch format"]
+                        return False
+                    hp.x = patch["x"]
+                    hp.y = patch["y"]
+                    hp.i = patch["i"]
+                    patches.append(hp)
+                self.hardmode_patches = patches
+            else:
+                self.data.errors += [f"unrecognized key \"{key}\""]
+                return False
         return True
     
     def get_name(self, hard=False):
@@ -693,6 +771,20 @@ class World:
         }
     
     def deserialize_json(self, j):
+        for key in j:
+            if key == "max-symmetry-idx":
+                self.max_symmetry_idx = j[key]
+            elif key == "macro-tiles":
+                self.macro_tiles = j[key]
+            elif key == "med-tiles":
+                self.med_tiles = j[key]
+            elif key == "med-tile-palette-idxs":
+                self.med_tile_palettes = j[key]
+            elif key == "bg-palettes":
+                self.palettes = j[key]
+            else:
+                self.data.errors += [f"unrecognized key: {key}"]
+                return False
         return True
         
     def mirror_tile(self, t):
@@ -2547,7 +2639,7 @@ class MMData:
     
     def serialize_json(self, jsonpath=""):
         return src.jsonpath.extract_json({
-            "format": constants.mmfmt,
+            ".format": constants.mmfmt,
             "config": {
                 "lives": self.default_lives,
                 "spawnable": self.spawnable_objects[:0x10],
@@ -2589,6 +2681,83 @@ class MMData:
         }, jsonpath)
         
     def deserialize_json(self, j):
+        for key in j:
+            if key.startswith("."):
+                errors += ["Cannot set '.' fields"]
+                return False
+            elif key == "config":
+                d = j[key]
+                for key in d:
+                    if key == "lives":
+                        self.default_lives = d[key]
+                    elif key == "spawnable":
+                        self.spawnable_objects = d[key] + self.spawnable_objects[0x10:]
+                    elif key == "spawnable-ext":
+                        self.spawnable_objects[0x10:] = d[key]
+                    elif key == "chest-objects":
+                        self.chest_objects = d[key]
+                    elif key == "mirror-pairs":
+                        self.mirror_pairs = d[key]
+                    elif key == "pause-text":
+                        self.pause_text = key
+                    elif key == "pause-text-x":
+                        self.pause_text_offset = key
+                    elif key == "mods":
+                        self.mods = d[key]
+                    elif key == "mapper-extension":
+                        self.mapper_extension = d[key]
+                    else:
+                        errors += [f"unrecognized key \"{key}\""]
+                        return False
+            elif key == "text-table-short":
+                if len(j[key]) != 24:
+                    errors += ["text-table-short length must be 24"]
+                    return False
+                self.text.table = j[key] + self.text.table[24:]
+            elif key == "text-table-long":
+                self.text.table = self.text.table[:24] + j[key]
+            elif key == "text":
+                self.text.text = j[key]
+            elif key == "sprite-palettes":
+                self.sprite_palettes = j[key]
+            elif key == "chr":
+                c = j[key]
+                if len(c) != 2:
+                    errors += ["chr must have 2 pages"]
+                    return False
+                if len(c[0]) != len(self.chr[0]):
+                    errors += ["chr page wrong length"]
+                    return False
+                self.chr = c
+            elif key == "worlds-common":
+                d = j[key]
+                for key in d:
+                    if key == "med-tiles":
+                        if len(d[key]) != constants.global_med_tiles_count:
+                            errors += ["invalid length for common med-tiles"]
+                            return False
+                        self.med_tiles = d[key]
+                    elif key == "macro-tiles":
+                        if len(d[key]) != constants.global_macro_tiles_count:
+                            errors += ["invalid length for common macro-tiles"]
+                            return False
+                        self.macro_tiles = d[key]
+                    else:
+                        errors += [f"unrecognized key \"{key}\""]
+                        return False
+            elif key == "worlds":
+                for world_idx, world in enumerate(j[key]):
+                    if world is not None:
+                        if not self.worlds[world_idx].deserialize_json(world):
+                            return False
+            elif key == "levels":
+                for level_idx, level in enumerate(j[key]):
+                    if level is not None:
+                        if not self.levels[level_idx].deserialize_json(level):
+                            return False
+            else:
+                errors += [f"unrecognized key \"{key}\""]
+                return False
         return True
 
     def serialize_json_str(self, jsonpath=""):

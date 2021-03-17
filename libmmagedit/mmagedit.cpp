@@ -326,6 +326,12 @@ mmagedit_get_version_int()
 	);
 }
 
+unsigned long int
+mmagedit_get_minimum_version_int()
+{
+	return min_version;
+}
+
 // returns 1 andsets error to mmdata's errors if any occurred;
 // otherwise, returns 0.
 #define check_error_mmdata if (error_code_t e = _check_error_mmdata_impl()) return e;
@@ -453,6 +459,8 @@ mmagedit_get_state_select(const char* jsonpath)
 	check_error_python("null");
 	defer_decref(result);
 
+	check_error_mmdata_rval("null");
+
 	return store_string(PyObject_AsString(result));
 }
 
@@ -467,6 +475,9 @@ mmagedit_apply_state(json_t json)
 
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "deserialize_json_str", str, args_end);
 	defer_decref(result);
+	check_error_python(1)
+
+	if (!result) return error("no result from deserialize_json_str");
 
 	if (PyObject_Not(result))
 	{
@@ -543,6 +554,10 @@ static int execmain(int argc, char** argv)
 	if (argc > 2)
 	{
 		std::cout << mmagedit_get_state_select(".chr[0][0:2]") << std::endl;
+
+		std::cout << mmagedit_get_state_select(".config.mapper-extension") << std::endl;
+		mmagedit_apply_state("{\"config\": {\"mapper-extension\": true}}");
+		std::cout << mmagedit_get_state_select(".config.mapper-extension") << std::endl;
 	}
 	mmagedit_end();
 	return 0;

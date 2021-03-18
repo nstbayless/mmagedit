@@ -22,7 +22,7 @@ typedef PyObject PyObjectBorrowed;
 
 #define args_end nullptr
 
-#define min_version 202103161639
+#define min_version 202103181058
 
 namespace
 {

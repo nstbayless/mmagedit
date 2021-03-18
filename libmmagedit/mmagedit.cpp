@@ -17,6 +17,9 @@ typedef PyObject PyObjectBorrowed;
 #define defer_decref(pyobj) defer(Py_XDECREF(pyobj))
 #define store_string(s) (g_static_string_out = s).c_str()
 
+#define check_not_null(param) if (!param) return error("received nullptr string paramter (" #param ")")
+#define check_not_null_rv(param, rv) if (!param) return error("received nullptr string paramter (" #param ")", rv)
+
 #define args_end nullptr
 
 #define min_version 202103161639
@@ -214,6 +217,8 @@ void mmagedit_set_log_level(int l)
 
 int mmagedit_init(const char* path_to_mmagedit)
 {
+	check_not_null(path_to_mmagedit);
+
 	log("initializing libpython...");
 	Py_Initialize();
 	log("done.");
@@ -368,6 +373,7 @@ error_code_t
 mmagedit_load_rom(const char* path_to_rom)
 {
 	precheck_error_python(1);
+	check_not_null(path_to_rom);
 
 	PyObject* rompath = PyString(path_to_rom);
 	defer_decref(rompath);
@@ -390,6 +396,7 @@ error_code_t
 mmagedit_load_hack(const char* path_to_hack)
 {
 	precheck_error_python(1);
+	check_not_null(path_to_hack);
 
 	PyObject* hackpath = PyString(path_to_hack);
 	defer_decref(hackpath);
@@ -412,6 +419,7 @@ error_code_t
 mmagedit_write_rom(const char* path_to_rom)
 {
 	precheck_error_python(1);
+	check_not_null(path_to_rom);
 
 	PyObject* rompath = PyString(path_to_rom);
 	defer_decref(rompath);
@@ -434,6 +442,7 @@ error_code_t
 mmagedit_write_hack(const char* path_to_hack, bool oall)
 {
 	precheck_error_python(1);
+	check_not_null(path_to_hack);
 
 	PyObject* hackpath = PyString(path_to_hack);
 	defer_decref(hackpath);
@@ -465,6 +474,7 @@ json_t
 mmagedit_get_state_select(const char* jsonpath)
 {
 	precheck_error_python("null");
+	check_not_null_rv(jsonpath, "null");
 
 	PyObject* pyjsonpath = PyString(jsonpath);
 	defer_decref(pyjsonpath);
@@ -554,7 +564,7 @@ mmagedit_hw_get_str()
 // usage: mmagedit /path/to/mmagedit.py [base.nes] [hack.txt]
 static int execmain(int argc, char** argv)
 {
-	if (argc == 0)
+	if (argc == 1)
 	{
 		std::cout << "usage: mmagedit /path/to/mmagedit.py [base.nes] [hack.txt]" << std::endl;
 		return 5;
@@ -563,8 +573,8 @@ static int execmain(int argc, char** argv)
 	if (mmagedit_init(argv[1])) return 1;
 	std::cout << mmagedit_get_name_version_date() << std::endl;
 	std::cout << mmagedit_get_version_int() << std::endl;
-	if (argc > 2) if (!mmagedit_load_rom(argv[2])) std::cout << "successfully loaded rom" << std::endl; else return 2;
-	if (argc > 3) if (!mmagedit_load_hack(argv[3])) std::cout << "successfully loaded hack" << std::endl; else return 3;
+	if (argc > 2) {if (!mmagedit_load_rom(argv[2])) std::cout << "successfully loaded rom" << std::endl; else return 2;}
+	if (argc > 3) {if (!mmagedit_load_hack(argv[3])) std::cout << "successfully loaded hack" << std::endl; else return 3;}
 	if (argc > 2)
 	{
 		std::cout << mmagedit_get_state_select(".chr[0][0:2]") << std::endl;

@@ -1,6 +1,7 @@
 // replacement for python.h library headers
 
-#include "stdio.h"
+#include <stddef.h>
+
 extern "C" {
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define Py_IMPORTED_SYMBOL __declspec(dllimport)
@@ -28,7 +29,7 @@ extern "C" {
 #endif
 
 // function declarations
-typedef ssize_t         Py_ssize_t;
+typedef int64_t         Py_ssize_t;
 
 struct _typeobject;
 typedef struct _typeobject PyTypeObject;

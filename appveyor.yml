@@ -8,6 +8,7 @@ cache:
 
 install:
     # get python3.9
+    - dir C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64
     - appveyor DownloadFile https://www.python.org/ftp/python/3.8.8/python-3.8.8-embed-amd64.zip -Filename python38_64.zip
     - 7z e -y -opython38 python38_64.zip
     - C:\\Python35\\python.exe --version
@@ -26,10 +27,10 @@ build_script:
     - g++ --version
     - dir
     # build libmmagedit.dll
-    - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H
+    - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H -Wl,-Bstatic -lstdc++ -lpthread
     # build mmagedit test
-    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN
-    - mmagedit.exe ../mmagedit.py
+    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN -Wl,-Bstatic -lstdc++ -lpthread
+    # - mmagedit.exe ../mmagedit.py
     - dir
     - cd ..
     - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
@@ -39,6 +40,7 @@ build_script:
     - mkdir libmmagedit
     - cd ..
     - move libmmagedit\libmmagedit.dll mmagedit\libmmagedit
+    - move libmmagedit\mmagedit.exe mmagedit\libmmagedit
     - move python38\* mmagedit\libmmagedit
 
 after_build:

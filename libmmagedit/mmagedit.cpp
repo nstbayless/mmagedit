@@ -253,10 +253,10 @@ int mmagedit_init(const char* path_to_mmagedit)
 
 	log("loading mmagedit...");
 	PyObject* run_rv = PyRun_File(f, path_to_mmagedit, Py_file_input, g_globals, g_locals);
+	log("done.");
 	defer_decref(run_rv);
 	check_error_python(-1);
 
-	log("done.");
 
 	if (!run_rv)
 	{

@@ -28,7 +28,7 @@ build_script:
     # build libmmagedit.dll
     - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H
     # build mmagedit test
-    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H
+    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN
     - mmagedit.exe ../mmagedit.py
     - dir
     - cd ..

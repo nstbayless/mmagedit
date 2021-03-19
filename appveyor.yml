@@ -25,7 +25,11 @@ build_script:
     - cd libmmagedit
     - g++ --version
     - dir
+    # build libmmagedit.dll
     - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H
+    # build mmagedit test
+    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H
+    - mmagedit.exe ../mmagedit.py
     - dir
     - cd ..
     - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."

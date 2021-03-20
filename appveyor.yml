@@ -29,9 +29,9 @@ build_script:
     # build libmmagedit.dll
     - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H -Wl,-Bstatic -lstdc++ -lpthread
     # build mmagedit test
-    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN -Wl,-Bstatic -lstdc++ -lpthread
-    # - mmagedit.exe ../mmagedit.py
+    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit_test.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN -Wl,-Bstatic -lstdc++ -lpthread
     - dir
+    # - mmagedit_test.exe ../mmagedit.py
     - cd ..
     - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
     - move dist\\mmagedit mmagedit
@@ -39,9 +39,10 @@ build_script:
     - cd mmagedit
     - mkdir libmmagedit
     - cd ..
-    - move libmmagedit\libmmagedit.dll mmagedit\libmmagedit
-    - move libmmagedit\mmagedit.exe mmagedit\libmmagedit
-    - move python38\* mmagedit\libmmagedit
+    # commenting this out, we don't need libmmagedit.
+    #- move libmmagedit\libmmagedit.dll mmagedit\libmmagedit
+    #- move libmmagedit\mmagedit_test.exe mmagedit\libmmagedit
+    #- move python38\* mmagedit\libmmagedit
 
 after_build:
     - C:\\Python35\\python.exe mmagedit.py --help

@@ -4,7 +4,7 @@ set -e
 echo "building..."
 
 g++ -shared -o libmmagedit.so  mmagedit.cpp  $CPPARGS
-g++ -o mmagedit  mmagedit.cpp  $CPPARGS -DMAIN -g
+g++ -o mmagedit  mmagedit.cpp  $CPPARGS -DMAIN -g -DLOCAL_PYTHON_H
 
 if command -v patchelf > /dev/null
 then

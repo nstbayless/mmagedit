@@ -2,9 +2,11 @@
 #include "defer.h"
 
 #include <type_traits>
-
-#include <stdio.h>
+#include <cstdint>
+#include <cstdlib>
 #include <iostream>
+
+
 
 #ifdef LOCAL_PYTHON_H
 	#include "py.h"
@@ -84,6 +86,38 @@ namespace
 		{
 			return "null";
 		}
+	}
+
+	std::string _dirname(std::string path)
+	{
+		size_t index_of_backslash = path.rfind("\\");
+		size_t index_of_slash = path.rfind("/");
+		size_t index_of_pathsep;
+		if (index_of_backslash != std::string::npos && index_of_slash != std::string::npos)
+		{
+			if (index_of_backslash > index_of_slash)
+			{
+				index_of_pathsep = index_of_backslash;
+			}
+			else
+			{
+				index_of_pathsep = index_of_slash;
+			}
+		}
+		else if (index_of_backslash != std::string::npos)
+		{
+			index_of_pathsep = index_of_backslash;
+		}
+		else if (index_of_slash != std::string::npos)
+		{
+			index_of_pathsep = index_of_slash;
+		}
+		else
+		{
+			return "./";
+		}
+
+		return path.substr(0, index_of_pathsep + 1);
 	}
 
 	// traceback module
@@ -248,11 +282,17 @@ int mmagedit_init(const char* path_to_mmagedit)
 	if (!g_traceback) return error("unable to access traceback module.");
 
 	// run mmagedit.py
-	FILE* f = fopen(path_to_mmagedit, "r");
-	defer(fclose(f));
-
+	std::string rootpath = _dirname(path_to_mmagedit);
+	log("python root path: " + rootpath);
+	
 	log("loading mmagedit...");
-	PyObject* run_rv = PyRun_File(f, path_to_mmagedit, Py_file_input, g_globals, g_locals);
+	PyObject* run_rv = PyRun_String(
+		"from src import constants\n"
+		"from src import util\n"
+		"from src.mmdata import MMData\n",
+		Py_file_input,
+		g_globals, g_locals
+	);
 	log("done.");
 	defer_decref(run_rv);
 	check_error_python(-1);

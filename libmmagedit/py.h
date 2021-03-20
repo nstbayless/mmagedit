@@ -28,8 +28,12 @@ extern "C" {
 #       endif /* __cplusplus */
 #endif
 
+#include <type_traits>
+#include <cstdint>
+#include <cstdlib>
+
 // function declarations
-typedef int64_t         Py_ssize_t;
+typedef std::make_signed<std::size_t>::type      Py_ssize_t;
 
 struct _typeobject;
 typedef struct _typeobject PyTypeObject;
@@ -271,18 +275,6 @@ PyType_HasFeature(PyTypeObject *type, unsigned long feature)
 #define PyUnicode_Check(op) \
                  PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_UNICODE_SUBCLASS)
                 
-#define PyRun_File(fp, p, s, g, l) \
-    PyRun_FileExFlags(fp, p, s, g, l, 0, NULL)
-
-PyAPI_FUNC(PyObject *) PyRun_FileExFlags(
-    FILE *fp,
-    const char *filename,       /* decoded from the filesystem encoding */
-    int start,
-    PyObject *globals,
-    PyObject *locals,
-    int closeit,
-    void *flags);
-
 PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
 #define Py_None (&_Py_NoneStruct)
 
@@ -296,4 +288,10 @@ PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
 
    This is the equivalent of the Python expression: o1 >> o2. */
 PyAPI_FUNC(PyObject *) PyNumber_Rshift(PyObject *o1, PyObject *o2);
+
+#define PyRun_String(str, s, g, l) PyRun_StringFlags(str, s, g, l, NULL)
+
+PyAPI_FUNC(PyObject *) PyRun_StringFlags(const char *, int, PyObject *,
+                                         PyObject *, void *);
+
 }

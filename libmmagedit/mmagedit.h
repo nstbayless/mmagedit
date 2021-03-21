@@ -80,6 +80,7 @@ mmagedit_get_version_int();
 
 // This retrieves the minimum format version that libmmagedit
 // requires mmagedit to have.
+// this can be run before mmagedit_init.
 // (guaranteed no error.)
 external uint64_t
 mmagedit_get_minimum_version_int();
@@ -129,14 +130,59 @@ mmagedit_apply_state(json_t);
 external medtile_idx_t
 mmagedit_get_mirror_tile_idx(world_idx_t, medtile_idx_t);
 
-// set log level (default is 0 -- print nothing)
+// set log level (default is 0 -- log nothing)
 // (this can be set before init)
 #define LOG_NONE 0
 #define LOG_ERROR 3
+#define LOG_INFO 4
 #define LOG_TRIVIAL 5
 
 external void
 mmagedit_set_log_level(int loglevel);
+
+// pass 0 to disable logging to stdout
+external void
+mmagedit_set_log_stdout(int);
+
+// sets the number of log lines to keep.
+// default is 100.
+// 0 means do not delete logs.
+external void
+mmagedit_set_log_count_max(int c);
+
+// get current number of logs in buffer
+external int
+mmagedit_get_log_count(int c);
+
+// retrieves the nth most recent log line.
+// guaranteed no error.
+// if n is out of bounds, an empty string is returned.
+external const char*
+mmagedit_get_log_entry(int n);
+
+// retrieves the nth most recent log line's log-level.
+// returns -1 if n is out of bounds.
+external int
+mmagedit_get_log_entry_level(int n);
+
+// run the string of python code directly.
+// returns nonzero on failure.
+// no output is returned, but you can inspect local or global variables with
+// the next functions in this header file.
+// start is a python start token; refer to python C api documentation,
+// or pass in 0 for a default.
+// the variable mmdata contains the MMData object for this library.
+external int
+mmagedit_run_pystring(const char* str, int start);
+
+// access local and global variables as int or string.
+// pass 1 to read local and 0 to read global.
+// use mmagedit_get_error_occurred() to check for errors.
+external int
+mmagedit_get_python_int(int local, const char* variable_name);
+
+external const char*
+mmagedit_get_python_str(int local, const char* variable_name);
 
 // "hello world" functions which can be used to verify library integrity
 

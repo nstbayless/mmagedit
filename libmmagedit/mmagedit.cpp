@@ -6,13 +6,13 @@
 #include <cstdlib>
 #include <iostream>
 
-
-
 #ifdef LOCAL_PYTHON_H
 	#include "py.h"
 #else
 	#include <Python.h>
 #endif
+
+#include <deque>
 
 typedef PyObject PyObjectBorrowed;
 
@@ -29,14 +29,34 @@ typedef PyObject PyObjectBorrowed;
 namespace
 {
 	int g_log_level = 0;
+	size_t g_logc = 100;
+	std::deque<std::pair<std::string, int>> g_logs;
+	bool g_log_stdout = true;
+
+	void crop_logs()
+	{
+		if (g_logc && g_logs.size() > g_logc)
+		{
+			// removes ending elements to fit to reduced size.
+			g_logs.resize(g_logc);
+		}
+	}
 
 	template<typename T>
 	void log(T val, int level = LOG_TRIVIAL)
 	{
 		if (level <= g_log_level)
 		{
-			(level == LOG_ERROR ? std::cerr : std::cout)
-				<< val << std::endl;
+			// add to logs list
+			g_logs.emplace_front(val, level);
+			crop_logs();
+
+			// tee to stdout
+			if (g_log_stdout)
+			{
+				(level == LOG_ERROR ? std::cerr : std::cout)
+					<< val << std::endl;
+			}
 		}
 	}
 
@@ -249,6 +269,49 @@ void mmagedit_set_log_level(int l)
 	g_log_level = l;
 }
 
+
+void
+mmagedit_set_log_stdout(int v)
+{
+	g_log_stdout = !!v;
+}
+
+void
+mmagedit_set_log_count_max(int c)
+{
+	if (c >= 0)
+	{
+		g_logc = c;
+		crop_logs();
+	}
+}
+
+int
+mmagedit_get_log_count(int c)
+{
+	return g_logs.size();
+}
+
+const char*
+mmagedit_get_log_entry(int n)
+{
+	if (n >= 0 && n < g_logs.size())
+	{
+		return store_string(g_logs.at(n).first);
+	}
+	return "";
+}
+
+int
+mmagedit_get_log_entry_level(int n)
+{
+	if (n >= 0 && n < g_logs.size())
+	{
+		return g_logs.at(n).second;
+	}
+	return -1;
+}
+
 int mmagedit_init(const char* path_to_mmagedit)
 {
 	check_not_null(path_to_mmagedit);
@@ -281,10 +344,29 @@ int mmagedit_init(const char* path_to_mmagedit)
 	check_error_python(-1);
 	if (!g_traceback) return error("unable to access traceback module.");
 
-	// run mmagedit.py
-	std::string rootpath = _dirname(path_to_mmagedit);
-	log("python root path: " + rootpath);
-	
+	// get path list
+	{
+		log("updating sys.path...");
+		PyObject* run_rv = PyRun_String(
+			"import sys\n"
+			"import os\n"
+			"if len(sys.path) > 0:\n"
+			"  if not os.path.exists(os.path.join(sys.path[0], \"src\")):\n"
+			"    sys.path[0] = os.path.join(sys.path[0], \"mmagedit\")\n"
+			,
+			Py_file_input,
+			g_globals, g_locals
+		);
+		defer_decref(run_rv);
+		log("sys.path is: " + PyObject_AsString(
+			PyObject_GetAttrString(
+            	PyDict_GetItemString(g_locals, "sys"),
+				"path"
+			)
+        ), LOG_INFO);
+	}
+
+	// run mmagedit.py	
 	log("loading mmagedit...");
 	PyObject* run_rv = PyRun_String(
 		"from src import constants\n"
@@ -296,7 +378,6 @@ int mmagedit_init(const char* path_to_mmagedit)
 	log("done.");
 	defer_decref(run_rv);
 	check_error_python(-1);
-
 
 	if (!run_rv)
 	{
@@ -321,6 +402,12 @@ int mmagedit_init(const char* path_to_mmagedit)
 	check_error_python(-1);
 	if (!g_data) return error("unable to create MMData instance");
 
+	// set mmdata to local
+	if (PyDict_SetItemString(g_locals, "mmdata", g_data))
+	{
+		return error("Unable to set local variable mmdata");
+	}
+
 	auto version = mmagedit_get_version_int();
 	if (version < min_version)
 	{
@@ -329,6 +416,63 @@ int mmagedit_init(const char* path_to_mmagedit)
 
 	postcheck_error_python(1);
 	return 0;
+}
+
+int
+mmagedit_run_pystring(const char* str, int start)
+{
+	check_not_null(str);
+	precheck_error_python(1);
+
+	if (start == 0) start = Py_file_input;
+	PyObject* run_rv = PyRun_String(
+		str,
+		start,
+		g_globals, g_locals
+	);
+	defer_decref(run_rv);
+	check_error_python(-1);
+	return !run_rv;
+}
+
+int
+mmagedit_get_python_int(int local, const char* variable_name)
+{
+	check_not_null(variable_name);
+	precheck_error_python(0);
+
+	PyObjectBorrowed* v = PyDict_GetItemString(
+		local ? g_locals : g_globals,
+		variable_name
+	);
+
+	check_error_python(0);
+
+	int o = PyNumber_AsSsize_t(v, nullptr);
+
+	check_error_python(0);
+
+	return o;
+}
+
+const char*
+mmagedit_get_python_str(int local, const char* variable_name)
+{
+	check_not_null_rv(variable_name, "");
+	precheck_error_python("");
+
+	PyObjectBorrowed* v = PyDict_GetItemString(
+		local ? g_locals : g_globals,
+		variable_name
+	);
+
+	check_error_python("");
+
+	std::string o = PyObject_AsString(v);
+
+	check_error_python("");
+
+	return store_string(o);
 }
 
 int mmagedit_end()

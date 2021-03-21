@@ -9,6 +9,7 @@ import src.bps
 import src.mappermages
 import src.jsonpath
 import copy
+import os
 
 breakpoint_on_byte_edit = False
 
@@ -1551,6 +1552,9 @@ class MMData:
     
     def read(self, file):
         self.errors = []
+        if not os.path.exists(file):
+            self.errors += ["No such ROM file: " + file]
+            return False
         with open(file, "rb") as f:
             self.orgbin = f.read()
             self.bin = bytearray(self.orgbin)
@@ -2276,6 +2280,9 @@ class MMData:
     # read data from a human-readable hack.txt file
     def parse(self, file):
         self.errors = []
+        if not os.path.exists(file):
+            self.errors += ["No such hack file: " + file]
+            return False
         with open(file, "r") as f:
             
             level = None

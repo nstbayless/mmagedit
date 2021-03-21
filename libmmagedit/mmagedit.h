@@ -192,6 +192,8 @@ mmagedit_hw_set_int(int);
 external int
 mmagedit_hw_get_int();
 
-// this should return the string "Hello, World!"
+// this should return the string "Hello, World!" or whatever was set previously
 external const char*
 mmagedit_hw_get_str();
+external void
+mmagedit_hw_set_str(const char*);

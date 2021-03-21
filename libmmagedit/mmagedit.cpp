@@ -723,7 +723,8 @@ mmagedit_get_mirror_tile_idx(world_idx_t idx, medtile_idx_t in)
 
 namespace
 {
-	int g_hello_world_int;
+	int g_hello_world_int = 0;
+	std::string g_hello_world_str = "Hello, World!";
 }
 
 void
@@ -741,7 +742,20 @@ mmagedit_hw_get_int()
 const char*
 mmagedit_hw_get_str()
 {
-	return "Hello, World!";
+	return g_hello_world_str.c_str();
+}
+
+void
+mmagedit_hw_set_str(const char* s)
+{
+	if (!s)
+	{
+		g_hello_world_str = "(null)";
+	}
+	else
+	{
+		g_hello_world_str = s;
+	}
 }
 
 // just a simple test main function

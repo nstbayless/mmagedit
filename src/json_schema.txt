@@ -1,0 +1,143 @@
+# this explains the format of json serialization.
+# any key which starts with a '.' is read only -- do not send these keys back to the library.
+# they are extra, non-redundant information for the benefit of the caller only.
+# all keys are guaranteed to appear in the json unless marked as |OPTIONAL
+# ... indicates omitted
+
+# root ----------------------
+
+{
+    ".format": number,
+    "config": {
+        "lives": number,
+        # list of objects which can be placed in a level directly and compressed
+        "spawnable": list of length 0x10, entries are obj_gid_t,
+        # more objects which can be placed in a level directly (but not compressible)
+        "spawnable-ext": list of obj_gid_t,
+        # objects which can be spawned from a chest (chosen at random; the last entry only can appear on multiplayer)
+        "chest-objects": list of obj_gid_t,
+        "mirror-pairs": list of med_tile_id_t,
+        # the characters that appear when pressing 'pause'
+        "pause-text": list of micro_tile_id_t,
+        # x position at which pause text appears on screen
+        "pause-text-x": number,
+        # all mods, except for 'mapper expansion'
+        "mods": { ... },
+        "mapper-expansion": bool
+    },
+    # which text characters (in the 'text' entry below) correspond to which
+    # micro tile indices.
+    "text-table-short": list of length 0x20 of micro_tile_id_t,
+    # more text characters, but these ones don't compress in data as well.
+    "text-table-long": list of length 0x20 of micro_tile_id_t,
+    # list of text in the game. Each character must belong to one of the above lists.
+    "text": [ ... ],
+    "sprite-palettes": [ ... ],
+    "chr": list of chr_bank_t (x2),
+    "worlds-common": {
+        # med tiles which are common to all worlds
+        # (note that 
+        "med-tiles": list of med_tile_t,
+        # macro tiles which are common to all worlds
+        "macro-tiles": list of macro_tile_t,
+    },
+    "worlds": list of world_t,
+    "levels": list of level_t
+}
+
+# med_tile_id_t ---------------------
+# stored TL, TR, BL, BR
+list of micro_tile_id_t (x4)
+
+# macro_tile_t ---------------------
+# stored TL, TR, BL, BR
+list of med_tile_id_t (x4)
+
+# world_t --------------------------
+
+{
+    "max-symmetry-idx": number,
+    # macro-tiles which exist only in this world
+    # they are indexed as though this array were appended to the common list.
+    "macro-tiles": list of macro_tile_t,
+    # med-tiles which exist only in this world
+    # they are indexed as though this array were appended to the common list.
+    "med-tiles": list of med_tile_t,
+    # palettes of all med-tiles, including the ones which are common to each world.
+    "med-tile-palette-idxs": list of palette,
+    "bg-palettes": self.palettes
+}
+
+
+# level_t --------------------------
+
+{
+    ".world-idx": number,
+    ".world-sublevel": number,
+    ".name": string,
+    "macro-rows": list of macro_row_t (x$20),
+    "objects": list of object_t,
+    "hardmode-patches": list of hardmode_patch_t
+    "unitile-patches": OPTIONAL list of unitile_patch_t
+}
+
+# object_t -------------------------
+
+{
+    # (true x position is 8x + 4)
+    # compressible x positions are odd
+    "x": number,
+    "y": number,
+    # object type (see constants.py for a list, as well as the chr rom addresses their sprites are located at)
+    "gid": obj_gid_t,
+    # is stored as compressed in rom (doesn't need to equal .compressible, but if compressed optimally it should.)
+    "compressed": bool,
+    # could this object be compressed (calculated from x, y, gid, and drop
+    ".compressible": bool,
+    # is this a drop from a chest or box (requires mod)
+    "drop": OPTIONAL bool
+}
+
+# unitile_patch_t ------------------
+{
+    # coords in med-tile dimensions (16px)
+    "x": number,
+    "y": number,
+    "med-tile": med_tile_id_t,
+    # bit 7: 1 if doesn't appear on normal
+    # bit 6: 1 if doesn't appear on hard
+    # bit 5: 1 if doesn't appear on hell
+    "flags": number
+}
+
+# hardmode_patch_t -----------------
+
+{
+    # coords in macro-tile patches
+    # x=0 means first entry in macro row (next to seam)
+    "x": number,
+    "y": number,
+    # replacement macro tile
+    # 0 -> ignore this patch;
+    # 1-F -> $30-$3E macro_tile_id_t
+    "i": number
+}
+
+# macro_row_t ----------------------
+
+{
+    "seam": number,
+    "macro-tiles": list of macro_tile_id_t (x4)
+}
+
+# chr_bank_t -----------------------
+list of chr_img_t (x$100)
+
+# chr_img_t ------------------------
+list of chr_row_t (x8)
+
+# chr_row_t ------------------------
+# 16-bit number containing a whole row of 2-bit pixels
+number
+
+# number, string, bool, null -- these are json primitive types.

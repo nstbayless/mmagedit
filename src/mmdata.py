@@ -2775,6 +2775,7 @@ class MMData:
                 return False
         return True
 
+    # see json_schema.txt
     def serialize_json_str(self, jsonpath=""):
         return json.dumps(self.serialize_json(jsonpath))
 

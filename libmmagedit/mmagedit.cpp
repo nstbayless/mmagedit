@@ -746,7 +746,7 @@ mmagedit_hw_get_str()
 }
 
 void
-mmagedit_hw_set_str(const char* s)
+mmagedit_hw_set_str(const wchar_t* s)
 {
 	if (!s)
 	{

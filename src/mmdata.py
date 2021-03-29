@@ -377,8 +377,10 @@ class Level:
         for key in j:
             if key == "macro-rows":
                 for i, macro_row in enumerate(j[key]):
-                    self.macro_rows[i].seam = j[key]["seam"]
-                    self.macro_rows[i].macro_tiles = j[key]["macro-tiles"]
+                    if "seam" in macro_row:
+                        self.macro_rows[i].seam = macro_row["seam"]
+                    if "macro-tiles" in macro_row:
+                        self.macro_rows[i].macro_tiles = macro_row["macro-tiles"]
             elif key == "objects":
                 objects = []
                 for obj in j[key]:

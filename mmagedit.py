@@ -43,6 +43,7 @@ def usage():
     print("--brx: breakpoint on byte edit")
     print("--json: serialize data to json")
     print("--select .field[a].field2[b:c]: (etc) select elements of json out")
+    print("--apply {...}: apply json to data")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -70,6 +71,7 @@ def main():
     expimage = False
     dojson = "--json" in sys.argv
     jsonpath = ""
+    jsonapply = None
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -114,6 +116,9 @@ def main():
 
     if "--brx" in sys.argv[2:]:
         src.mmdata.breakpoint_on_byte_edit = True
+
+    if "--apply" in sys.argv[2:-1]:
+        jsonapply = sys.argv[sys.argv.index("--apply") + 1]
 
     if dojson:
         gui = False
@@ -193,6 +198,9 @@ def main():
                 print("--set-chr requires PIL (Pillow), which is not installed. (python3 -m pip install Pillow)")
             else:
                 src.mmimage.set_chr_rom_from_image_path(mmdata, chrin)
+
+        if jsonapply is not None:
+            mmdata.deserialize_json_str(jsonapply)
 
         # data out ---------------------------
 

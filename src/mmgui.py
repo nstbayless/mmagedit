@@ -2601,7 +2601,7 @@ Please remember to save frequently and make backups.
         self.macro_canvas.refresh()
         
         # med canvas handles its own selection rect
-        if self.data.mapper_extension and self.mapper_extension_components_init:
+        if self.data and self.data.mapper_extension and self.mapper_extension_components_init:
             if self.unitile_select_id is not None:
                 self.unitile_canvas.selection_idx = self.placable_med_tiles.index(self.unitile_select_id)
             else:

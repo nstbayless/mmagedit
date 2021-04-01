@@ -7,8 +7,7 @@ cache:
   - C:\Tools\vcpkg\
 
 install:
-    # get python3.9
-    - dir C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64
+    # get python38
     - appveyor DownloadFile https://www.python.org/ftp/python/3.8.8/python-3.8.8-embed-amd64.zip -Filename python38_64.zip
     - 7z e -y -opython38 python38_64.zip
     - C:\\Python35\\python.exe --version

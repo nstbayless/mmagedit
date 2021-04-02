@@ -2637,7 +2637,10 @@ class MMData:
                             else:
                                 self.mods[mod] = config["mods"][mod]
                     parsing_globals_complete = True
-                    
+            
+            # integrate CHR changes
+            self.set_chr_from_bin()
+
             # correct title screen
             for k in range(2):
                 screen_name = ["title screen", "ending screen"][k]

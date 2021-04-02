@@ -1,8 +1,8 @@
 from src.util import *
 
-mmname = "MMagEdit v1.25"
+mmname = "MMagEdit v1.26"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202103211159
+mmfmt = 202104021346
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():

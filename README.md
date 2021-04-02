@@ -21,8 +21,7 @@ You can build [mmagedit.cpp](./libmmagedit/mmagedit.cpp) as a shared library. To
 Here's a simple example of usage:
 
 ```C++
-// The .py files in this repository are required, though
-// Python itself does not need to be installed.
+// The .py files in this repository are required
 mmagedit_init("/path/to/mmagedit.py");
 
 // Check for errors

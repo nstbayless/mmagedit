@@ -6,7 +6,7 @@
  
 This utility can edit levels, worlds, and tile information for Micro Mages (by [Morphcat games](http://morphcat.de/)), and it can extend the game's basic features with new elements, such as more complex level data. Made with Python3, `Pillow`, and `tkinter`. Has both a GUI and CLI.
 
-MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib, or .dll)** so that other projects can use MMagEdit's back-end to create hacks for Micro Mages, even if they aren't written in python. C, C++, C#, Unity, Lua, or any other language that can link to a shared library should all be supported.
+MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib, or .dll)** so that other projects can use MMagEdit's back-end to create hacks for Micro Mages, even if they aren't written in python. C, C++, C#, Unity, Lua, or any other language that can link to a shared library should all be supported. If compiled with [emscripten](https://emscripten.org/), it can even run in the browser.
 
 **Windows**: [Download](https://ci.appveyor.com/api/projects/nstbayless/mmagedit/artifacts/mmagedit.zip).
 

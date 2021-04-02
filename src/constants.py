@@ -1,4 +1,4 @@
-zfrom src.util import *
+from src.util import *
 
 mmname = "MMagEdit v1.25"
 mmrepo = "https://github.com/nstbayless/mmagedit"

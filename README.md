@@ -16,7 +16,7 @@ MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib
 
 ## Shared Library
 
-You can build [mmagedit.cpp](./libmmagedit/mmagedit.cpp) as a shared library. To do so, you must compile the cpp file and link it to libpython35 or higher, which can be downloaded [here](). **No other dependencies are required** -- you don't even need a working Python installation. Documentation for the library interface can be found in [mmagedit.h](./libmmagedit/mmagedit.h).
+You can build [mmagedit.cpp](./libmmagedit/mmagedit.cpp) as a shared library. To do so, you must compile the cpp file and link it to libpython35 or higher. Documentation for the library interface can be found in [mmagedit.h](./libmmagedit/mmagedit.h).
 
 Here's a simple example of usage:
 

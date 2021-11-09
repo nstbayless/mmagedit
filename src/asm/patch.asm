@@ -390,16 +390,18 @@ ifdef UNITILE
     ;    unitile_level_table_end:
 endif
 
-FROM $E688
+FROM $E686
 ifdef TEXT_DIACRITICS
 
     text_diacritic_table:
-        HEX EB EC F0 F1 02
+        SKIPREL 5
 
     ; if the text character is less than 0x13, then it's a regular extended character.
     text_diacritic_check:
         CMP #$13
         BCS text_diacritic
+        ; -C
+        ADC #$1E
         JMP text_diacritic_return
     
     ; write a diacritic, then do the next character.
@@ -417,12 +419,12 @@ ifdef TEXT_DIACRITICS
         ; go up one row in ppu address space (8 pixels up)
         LDA text_ppuAddr
         PHA ; push <ppu addr
-        SBC #$10
+        SBC #$20
         TAY
         LDA text_ppuAddr+1
         PHA ; push >ppu addr
         BCS +
-        ADC #$1
+        ADC #$FF
     +   STA PPUADDR
         STY PPUADDR
         

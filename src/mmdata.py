@@ -1398,12 +1398,12 @@ class TextData:
             # start-of-text marker
             bs.write_bits(1, 5)
             
-            i = -1
+            j = -1
             while True:
-                i = i + 1
-                if i >= len(text):
+                j = j + 1
+                if j >= len(text):
                     break
-                t = text[i]
+                t = text[j]
                 if t == " ":
                     bs.write_bits(0, 5)
                 elif t == "%" or t == "\n":
@@ -1411,12 +1411,11 @@ class TextData:
                 else:
                     if t == "\\":
                         # escape characters
-                        if text[i + 1] == "\\":
-                            t = "\\"
-                            i = i + 1
-                        elif text[i + 1] == "d":
-                            t = text[i+1:i+4]
-                            i = i + 3
+                        if text[j + 1] == "\\":
+                            j = j + 1
+                        elif text[j + 1] == "d":
+                            t = text[j+1:j+4]
+                            j = j + 3
                     if t in self.table:
                         i = self.table.index(t)
                         if i <= 0x1b:
@@ -1426,7 +1425,7 @@ class TextData:
                         else:
                             # extended character
                             bs.write_bits(2, 5)
-                            assert(i - 0x1a < 0x20)
+                            assert(i - 0x1a < 0x13)
                             bs.write_bits(i - 0x1a, 5)
                     elif len(t) == 3 and t[0] == "d":
                         if self.data.mapper_extension:
@@ -1436,7 +1435,8 @@ class TextData:
                                 if len(unique_diacritics) > src.mappermages.diacritics_table_range[1] - src.mappermages.diacritics_table_range[0]:
                                     self.data.errors += ["Too many unique diacritics. Please use fewer types of diacritics."]
                                     return False
-                                self.data.write_byte(self.data.ram_to_rom(src.mappermages.diacritics_table_range[0]) + len(unique_diacritics) - 1, diacritic)
+                                addr = src.mappermages.diacritics_table_range[0] + len(unique_diacritics) - 1
+                                self.data.write_byte(self.data.ram_to_rom(addr), diacritic)
                             # extended character: diacritic.
                             bs.write_bits(2, 5)
                             outb = 0x13 + unique_diacritics.index(diacritic)

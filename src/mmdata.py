@@ -1393,16 +1393,30 @@ class TextData:
         
     def write(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+        unique_diacritics = []
         for text in self.text:
             # start-of-text marker
             bs.write_bits(1, 5)
             
-            for t in text:
+            i = -1
+            while True:
+                i = i + 1
+                if i >= len(text):
+                    break
+                t = text[i]
                 if t == " ":
                     bs.write_bits(0, 5)
                 elif t == "%" or t == "\n":
                     bs.write_bits(3, 5)
                 else:
+                    if t == "\\":
+                        # escape characters
+                        if text[i + 1] == "\\":
+                            t = "\\"
+                            i = i + 1
+                        elif text[i + 1] == "d":
+                            t = text[i+1:i+4]
+                            i = i + 3
                     if t in self.table:
                         i = self.table.index(t)
                         if i <= 0x1b:
@@ -1414,8 +1428,24 @@ class TextData:
                             bs.write_bits(2, 5)
                             assert(i - 0x1a < 0x20)
                             bs.write_bits(i - 0x1a, 5)
+                    elif len(t) == 3 and t[0] == "d":
+                        if self.data.mapper_extension:
+                            diacritic = int(t[1:], 16)
+                            if diacritic not in unique_diacritics:
+                                unique_diacritics.append(diacritic)
+                                if len(unique_diacritics) > src.mappermages.diacritics_table_range[1] - src.mappermages.diacritics_table_range[0]:
+                                    self.data.errors += ["Too many unique diacritics. Please use fewer types of diacritics."]
+                                    return False
+                                self.data.write_byte(self.data.ram_to_rom(src.mappermages.diacritics_table_range[0]) + len(unique_diacritics) - 1, diacritic)
+                            # extended character: diacritic.
+                            bs.write_bits(2, 5)
+                            outb = 0x13 + unique_diacritics.index(diacritic)
+                            bs.write_bits(outb, 5)
+                        else:
+                            self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo enable diacritics, please set the mapper_extension mod to true."]
+                            return False
                     else:
-                        self.data.errors += ["Invalid text symbol: \"" + t + "\""]
+                        self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo add new symbols, please export images, edit chr-rom, then reimport chr-rom."]
                         return False
             
         # bounds check
@@ -2012,6 +2042,15 @@ class MMData:
             # text data
             out()
             out("# text data")
+            out()
+            out("#The letters listed here corresponds to the letters in the CHR-ROM.")
+            out("#If you export the chr-rom data, you should see the image data for each")
+            out("#character in the same order as they are listed here. You may edit both")
+            out("#the chr-rom and the letters listed here to more conveniently edit the game text.")
+            out()
+            out("# \"short\" letters take 5 bits to store, and \"long\" letters take 10 bits to store.")
+            out("# Space (\" \") is always a 5 bit character, and need not be listed here.")
+            out()
             out("short " + self.text.table[:24])
             out("long " + self.text.table[24:])
             out()

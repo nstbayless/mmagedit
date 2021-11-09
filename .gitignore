@@ -9,3 +9,4 @@ mm-*.png
 .vscode/
 !examples/
 *.txt
+*.cdl

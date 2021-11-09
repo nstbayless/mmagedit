@@ -8,6 +8,7 @@ import struct
 EXTENSION_LENGTH = 0x8000
 
 from src.asmpy import patches_unitile
+from src.asmpy import patches_diacritics
 
 PATCHES = [
 
@@ -120,15 +121,17 @@ PATCHES = [
 	(0xf84f, bytearray.fromhex("20 1a db")),
 ]
 
-# this adds support for unitile data
+# this adds support for unitile data and text diacritics
 # asm source: https://github.com/nstbayless/mm-patches
-unitile_patches = patches_unitile.PATCHES
+unitile_patches = patches_unitile.PATCHES + patches_diacritics.PATCHES
 for i, patch in enumerate(unitile_patches):
 	# change addresses to fit extended ROM
 	if patch[0] >= 0x4010:
 		unitile_patches[i] = (patch[0] + EXTENSION_LENGTH, patch[1])
 
-unitile_table_range = [0xDCD1, 0xe6c3]
+# we could get as far as 0xE6C3, but we need some space for the text hack.
+unitile_table_range = [0xDCD1, 0xe688]
+diacritics_table_range = [0xE688, 0xE68D]
 
 """
 # add PRG banks 1-2, pushing the old bank 1 to bank 3

@@ -390,7 +390,7 @@ ifdef UNITILE
     ;    unitile_level_table_end:
 endif
 
-FROM $E672
+FROM $E650
 ifdef TEXT_DIACRITICS
 
     text_diacritic_table:
@@ -444,15 +444,17 @@ ifdef TEXT_DIACRITICS
         jmp text_print_continue
     
     text_clear_two_lines:
-        STA PPUDATA
-        TAX
-        
-        ; write at address + 32 if line is odd
         LDY $C3
-        LDA PPUSTATUS
-        LDA $C2
-        EOR #$20
+        LDX #$0
         JSR set_PPU_addr
+        STX PPUDATA
+        BIT PPUSTATUS
+        ; experimentally, carry seems not to be set here.
+        ; so this achieves SUB #$20 in practice.
+        SBC #$1F
+        BCS +
+        DEY
+      + JSR set_PPU_addr
         
         STX PPUDATA
         RTS        
@@ -512,9 +514,18 @@ FROM $E94F:
     text_print_continue:
 
 ifdef TEXT_DIACRITICS
-    FROM $A7D9
+    FROM $A7D0
+        LDA $C2
+        AND #$20
+        BNE + 
+        LDA $C2
         ; clear two lines at a time
         JSR text_clear_two_lines
+        NOP
+      +
+        if $ != $A7DC
+            error "text clear jump space inexact"
+        endif
         
     FROM $E96B
         ; we've just loaded 5 bits representing the extended character

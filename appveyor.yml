@@ -11,7 +11,7 @@ install:
     - appveyor DownloadFile https://www.python.org/ftp/python/3.8.8/python-3.8.8-embed-amd64.zip -Filename python38_64.zip
     - 7z e -y -opython38 python38_64.zip
     - C:\\Python35\\python.exe --version
-    - C:\\Python35\\python.exe -m pip install pyinstaller==4.0
+    - C:\\Python35\\python.exe -m pip install setuptools==51.1.2 pyinstaller==4.0
     - C:\\Python35\\python.exe -m pip install Pillow
     # check that dependencies installed.
     - C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"

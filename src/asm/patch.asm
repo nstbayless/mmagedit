@@ -390,7 +390,7 @@ ifdef UNITILE
     ;    unitile_level_table_end:
 endif
 
-FROM $E686
+FROM $E672
 ifdef TEXT_DIACRITICS
 
     text_diacritic_table:
@@ -442,7 +442,21 @@ ifdef TEXT_DIACRITICS
         ; we're done. move on to the next character.
         ; AXY can all be clobbered at this point; that's fine.
         jmp text_print_continue
+    
+    text_clear_two_lines:
+        STA PPUDATA
+        TAX
         
+        ; write at address + 32 if line is odd
+        LDY $C3
+        LDA PPUSTATUS
+        LDA $C2
+        EOR #$20
+        JSR set_PPU_addr
+        
+        STX PPUDATA
+        RTS        
+    
     if $ > $E6C3
         error "diacritic code patch space exceeded"
     endif
@@ -498,12 +512,20 @@ FROM $E94F:
     text_print_continue:
 
 ifdef TEXT_DIACRITICS
+    FROM $A7D9
+        ; clear two lines at a time
+        JSR text_clear_two_lines
+        
     FROM $E96B
         ; we've just loaded 5 bits representing the extended character
         ; jump to our bonus code.
         JMP text_diacritic_check
         text_diacritic_return:
 endif
+
+FROM $EEDE
+; sets PPU addr, Y then A.
+set_PPU_addr:
 
 ; this subroutine mirrors a med-tile (16x16).
 ; most med-tiles mirror by flipping the least bit.

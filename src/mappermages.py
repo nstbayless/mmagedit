@@ -129,9 +129,9 @@ for i, patch in enumerate(unitile_patches):
 	if patch[0] >= 0x4010:
 		unitile_patches[i] = (patch[0] + EXTENSION_LENGTH, patch[1])
 
-# we could get as far as 0xE6C3, but we need some space for the text hack.
-unitile_table_range = [0xDCD1, 0xe686]
-diacritics_table_range = [0xE686, 0xE68D]
+diacritics_table_range = [0xE650, 0xE650 + 5]
+# we could get as far as 0xE6C3, but we need some space for the diacritics hack.
+unitile_table_range = [0xDCD1, diacritics_table_range[0]]
 
 """
 # add PRG banks 1-2, pushing the old bank 1 to bank 3

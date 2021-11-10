@@ -18,46 +18,6 @@ format 202111091409
   }
 }
 
--- title --
-# data for the title screen and ending screen
-# this is stored with Lempel-Ziv compression, so it's best to try to use repeating structures.
-
-# tiles for title screen
-# __ is equivalent to 00.
-
-T __ __ __ __ __ __ D1 C6 C2 C4 C2 C4 __ C6 __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ C2 23 CB 23 CB 23 D0 C3 __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ C8 23 CE 23 CB 23 __ C6 __ C6 CC C4 D1 C6 C6 CA C6 CC C4 __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ C9 23 CB 23 CB 23 __ 23 D0 23 __ __ D0 23 D2 D0 23 __ 23 __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ C8 23 CB 23 CB 23 __ 23 __ 23 __ __ __ 23 __ __ 23 __ 23 __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ CD C3 __ C3 __ C3 __ C3 __ C5 C4 C2 __ C3 __ __ C5 C4 C3 CF __ __ __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ D1 C6 C2 C4 C2 C4 __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ C2 23 CB 23 CB 23 __ C6 CC C4 __ C6 CC C4 __ C6 CC C4 D1 C6 CC C4 __ __ __ __ __ 
-T __ __ __ __ __ C8 23 CE 23 CB 23 D0 23 __ 23 __ 23 __ 23 D0 23 __ C3 D0 C5 C4 __ __ __ __ __ __ 
-T __ __ __ __ __ C9 23 CB 23 CB 23 __ 23 __ 23 __ 23 __ 23 __ 23 C2 __ __ __ C5 C4 __ __ __ __ __ 
-T __ __ __ __ __ C8 23 CB 23 CB 23 __ C5 C2 C5 __ C5 C4 23 __ C5 C4 C2 __ CC C4 C3 CF __ __ __ __ 
-T __ __ __ __ __ CD C3 __ C3 __ C3 __ __ __ __ __ D1 C6 C3 __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 4B 4B __ __ __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 4B __ 42 44 __ 4B __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ A3 __ 35 57 4B A3 __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 99 __ A3 99 35 57 A3 A3 __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ C2 88 8C C2 88 __ __ 66 __ __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 0A 0B 6A 0A 0B 6A 6A 61 98 __ __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 2C 61 __ 2C 61 __ __ 58 __ __ __ __ 
-T 97 __ __ __ __ __ __ __ __ 90 97 __ __ __ __ __ __ __ __ __ 2E 61 __ 2E 61 __ __ 99 __ __ __ 63 
-T 88 97 __ 90 97 __ 90 97 __ 63 88 97 __ 90 97 __ 90 97 __ B8 BB 65 B8 BB 65 __ __ __ 66 __ 63 __ 
-T __ 88 97 63 __ 65 97 __ 63 __ __ 88 97 63 __ 65 97 __ B8 5F 65 B8 5F 65 __ __ __ __ __ 67 __ __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ B8 AE 65 68 66 __ __ __ __ __ __ __ __ 67 __ 
-T __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ 
-
-# palette indices for title screen
-P 00 00 00 
-P 00 00 00 00 00 A8 AA 00 
-P F0 F0 F0 F0 F0 AA AA EE 
-P FF FF 7F 5F 57 55 55 5D 
-
 -- global --
 
 # text data
@@ -73,7 +33,7 @@ P FF FF 7F 5F 57 55 55 5D
 short EOSRATINMLDHYCGUFP-.W!V:
 long 'BQ`@X123456789
 
-> COMMEN@<
+> COMMEN<
 >  %  <
 >@ 2O19 MORPHCAT GAMES<
 >PLAYERS    % 1 2 3 4%       %PASSWORD<
@@ -91,7 +51,7 @@ long 'BQ`@X123456789
 >WELL DONE!%TRY THIS CODE: 7 1 9 5<
 >PASSWORD: <
 >HELL MODE<
->\df4A UNE \df1EPOQUE OUBLI\df1EE...%%QUATRE MAGES DOIVENT SAUVER%%LEUR PRINCESSE AIM\df1EE DE LA%%FORTRESSE MAUDITE<
+>%\df4A UNE \df1EPOQUE OUBLI\df1EE...%%QUATRE MAGES DOIVENT SAUVER%%LEUR PRINCESSE AIM\df1EE DE LA%%FORTRESSE MAUDITE<
 >THANQS FOR COM-PLE-TING%A GREAT GAME <
 >YOU RES-CUED ME YOU ARE%MY HE-RO! <
 >WELL AC-TUAL-LY I WENT%FOR A STROLL ON MY OWN <

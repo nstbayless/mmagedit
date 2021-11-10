@@ -182,6 +182,8 @@ medtile_data_d:
 ; NES peripheral registers
 BASE $2002
     PPUSTATUS:
+BASE $2005
+    PPUSCROLL:
 BASE $2006
     PPUADDR:
 BASE $2007

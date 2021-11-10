@@ -1635,6 +1635,9 @@ class MMData:
             self.pause_text = [self.read_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i)) for i in range(5)]
             self.pause_text_offset = self.read_byte(self.ram_to_rom(constants.ram_pause_text_offset))
             
+            self.title_screen_press_start_text_position = self.read_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[0])) * 0x100 + self.read_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[1]))
+            self.title_screen_players_text_position = self.read_byte(self.ram_to_rom(constants.title_screen_players_text_position[0])) * 0x100 + self.read_byte(self.ram_to_rom(constants.title_screen_players_text_position[1]))
+            
             # read CHR
             self.set_chr_from_bin()
             
@@ -1761,6 +1764,12 @@ class MMData:
         self.write_byte(self.ram_to_rom(constants.ram_pause_text_offset), self.pause_text_offset)
         for i in range(5):
             self.write_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i), self.pause_text[i])
+            
+        # write title screen text position
+        self.write_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[0]), self.title_screen_press_start_text_position // 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[1]), self.title_screen_press_start_text_position % 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_players_text_position[0]), self.title_screen_players_text_position // 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_players_text_position[1]), self.title_screen_players_text_position % 0x100)
         
         # write object-specific data
         for cfg in self.object_config:
@@ -1981,6 +1990,10 @@ class MMData:
             out('  # pause text position and pause text (must be 5 characters exactly; use 00 or 01 to end it early)')
             out('  "pause-text":', "[", " ,".join(['"' + hb(i) + '"' for i in self.pause_text]), "],")
             out('  "pause-text-x": "' + hb(self.pause_text_offset) + "\",")
+            out()
+            out('  # position of title screen text (in ppu ram address format)')
+            out('  "title-press-start-text-position":', str(self.title_screen_press_start_text_position) + ",")
+            out('  "title-players-text-position":', str(self.title_screen_players_text_position) + ",")
             out()
             out('  # some special mods that can be applied')
             out('  "mods": {')
@@ -2669,6 +2682,10 @@ class MMData:
                             self.pause_text.append(int(c, 16))
                     if "pause-text-x" in config:
                         self.pause_text_offset = int(config["pause-text-x"], 16)
+                    if "title-press-start-text-position" in config:
+                        self.title_screen_press_start_text_position = int(config["title-press-start-text-position"])
+                    if "title-players-text-position" in config:
+                        self.title_screen_players_text_position = int(config["title-players-text-position"])
                     if "mods" in config:
                         for mod in config["mods"]:
                             if mod == "mapper-extension":

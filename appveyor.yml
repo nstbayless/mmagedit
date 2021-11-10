@@ -10,12 +10,12 @@ install:
     # get python38
     - appveyor DownloadFile https://www.python.org/ftp/python/3.8.8/python-3.8.8-embed-amd64.zip -Filename python38_64.zip
     - 7z e -y -opython38 python38_64.zip
-    - C:\\Python35\\python.exe --version
-    - C:\\Python35\\python.exe -m pip install setuptools==50.3.2 pyinstaller==4.0
-    - C:\\Python35\\python.exe -m pip install Pillow
+    - C:\\Python36\\python.exe --version
+    - C:\\Python36\\python.exe -m pip install setuptools==50.3.2 pyinstaller==4.0
+    - C:\\Python36\\python.exe -m pip install Pillow
     # check that dependencies installed.
-    - C:\\Python35\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
-    - C:\\Python35\\python.exe -c "from tkinter import ttk"
+    - C:\\Python36\\python.exe -c "from PIL import Image, ImageDraw, ImageOps"
+    - C:\\Python36\\python.exe -c "from tkinter import ttk"
     - SET PATH=%PATH%;C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin
     # (for 32 bit -- also maybe need to add -m32 to the build?)
     #- SET PATH=%PATH%;C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin
@@ -32,7 +32,7 @@ build_script:
     - dir
     # - mmagedit_test.exe ../mmagedit.py
     - cd ..
-    - C:\Python35\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+    - C:\Python36\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
     - move dist\\mmagedit mmagedit
     - move examples mmagedit
     - cd mmagedit
@@ -44,8 +44,8 @@ build_script:
     #- move python38\* mmagedit\libmmagedit
 
 after_build:
-    - C:\\Python35\\python.exe mmagedit.py --help
-    - C:\\Python35\\python.exe mmagedit.py --deps
+    - C:\\Python36\\python.exe mmagedit.py --help
+    - C:\\Python36\\python.exe mmagedit.py --deps
     - mmagedit\\mmagedit.exe --help
     - mmagedit\\mmagedit.exe --deps
 

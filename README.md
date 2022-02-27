@@ -1,6 +1,7 @@
  # MMagEdit
  
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/nstbayless/mmagedit?svg=true)](https://ci.appveyor.com/project/nstbayless/mmagedit)
+[![Discord](https://img.shields.io/discord/708407305833676960?svg=true)](https://discord.gg/3WJYQ6a)
  
 *A cross-platform ROM editor and library for [Micro Mages](http://morphcat.de/micromages/).*
  
@@ -9,7 +10,7 @@ This utility can edit levels, worlds, and tile information for Micro Mages (by [
 MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib, or .dll)** so that other projects can use MMagEdit's back-end to create hacks for Micro Mages, even if they aren't written in python. C, C++, C#, Unity, Lua, or any other language that can link to a shared library should all be supported. If compiled with [emscripten](https://emscripten.org/), it can even run in the browser.
 
 **Windows**: [Download](https://ci.appveyor.com/api/projects/nstbayless/mmagedit/artifacts/mmagedit.zip).
-*Note: Appveyor deletes builds after 1 month. If this link doesnt work, please ping NaOH on discord to manually rebuild. We will migrate to github for builds soon, which will solve this problem.*
+*Note: Appveyor deletes builds after 1 month. If this link doesnt work, please ping NaOH on [Discord]((https://discord.gg/3WJYQ6a) to manually rebuild. We will migrate to github for builds soon, which will solve this problem.*
 
 **Linux**: See "Launching (Ubuntu)" below.
 

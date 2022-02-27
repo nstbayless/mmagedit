@@ -10,7 +10,7 @@ This utility can edit levels, worlds, and tile information for Micro Mages (by [
 MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib, or .dll)** so that other projects can use MMagEdit's back-end to create hacks for Micro Mages, even if they aren't written in python. C, C++, C#, Unity, Lua, or any other language that can link to a shared library should all be supported. If compiled with [emscripten](https://emscripten.org/), it can even run in the browser.
 
 **Windows**: [Download](https://ci.appveyor.com/api/projects/nstbayless/mmagedit/artifacts/mmagedit.zip).
-*Note: Appveyor deletes builds after 1 month. If this link doesnt work, please ping NaOH on [Discord]((https://discord.gg/3WJYQ6a) to manually rebuild. We will migrate to github for builds soon, which will solve this problem.*
+*Note: Appveyor deletes builds after 1 month. If this link doesnt work, please ping NaOH on [Discord](https://discord.gg/3WJYQ6a) to manually rebuild. We will migrate to github for builds soon, which will solve this problem.*
 
 **Linux**: See "Launching (Ubuntu)" below.
 

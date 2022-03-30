@@ -343,6 +343,7 @@ class Level:
             ".world-idx": self.world_idx,
             ".world-sublevel": self.world_sublevel,
             ".name": self.get_name(),
+            "music-idx": self.music_idx,
             "macro-rows": [
                 {
                     "seam": macro_row.seam,
@@ -390,6 +391,8 @@ class Level:
                     if not objects[-1].deserialize(j[key]):
                         return False
                 self.objects = objects
+            elif key == "music_idx":
+                self.music_idx = j[key]
             elif key == "unitile-patches":
                 patches = []
                 for patch in j[key]:

@@ -1,0 +1,74 @@
+# Micro Mages Hack File
+
+# This file can be opened using MMagEdit, available here:
+# https://github.com/nstbayless/mmagedit
+
+# Work in progress french translation
+
+format 202111091409
+
+-- config --
+
+{
+  # pause text
+  "pause-text": [ "ea" ,"dd" ,"e8" ,"db" ,"d9" ],
+  "title-press-start-text-position": 10795,
+  "title-players-text-position": 10792,
+  "mods": {
+      "mapper-extension": true
+  }
+}
+
+-- global --
+
+# text data
+
+#The letters listed here corresponds to the letters in the CHR-ROM.
+#If you export the chr-rom data, you should see the image data for each
+#character in the same order as they are listed here. You may edit both
+#the chr-rom and the letters listed here to more conveniently edit the game text.
+
+# "short" letters take 5 bits to store, and "long" letters take 10 bits to store.
+# Space (" ") is always a 5 bit character, and need not be listed here.
+
+short EOSRATINMLDHZCGUFP-.J!V:
+long 'BQ`@X123456789
+
+>COMMENCER<
+>  %  <
+>@ 2O19 MORPHCAT GAMES<
+>   JOUEURS  %   1 2 3 4%%MOT DE PASSE<
+>SUIS-LE!%UTILIZEZ%MA MAGIE!<
+>JEU TERMIN\df1E<
+>ENCORE%FIN<
+>  SCORE%%<
+>TOUR <
+> . . . .<
+>CECI EST%UN PORTAIL CR\df1E\df1E PAR%ILLUMINATEUR. DEFIEZ%LE MODE DIFFICILE<
+>VOUS: PRINCESSE!%%<
+>ELLE: OUAF!%%<
+>VOUS: ALLONS CHEZ NOUS<
+>  FIN<
+>BIEN FAIT!%ENTREZ CE CODE: 7 1 9 5<
+>MOT DE PASSE: <
+>MODE ENFER<
+>\df4A UNE \df1EPOQUE OUBLI\df1EE...%%QUATRE MAGES DOIVENT SAUVER%%LEUR PRINCESSE BIEN-AIM\df1EE%%DES TOURS MAUDITES<
+>MER-CI POUR COM-PL\df1E-TER%CE JEU <
+>LES BONS COMPTES FONT LES TR\df4ES%BONS A-MIS! <
+>EN FAIT UN JOUR JE SUIS%AL-L\df1EE ME PRO-MEN-ER <
+>CAR VOUS NE ME PREN-EZ%JA-MAIS POUR LES ..OUAF <
+>FRITES ET CR\df4EME GLAC\df1EE <
+>QUE CE-LA SER-VIR%DE RAP-PEL A-MI-CAL <
+>IL FAUT NOURIR%LES CHIENS <
+>MA VIE EST COURTE <
+>DONC COM-MAN-DEZ MOI DES%PIZ-ZAS ET ..OUAF <
+>CHANT-ONS NOUS <
+
+# chr-rom
+
+CRB E5:   00 FE 0E 1C 38 70 E0 FE   00 FE 0E 1C 38 70 E0 FE
+CRB ED:   00 FE 18 18 18 D8 D8 70   00 FE 18 18 18 D8 D8 70
+CRB EF:   00 E2 E2 E2 E6 6C 38 10   00 E2 E2 E2 E6 6C 38 10
+CRB F1:   00 00 00 00 00 1C 38 00   00 00 00 00 00 1C 38 00
+CRB F3:   00 7C F6 E2 E2 E4 FE 76   00 7C F6 E2 E2 E4 FE 76
+CRB F4:   00 00 00 00 00 70 38 00   00 00 00 00 00 70 38 00

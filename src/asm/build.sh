@@ -1,7 +1,7 @@
 # note: asm6f must be on the PATH.
-configs=(NO_BOUNCY_LANDINGS NO_AUTO_SCROLL UNITILE EXTENDED_OBJECTS)
-outs=(no-bouncy-landings no-auto-scroll unitile extended_objects)
-folders=("no-bouncy-landings/" "no-auto-scroll/" "unitile/" "ext-objects/")
+configs=(NO_BOUNCY_LANDINGS NO_AUTO_SCROLL UNITILE EXTENDED_OBJECTS TEXT_DIACRITICS)
+outs=(no-bouncy-landings no-auto-scroll unitile extended_objects diacritics)
+folders=("no-bouncy-landings/" "no-auto-scroll/" "unitile/" "ext-objects/" "diacritics"/)
 
 name="patches"
 
@@ -26,7 +26,7 @@ then
     mkdir "nes"
 fi
 
-for i in {0..3}
+for i in {0..4}
 do
     CONFIG="${configs[$i]}"
     SRC="patch.asm"

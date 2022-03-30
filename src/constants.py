@@ -1,8 +1,8 @@
 from src.util import *
 
-mmname = "MMagEdit v1.26"
+mmname = "MMagEdit v1.27"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202104021346
+mmfmt = 202111091409
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -46,6 +46,8 @@ ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square
 
 title_screen_tile_count = [0x340, 382]
 title_screen_palette_idx_count = [0x1b, 0x1b]
+title_screen_press_start_text_position = [0xA82A, 0xA82C]
+title_screen_players_text_position = [0xE793, 0xE795]
 ram_range_title_screen = [0xc5a2, 0xC737]
 ram_range_title_screen_palette = [
     [0xc737, 0xc737 + 0x9],

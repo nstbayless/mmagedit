@@ -388,7 +388,7 @@ class Level:
                     if obj == None or len(obj) == 0:
                         self.data.errors += ["all objects in .objects list must be fully-realized"]
                     objects.append(Object(self.data))
-                    if not objects[-1].deserialize(j[key]):
+                    if not objects[-1].deserialize(obj):
                         return False
                 self.objects = objects
             elif key == "music_idx":
@@ -1396,16 +1396,29 @@ class TextData:
         
     def write(self):
         bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+        unique_diacritics = []
         for text in self.text:
             # start-of-text marker
             bs.write_bits(1, 5)
             
-            for t in text:
+            j = -1
+            while True:
+                j = j + 1
+                if j >= len(text):
+                    break
+                t = text[j]
                 if t == " ":
                     bs.write_bits(0, 5)
                 elif t == "%" or t == "\n":
                     bs.write_bits(3, 5)
                 else:
+                    if t == "\\":
+                        # escape characters
+                        if text[j + 1] == "\\":
+                            j = j + 1
+                        elif text[j + 1] == "d":
+                            t = text[j+1:j+4]
+                            j = j + 3
                     if t in self.table:
                         i = self.table.index(t)
                         if i <= 0x1b:
@@ -1415,10 +1428,27 @@ class TextData:
                         else:
                             # extended character
                             bs.write_bits(2, 5)
-                            assert(i - 0x1a < 0x20)
+                            assert(i - 0x1a < 0x13)
                             bs.write_bits(i - 0x1a, 5)
+                    elif len(t) == 3 and t[0] == "d":
+                        if self.data.mapper_extension:
+                            diacritic = int(t[1:], 16)
+                            if diacritic not in unique_diacritics:
+                                unique_diacritics.append(diacritic)
+                                if len(unique_diacritics) > src.mappermages.diacritics_table_range[1] - src.mappermages.diacritics_table_range[0]:
+                                    self.data.errors += ["Too many unique diacritics. Please use fewer types of diacritics."]
+                                    return False
+                                addr = src.mappermages.diacritics_table_range[0] + len(unique_diacritics) - 1
+                                self.data.write_byte(self.data.ram_to_rom(addr), diacritic)
+                            # extended character: diacritic.
+                            bs.write_bits(2, 5)
+                            outb = 0x13 + unique_diacritics.index(diacritic)
+                            bs.write_bits(outb, 5)
+                        else:
+                            self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo enable diacritics, please set the mapper_extension mod to true."]
+                            return False
                     else:
-                        self.data.errors += ["Invalid text symbol: \"" + t + "\""]
+                        self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo add new symbols, please export images, edit chr-rom, then reimport chr-rom."]
                         return False
             
         # bounds check
@@ -1608,6 +1638,9 @@ class MMData:
             self.pause_text = [self.read_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i)) for i in range(5)]
             self.pause_text_offset = self.read_byte(self.ram_to_rom(constants.ram_pause_text_offset))
             
+            self.title_screen_press_start_text_position = self.read_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[0])) * 0x100 + self.read_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[1]))
+            self.title_screen_players_text_position = self.read_byte(self.ram_to_rom(constants.title_screen_players_text_position[0])) * 0x100 + self.read_byte(self.ram_to_rom(constants.title_screen_players_text_position[1]))
+            
             # read CHR
             self.set_chr_from_bin()
             
@@ -1734,6 +1767,12 @@ class MMData:
         self.write_byte(self.ram_to_rom(constants.ram_pause_text_offset), self.pause_text_offset)
         for i in range(5):
             self.write_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i), self.pause_text[i])
+            
+        # write title screen text position
+        self.write_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[0]), self.title_screen_press_start_text_position // 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_press_start_text_position[1]), self.title_screen_press_start_text_position % 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_players_text_position[0]), self.title_screen_players_text_position // 0x100)
+        self.write_byte(self.ram_to_rom(constants.title_screen_players_text_position[1]), self.title_screen_players_text_position % 0x100)
         
         # write object-specific data
         for cfg in self.object_config:
@@ -1955,6 +1994,10 @@ class MMData:
             out('  "pause-text":', "[", " ,".join(['"' + hb(i) + '"' for i in self.pause_text]), "],")
             out('  "pause-text-x": "' + hb(self.pause_text_offset) + "\",")
             out()
+            out('  # position of title screen text (in ppu ram address format)')
+            out('  "title-press-start-text-position":', str(self.title_screen_press_start_text_position) + ",")
+            out('  "title-players-text-position":', str(self.title_screen_players_text_position) + ",")
+            out()
             out('  # some special mods that can be applied')
             out('  "mods": {')
             for mod in self.mods:
@@ -2015,6 +2058,15 @@ class MMData:
             # text data
             out()
             out("# text data")
+            out()
+            out("#The letters listed here corresponds to the letters in the CHR-ROM.")
+            out("#If you export the chr-rom data, you should see the image data for each")
+            out("#character in the same order as they are listed here. You may edit both")
+            out("#the chr-rom and the letters listed here to more conveniently edit the game text.")
+            out()
+            out("# \"short\" letters take 5 bits to store, and \"long\" letters take 10 bits to store.")
+            out("# Space (\" \") is always a 5 bit character, and need not be listed here.")
+            out()
             out("short " + self.text.table[:24])
             out("long " + self.text.table[24:])
             out()
@@ -2633,6 +2685,10 @@ class MMData:
                             self.pause_text.append(int(c, 16))
                     if "pause-text-x" in config:
                         self.pause_text_offset = int(config["pause-text-x"], 16)
+                    if "title-press-start-text-position" in config:
+                        self.title_screen_press_start_text_position = int(config["title-press-start-text-position"])
+                    if "title-players-text-position" in config:
+                        self.title_screen_players_text_position = int(config["title-players-text-position"])
                     if "mods" in config:
                         for mod in config["mods"]:
                             if mod == "mapper-extension":

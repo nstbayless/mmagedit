@@ -386,6 +386,82 @@ ifdef UNITILE
         objects_table:
     SKIP $1A
         unitile_level_table:
+    ;FROM $E6C3
+    ;    unitile_level_table_end:
+endif
+
+FROM $E650
+ifdef TEXT_DIACRITICS
+
+    text_diacritic_table:
+        SKIPREL 5
+
+    ; if the text character is less than 0x13, then it's a regular extended character.
+    text_diacritic_check:
+        CMP #$13
+        BCS text_diacritic
+        ; -C
+        ADC #$1E
+        JMP text_diacritic_return
+    
+    ; write a diacritic, then do the next character.
+    text_diacritic:
+        ; X <- offset into text_diacritic_table
+        ; +C
+        SBC #$13
+        ; +C
+        TAX
+        
+        ; reset latch for ppu addr
+        ; (this may not be necessary)
+        LDA PPUSTATUS
+        
+        ; go up one row in ppu address space (8 pixels up)
+        LDA text_ppuAddr
+        PHA ; push <ppu addr
+        SBC #$20
+        TAY
+        LDA text_ppuAddr+1
+        PHA ; push >ppu addr
+        BCS +
+        ADC #$FF
+    +   STA PPUADDR
+        STY PPUADDR
+        
+        ; write the character (the diacritic)
+        LDA text_diacritic_table, X
+        STA PPUDATA
+        
+        ; restore preivous PPU address position
+        LDA text_ppuAddr
+        PLA
+        STA PPUADDR
+        PLA
+        STA PPUADDR
+    
+        ; we're done. move on to the next character.
+        ; AXY can all be clobbered at this point; that's fine.
+        jmp text_print_continue
+    
+    text_clear_two_lines:
+        LDY $C3
+        LDX #$0
+        JSR set_PPU_addr
+        STX PPUDATA
+        BIT PPUSTATUS
+        ; experimentally, carry seems not to be set here.
+        ; so this achieves SUB #$20 in practice.
+        SBC #$1F
+        BCS +
+        DEY
+      + JSR set_PPU_addr
+        
+        STX PPUDATA
+        RTS        
+    
+    if $ > $E6C3
+        error "diacritic code patch space exceeded"
+    endif
 endif
 
 ; executes the next commands for track X.
@@ -433,6 +509,34 @@ ifdef PLACE_OBJECTS
         JMP place_objects_chest
         NOP
 endif
+
+FROM $E94F:
+    text_print_continue:
+
+ifdef TEXT_DIACRITICS
+    FROM $A7D0
+        LDA $C2
+        AND #$20
+        BNE + 
+        LDA $C2
+        ; clear two lines at a time
+        JSR text_clear_two_lines
+        NOP
+      +
+        if $ != $A7DC
+            error "text clear jump space inexact"
+        endif
+        
+    FROM $E96B
+        ; we've just loaded 5 bits representing the extended character
+        ; jump to our bonus code.
+        JMP text_diacritic_check
+        text_diacritic_return:
+endif
+
+FROM $EEDE
+; sets PPU addr, Y then A.
+set_PPU_addr:
 
 ; this subroutine mirrors a med-tile (16x16).
 ; most med-tiles mirror by flipping the least bit.

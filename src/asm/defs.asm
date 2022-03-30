@@ -151,6 +151,9 @@ mus_varA:
 BASE $4F9
 mus_varB:
 
+BASE $580
+text_ppuAddr:
+
 ; ------------------------------------------------------------------------------
 
 ; points to next 4 (8 when mirrored) macro-tiles.
@@ -174,5 +177,16 @@ medtile_data_c:
 
 BASE $F1
 medtile_data_d:
+
+; ------------------------------------------------------------------------------
+; NES peripheral registers
+BASE $2002
+    PPUSTATUS:
+BASE $2005
+    PPUSCROLL:
+BASE $2006
+    PPUADDR:
+BASE $2007
+    PPUDATA:
 
 ENDE

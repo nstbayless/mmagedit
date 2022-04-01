@@ -10,3 +10,4 @@ mm-*.png
 !examples/
 *.txt
 *.cdl
+.vs/

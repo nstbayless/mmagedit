@@ -97,7 +97,7 @@ mmagedit_load_hack(const char* path_to_hack);
 external error_code_t
 mmagedit_write_rom(const char* path_to_rom);
 
-// write an ips patch
+// write an ips patch.
 external error_code_t
 mmagedit_write_patch(const char* path_to_patch);
 

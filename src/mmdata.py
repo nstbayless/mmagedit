@@ -388,7 +388,7 @@ class Level:
                     if obj == None or len(obj) == 0:
                         self.data.errors += ["all objects in .objects list must be fully-realized"]
                     objects.append(Object(self.data))
-                    if not objects[-1].deserialize(obj):
+                    if not objects[-1].deserialize_json(obj):
                         return False
                 self.objects = objects
             elif key == "music_idx":

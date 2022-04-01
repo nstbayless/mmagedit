@@ -97,6 +97,10 @@ mmagedit_load_hack(const char* path_to_hack);
 external error_code_t
 mmagedit_write_rom(const char* path_to_rom);
 
+// write an ips patch.
+external error_code_t
+mmagedit_write_patch(const char* path_to_patch);
+
 // write a hack file
 // if "all" is false, certain details will be withheld from the hack file if they
 // have not been changed from the base ROM, including CHR data.

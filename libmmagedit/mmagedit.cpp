@@ -623,6 +623,29 @@ mmagedit_write_rom(const char* path_to_rom)
 }
 
 error_code_t
+mmagedit_write_patch(const char* path_to_patch)
+{
+	precheck_error_python(1);
+	check_not_null(path_to_patch);
+
+	PyObject* patchpath = PyString(path_to_patch);
+	defer_decref(patchpath);
+
+	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "write_ips", patchpath, args_end);
+	check_error_python(1);
+	defer_decref(result);
+
+	if (!result) return error("failure to invoke mmdata.write_ips()");
+
+	if (PyObject_Not(result))
+	{
+		check_error_mmdata else return error("unknown error");
+	}
+
+	return 0;
+}
+
+error_code_t
 mmagedit_write_hack(const char* path_to_hack, bool oall)
 {
 	precheck_error_python(1);

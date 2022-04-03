@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <iostream>
 
 #ifdef LOCAL_PYTHON_H
@@ -24,7 +25,7 @@ typedef PyObject PyObjectBorrowed;
 
 #define args_end nullptr
 
-#define min_version 202103181058
+#define min_version 202204032250
 
 namespace
 {
@@ -533,6 +534,38 @@ uint64_t
 mmagedit_get_minimum_version_int()
 {
 	return min_version;
+}
+
+uint64_t
+mmagedit_get_total_usage()
+{
+	precheck_error_python(1);
+
+	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "get_total_usage", args_end);
+	check_error_python(1);
+
+	uint64_t a = PyNumber_AsSsize_t(
+		result,
+		nullptr
+	);
+
+	return a;
+}
+
+uint64_t
+mmagedit_get_max_usage()
+{
+	precheck_error_python(1);
+
+	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "get_max_usage", args_end);
+	check_error_python(1);
+
+	uint64_t a = PyNumber_AsSsize_t(
+		result,
+		nullptr
+	);
+
+	return a;
 }
 
 // returns 1 andsets error to mmdata's errors if any occurred;

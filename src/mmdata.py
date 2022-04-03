@@ -391,7 +391,7 @@ class Level:
                     if not objects[-1].deserialize_json(obj):
                         return False
                 self.objects = objects
-            elif key == "music_idx":
+            elif key == "music-idx":
                 self.music_idx = j[key]
             elif key == "unitile-patches":
                 patches = []
@@ -1458,6 +1458,16 @@ class TextData:
         return True
             
 class MMData:
+
+    def get_total_usage(self):
+        total_level_length = 0
+        for level in self.levels:
+            total_level_length += level.length_bytes()
+        return total_level_length - 13 * 4 * constants.macro_rows_per_level
+
+    def get_max_usage(self):
+        return constants.ram_range_levels[1] - constants.ram_range_levels[0] - 13 * 4 * constants.macro_rows_per_level
+
     # convert ram address to rom address
     def ram_to_rom(self, address, chunk=""):
         if self.mapper_extension and len(self.bin) > 0xa010:

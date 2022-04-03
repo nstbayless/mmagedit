@@ -85,6 +85,14 @@ mmagedit_get_version_int();
 external uint64_t
 mmagedit_get_minimum_version_int();
 
+// This retrieves total ROM usage from mmagedit
+external uint64_t
+mmagedit_get_total_usage();
+
+// This retrieves max ROM usage from mmagedit
+external uint64_t
+mmagedit_get_max_usage();
+
 // load a base rom.
 external error_code_t
 mmagedit_load_rom(const char* path_to_rom);
@@ -97,7 +105,6 @@ mmagedit_load_hack(const char* path_to_hack);
 external error_code_t
 mmagedit_write_rom(const char* path_to_rom);
 
-// write an ips patch.
 external error_code_t
 mmagedit_write_patch(const char* path_to_patch);
 

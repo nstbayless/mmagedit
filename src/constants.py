@@ -2,7 +2,7 @@ from src.util import *
 
 mmname = "MMagEdit v1.27"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202111091409
+mmfmt = 202204032250
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():

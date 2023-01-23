@@ -142,7 +142,6 @@ To edit any of these aspects of the hack, please open the hack text file directl
 - selection:
     - checkboxes to select what layers to copy/paste to/from
     - macro-patch copy/pasting
-- export single image
 - mod to make game over respawn from start of level instead of world
 - GUI string editor
 - objects with normal/hard/hell flags

@@ -13,12 +13,16 @@ jobs:
   # 32-bit windows build
   build-win32:
     runs-on: windows-latest
-    env:
-        OL: '.\\libs'
     steps:
 
     # pull
     - uses: actions/checkout@v2
+    
+    # python
+    - name: Set up Python3.6
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.6
 
     # download dependencies
     - run: pwd
@@ -33,6 +37,9 @@ jobs:
      
     - name: check-dependencies (2)
       run: python3 -c "from tkinter import ttk"
+      
+    - name: check-dependencies (2)
+      run: python3 -c "import tkinter; print(tkinter.__file__)"
       
     - name: build with pyinstaller
       run: C:\Python36\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."

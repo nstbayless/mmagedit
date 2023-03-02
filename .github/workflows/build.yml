@@ -42,7 +42,7 @@ jobs:
       run: Tree C:\hostedtoolcache\windows\Python\3.6.8 /F
       
     - name: build with pyinstaller
-      run: $pythonLocation\Tools/scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+      run: ${{ env.pythonLocation }}\Tools/scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit

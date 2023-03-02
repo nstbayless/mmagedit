@@ -36,6 +36,7 @@ def usage():
     print("-b: export to bps patch")
     print("--export-images: creates image sheet for levels")
     print("--set-chr: sets chr rom (graphics data) to the data in the given image file.")
+    print("--zoom n: starts editor at zoom level n (n can be 0, 1, or 2)")
     print("")
     print("debug options:")
     print("")

@@ -1134,7 +1134,7 @@ class Gui:
             return
             
         if not force:
-            if tkinter.messagebox.askyesno("Warning", "Zooming logic is currently in beta. It may take several seconds to process this request. Additionally, subwindows may take a long time to close. Continue?\n\n(Ctrl+Alt+" + str(zoom_idx + 1) + " to zoom without seeing this dialogue box.)") is False:
+            if tkinter.messagebox.askyesno("Warning", "Magnification is currently in beta. It may take several seconds to process this request. Additionally, subwindows may take a long time to close. Continue?\n\n(Ctrl+Alt+" + str(zoom_idx + 1) + " to zoom without seeing this dialogue box.)") is False:
                 return
         
         # close subwindows

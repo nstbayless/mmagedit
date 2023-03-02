@@ -38,16 +38,11 @@ jobs:
     - name: check-dependencies (2)
       run: python3 -c "from tkinter import ttk"
       
-    - name: check-dependencies (4)
-      run: Tree C:\hostedtoolcache\windows\Python\3.6.8
-      
-    - name: check-dependencies (3)
-      run: python3 -c "import tkinter; s = tkinter.__file__; print('PYDIR=' + s[:s.index('Python')])" >> $GITHUB_ENV
-      
-    - run: echo "$PYDIR"
+    - name: Tree
+      run: Tree C:\hostedtoolcache\windows\Python\3.6.8 /F
       
     - name: build with pyinstaller
-      run: C:\Python36\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+      run: $pythonLocation\Tools/scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit

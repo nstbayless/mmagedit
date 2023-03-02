@@ -2,9 +2,9 @@ name: 'Build'
 
 on:
   push:
-    branches: [ master, main, dev ]
+    branches: [ master, main, dev, emulator ]
   pull_request:
-    branches: [ master, main, dev ]
+    branches: [ master, main, dev, emulator ]
   schedule:
     # run every saturday at 4:43 AM
     - cron: '43 4 * * SAT'
@@ -14,9 +14,9 @@ jobs:
   build-win32:
     runs-on: windows-latest
     steps:
-
-    # pull
-    - uses: actions/checkout@v2
+    
+    # sdl2
+    - run: vcpkg install sdl2
     
     # python 3.6 is required for pyinstaller
     - name: Set up Python3.6
@@ -39,9 +39,14 @@ jobs:
     - name: check-dependencies (2)
       run: python3 -c "from tkinter import ttk"
       
-    - name: Tree
-      run: Tree C:\hostedtoolcache\windows\Python\3.6.8/x86/Tools /F
+    # pull ------------------------
+    - uses: actions/checkout@v2
       
+    # nesm build
+    - name: NESM
+      run: cd nesm && cmake . && make 
+      
+    # pyinstaller build
     - name: build with pyinstaller
       run: pyinstaller mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
       

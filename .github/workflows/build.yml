@@ -28,7 +28,8 @@ jobs:
     - run: pwd
     - run: python3 --version
     - run: where python3
-    - run: python3 -m pip install setuptools==50.3.2 pyinstaller==4.0
+    - run: python3 -m pip install setuptools==50.3.2
+    - run: python3 -m pip install pyinstaller==4.0 -vvv
     - run: python3 -m pip install Pillow
     
     # check that dependencies installed.
@@ -39,10 +40,10 @@ jobs:
       run: python3 -c "from tkinter import ttk"
       
     - name: Tree
-      run: Tree C:\hostedtoolcache\windows\Python\3.6.8 /F
+      run: Tree C:\hostedtoolcache\windows\Python\3.6.8/x86/Tools /F
       
     - name: build with pyinstaller
-      run: ${{ env.pythonLocation }}\Tools/scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+      run: pyinstaller mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit

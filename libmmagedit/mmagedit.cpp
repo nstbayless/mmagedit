@@ -1,5 +1,6 @@
 #include "mmagedit.h"
 #include "defer.h"
+#include "any.h"
 
 #include <type_traits>
 #include <cstdint>
@@ -13,14 +14,185 @@
 #endif
 
 #include <deque>
+#include <vector>
+#include <map>
+
+// ---------------------------------------------------------------------
+// forward declarations
+
+template <typename S=const char*, typename T=error_code_t>
+	inline T error(S, T);
+
+template <typename S=const char*, typename T=error_code_t>
+	inline T error(S);
+
+// ---------------------------------------------------------------------
+// API call monitoring
+
+namespace
+{
+	// api trace active?
+	bool g_api_trace = false;
+	int g_api_trace_reentrant_lock = 0;
+
+	// stores an api trace command
+	class api_trace_t {
+		std::string m_func_name;
+		std::vector<any> m_args;
+	};
+
+	std::vector<api_trace_t> g_api_traces;
+}
+
+// all types used in any API call must be registered here.
+register_any_type(int);
+register_any_type(uint32_t);
+register_any_type(uint64_t);
+register_any_type(const char*);
+
+// maps api function name to function
+const std::map<std::string, std::function<any(std::vector<any>)> > g_api_funcs {
+	#define $(ret_t, func, ...) \
+		{#func, [](std::vector<any> v) -> any { \
+			return retv<ret_t>::anyfunc<__VA_ARGS__>(func, v.empty() ? nullptr : v.data()); \
+		}},
+	#include "api.inc"
+	#undef $
+};
+
+log_api_execute(const api_trace& t, const any& out)
+{
+	
+}
+
+error_code_t api_trace_execute(const api_trace& t)
+{
+	g_api_trace_reentrant_lock++;
+	defer(g_api_trace_reentrant_lock--);
+	try
+	{
+		const auto lookup_func_iter = g_api_funcs.find(t.m_func_name);
+		if (lookup_func_iter == g_api_funcs.end())
+		{
+			return error("no function found matching name", 2);
+		}
+
+		const auto& lookup = *lookup_func_iter;
+		log_api_execute(t, lookup(t.m_args));
+
+		return 0;
+	}
+	catch (const std::bad_cast& e)
+	{
+		return error("bad cast on api execute", 1)
+	}
+}
+
+// function name trait
+
+// begins capturing all api calls (other than those to mmagedit_api_*)
+// (also clears api trace buffer)
+void
+mmagedit_api_trace_begin()
+{
+	g_api_trace = true;
+	mmagedit_api_trace_clear();
+}
+
+// finishes capturing
+void
+mmagedit_api_trace_end()
+{
+	g_api_trace = true;
+}
+
+// clears api trace buffer
+void
+mmagedit_api_trace_clear()
+{
+	g_api_traces.clear();
+}
+
+// gets number of trace calls
+int
+mmagedit_api_trace_count()
+{
+	return g_api_traces.size();
+}
+
+// reads API call captures from a file
+// returns number of calls read
+// (also clears api trace buffer)
+error_code_t
+mmagedit_api_trace_read(const char* path)
+{
+	g_api_traces.clear();
+	return 0;
+}
+
+// writes API call captures to a file
+// returns number of calls written
+int
+mmagedit_api_trace_write(const char* path)
+{
+	return 0;
+}
+
+// writes api captures to a string
+const char*
+mmagedit_api_trace_write_string()
+{
+	return "";
+}
+
+// reads api captures from a string
+// (also clears api trace buffer)
+error_code_t
+mmagedit_api_trace_read_string(const char* s)
+{
+	g_api_traces.clear();
+	return error("not implemented", 1);
+	return 0;
+}
+
+// executes API call captures
+void
+mmagedit_api_trace_execute()
+{
+	for (const api_trace_t& trace : g_api_traces)
+	{
+		api_trace_execute(trace);
+	}
+}
+
+class api_tracer_t {
+public:
+	api_tracer_t(const char* funcname, std::vector<any> args)
+	{
+		g_api_trace_reentrant_lock++;
+		if (g_api_trace && !g_api_trace_reentrant_lock)
+		{
+			g_api_traces.emplace_back(funcname, args);
+		}
+	}
+
+	~api_tracer_t()
+	{
+		g_api_trace_reentrant_lock--;
+	}
+};
+
+#define API_TRACE(...) api_tracer_t __api_tracer__{ __func__, {__VA_ARGS__} }
+
+// --------------------------------------------------------
 
 typedef PyObject PyObjectBorrowed;
 
 #define defer_decref(pyobj) defer(Py_XDECREF(pyobj))
 #define store_string(s) (g_static_string_out = s).c_str()
 
-#define check_not_null(param) if (!param) return error("received nullptr string paramter (" #param ")")
-#define check_not_null_rv(param, rv) if (!param) return error("received nullptr string paramter (" #param ")", rv)
+#define check_not_null(param) if (!param) return error("received nullptr string parameter (" #param ")")
+#define check_not_null_rv(param, rv) if (!param) return error("received nullptr string parameter (" #param ")", rv)
 
 #define args_end nullptr
 
@@ -249,23 +421,27 @@ namespace
 int
 mmagedit_get_error_occurred()
 {
+	API_TRACE();
 	return g_error.length() > 0;
 }
 
 void mmagedit_clear_error()
 {
+	API_TRACE();
 	g_error = "";
 }
 
 const char*
 mmagedit_get_error()
 {
+	API_TRACE();
 	defer(mmagedit_clear_error());
 	return store_string(g_error);
 }
 
 void mmagedit_set_log_level(int l)
 {
+	API_TRACE(l);
 	g_log_level = l;
 }
 
@@ -273,12 +449,14 @@ void mmagedit_set_log_level(int l)
 void
 mmagedit_set_log_stdout(int v)
 {
+	API_TRACE(v);
 	g_log_stdout = !!v;
 }
 
 void
 mmagedit_set_log_count_max(int c)
 {
+	API_TRACE(c);
 	if (c >= 0)
 	{
 		g_logc = c;
@@ -289,12 +467,14 @@ mmagedit_set_log_count_max(int c)
 int
 mmagedit_get_log_count(int c)
 {
+	API_TRACE(c);
 	return g_logs.size();
 }
 
 const char*
 mmagedit_get_log_entry(int n)
 {
+	API_TRACE(n);
 	if (n >= 0 && n < g_logs.size())
 	{
 		return store_string(g_logs.at(n).first);
@@ -305,6 +485,7 @@ mmagedit_get_log_entry(int n)
 int
 mmagedit_get_log_entry_level(int n)
 {
+	API_TRACE(n);
 	if (n >= 0 && n < g_logs.size())
 	{
 		return g_logs.at(n).second;
@@ -314,6 +495,7 @@ mmagedit_get_log_entry_level(int n)
 
 int mmagedit_init(const char* path_to_mmagedit)
 {
+	API_TRACE(path_to_mmagedit);
 	check_not_null(path_to_mmagedit);
 
 	log("initializing libpython...");
@@ -421,6 +603,7 @@ int mmagedit_init(const char* path_to_mmagedit)
 int
 mmagedit_run_pystring(const char* str, int start)
 {
+	API_TRACE(str, start);
 	check_not_null(str);
 	precheck_error_python(1);
 
@@ -438,6 +621,7 @@ mmagedit_run_pystring(const char* str, int start)
 int
 mmagedit_get_python_int(int local, const char* variable_name)
 {
+	API_TRACE(local, variable_name);
 	check_not_null(variable_name);
 	precheck_error_python(0);
 
@@ -458,6 +642,7 @@ mmagedit_get_python_int(int local, const char* variable_name)
 const char*
 mmagedit_get_python_str(int local, const char* variable_name)
 {
+	API_TRACE(local, variable_name);
 	check_not_null_rv(variable_name, "");
 	precheck_error_python("");
 
@@ -477,6 +662,7 @@ mmagedit_get_python_str(int local, const char* variable_name)
 
 int mmagedit_end()
 {
+	API_TRACE();
 	Py_XDECREF(g_globals);
 	Py_XDECREF(g_locals);
 	Py_XDECREF(g_data);
@@ -489,6 +675,7 @@ int mmagedit_end()
 const char*
 mmagedit_get_name_version_date()
 {
+	API_TRACE();
 	precheck_error_python("");
 
 	PyObjectBorrowed* fn = PyObject_GetAttrString(g_constants, "get_version_and_date");
@@ -506,6 +693,7 @@ mmagedit_get_name_version_date()
 uint64_t
 mmagedit_get_version_int()
 {
+	API_TRACE();
 	precheck_error_python(0);
 
 	PyObjectBorrowed* pob = PyObject_GetAttrString(g_constants, "mmfmt");
@@ -532,7 +720,14 @@ mmagedit_get_version_int()
 uint64_t
 mmagedit_get_minimum_version_int()
 {
+	API_TRACE();
 	return min_version;
+}
+
+external const char*
+mmagedit_get_shared_library_build_date()
+{
+	return __DATE__ " " __TIME__;
 }
 
 // returns 1 andsets error to mmdata's errors if any occurred;
@@ -541,6 +736,7 @@ mmagedit_get_minimum_version_int()
 #define check_error_mmdata_rval(rval) if (error_code_t e = [](){check_error_mmdata else return 0;}()) return rval;
 static error_code_t _check_error_mmdata_impl()
 {
+	API_TRACE();
 	PyObject* result = PyObject_CallMethodObjArgsString(g_data, "errors_string", args_end);
 	check_error_python(1);
 	defer_decref(result);
@@ -556,6 +752,7 @@ static error_code_t _check_error_mmdata_impl()
 error_code_t
 mmagedit_load_rom(const char* path_to_rom)
 {
+	API_TRACE(path_to_rom);
 	precheck_error_python(1);
 	check_not_null(path_to_rom);
 
@@ -579,6 +776,7 @@ mmagedit_load_rom(const char* path_to_rom)
 error_code_t
 mmagedit_load_hack(const char* path_to_hack)
 {
+	API_TRACE(path_to_hack);
 	precheck_error_python(1);
 	check_not_null(path_to_hack);
 
@@ -602,6 +800,7 @@ mmagedit_load_hack(const char* path_to_hack)
 error_code_t
 mmagedit_write_rom(const char* path_to_rom)
 {
+	API_TRACE(path_to_rom);
 	precheck_error_python(1);
 	check_not_null(path_to_rom);
 
@@ -623,8 +822,9 @@ mmagedit_write_rom(const char* path_to_rom)
 }
 
 error_code_t
-mmagedit_write_hack(const char* path_to_hack, bool oall)
+mmagedit_write_hack(const char* path_to_hack, bool_t oall)
 {
+	API_TRACE(path_to_hack, oall);
 	precheck_error_python(1);
 	check_not_null(path_to_hack);
 
@@ -651,12 +851,14 @@ mmagedit_write_hack(const char* path_to_hack, bool oall)
 json_t
 mmagedit_get_state()
 {
+	API_TRACE();
 	return mmagedit_get_state_select("");
 }
 
 json_t
 mmagedit_get_state_select(const char* jsonpath)
 {
+	API_TRACE(jsonpath);
 	precheck_error_python("null");
 	check_not_null_rv(jsonpath, "null");
 
@@ -675,6 +877,7 @@ mmagedit_get_state_select(const char* jsonpath)
 error_code_t
 mmagedit_apply_state(json_t json)
 {
+	API_TRACE(json);
 	precheck_error_python(1);
 	
 	PyObject* str = PyString(json);
@@ -698,6 +901,7 @@ mmagedit_apply_state(json_t json)
 medtile_idx_t
 mmagedit_get_mirror_tile_idx(world_idx_t idx, medtile_idx_t in)
 {
+	API_TRACE(idx, n);
 	// validation
 	if (in < 0) return error("negative medtile idx forbidden.", -1);
 
@@ -730,24 +934,28 @@ namespace
 void
 mmagedit_hw_set_int(int c) 
 {
+	API_TRACE(c);
 	g_hello_world_int = c;
 }
 
 int
 mmagedit_hw_get_int()
 {
+	API_TRACE();
 	return g_hello_world_int;
 }
 
 const char*
 mmagedit_hw_get_str()
 {
+	API_TRACE();
 	return g_hello_world_str.c_str();
 }
 
 void
 mmagedit_hw_set_str(const char* s)
 {
+	API_TRACE(s);
 	if (!s)
 	{
 		g_hello_world_str = "(null)";
@@ -757,6 +965,9 @@ mmagedit_hw_set_str(const char* s)
 		g_hello_world_str = s;
 	}
 }
+
+// ---------------------------------------------------
+// main
 
 // just a simple test main function
 // usage: mmagedit /path/to/mmagedit.py [base.nes] [hack.txt]

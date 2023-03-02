@@ -29,11 +29,14 @@ typedef int error_code_t;
 // if string contains only "null", check for an error with mmagedit_get_error_occurred()
 typedef const char* json_t;
 
+typedef int bool_t;
 typedef int microtile_idx_t;
 typedef int medtile_idx_t;
 typedef int macrotile_idx_t;
 typedef int level_idx_t;
 typedef int world_idx_t;
+
+// BEGIN API ------------------------------------------------------------------
 
 // All returned strings are valid references until the next library call is made.
 
@@ -85,6 +88,10 @@ mmagedit_get_version_int();
 external uint64_t
 mmagedit_get_minimum_version_int();
 
+// gets build date for shared library.
+external const char*
+mmagedit_get_shared_library_build_date();
+
 // load a base rom.
 external error_code_t
 mmagedit_load_rom(const char* path_to_rom);
@@ -101,7 +108,7 @@ mmagedit_write_rom(const char* path_to_rom);
 // if "all" is false, certain details will be withheld from the hack file if they
 // have not been changed from the base ROM, including CHR data.
 external error_code_t
-mmagedit_write_hack(const char* path_to_hack, bool all);
+mmagedit_write_hack(const char* path_to_hack, bool_t all);
 
 // returns a json string containing all the data in the current state of the hack
 // if an error occurs, the return value is the string containing "null"
@@ -129,6 +136,9 @@ mmagedit_apply_state(json_t);
 // returns -1 if an error occurred.
 external medtile_idx_t
 mmagedit_get_mirror_tile_idx(world_idx_t, medtile_idx_t);
+
+// ---------------------------------------------------------------------
+// logging
 
 // set log level (default is 0 -- log nothing)
 // (this can be set before init)
@@ -184,6 +194,7 @@ mmagedit_get_python_int(int local, const char* variable_name);
 external const char*
 mmagedit_get_python_str(int local, const char* variable_name);
 
+// ---------------------------------------------------------------------
 // "hello world" functions which can be used to verify library integrity
 
 // store and retrieve an int
@@ -197,3 +208,48 @@ external const char*
 mmagedit_hw_get_str();
 external void
 mmagedit_hw_set_str(const char*);
+
+// END API -------------------------------------------------------------
+
+// ---------------------------------------------------------------------
+// API call monitoring
+
+// begins capturing all api calls (other than those to mmagedit_api_*)
+// (also clears api trace buffer)
+external void
+mmagedit_api_trace_begin();
+
+// finishes capturing
+external void
+mmagedit_api_trace_end();
+
+// clears api trace buffer
+external void
+mmagedit_api_trace_clear();
+
+// gets number of trace calls
+external int
+mmagedit_api_trace_count();
+
+// reads API call captures from a file
+// returns number of calls read
+external error_code_t
+mmagedit_api_trace_read(const char* path);
+
+// writes API call captures to a file
+// returns number of calls written
+external int
+mmagedit_api_trace_write(const char* path);
+
+// writes api captures to a string
+external const char*
+mmagedit_api_trace_write_string();
+
+// reads api captures from a string
+// (also clears api trace buffer)
+external error_code_t
+mmagedit_api_trace_read_string(const char*);
+
+// executes API call captures
+external void
+mmagedit_api_trace_execute();

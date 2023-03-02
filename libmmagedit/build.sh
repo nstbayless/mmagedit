@@ -1,4 +1,4 @@
-CPPARGS="-fPIC -static-libstdc++ -I/usr/include/python3.9/ -lpython3.9"
+CPPARGS="-fPIC -static-libstdc++ -I/usr/include/python3.9/ -lpython3.9 -std=c++11"
 
 set -e
 echo "building..."

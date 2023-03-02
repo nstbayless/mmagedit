@@ -3,7 +3,7 @@
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/nstbayless/mmagedit?svg=true)](https://ci.appveyor.com/project/nstbayless/mmagedit)
 [![Discord](https://img.shields.io/discord/708407305833676960?svg=true)](https://discord.gg/3WJYQ6a)
  
-*A cross-platform ROM editor and library for [Micro Mages](http://morphcat.de/micromages/).*
+*A cross-platform ROM editor for [Micro Mages](http://morphcat.de/micromages/).*
  
 This utility can edit levels, worlds, and tile information for Micro Mages (by [Morphcat games](http://morphcat.de/)), and it can extend the game's basic features with new elements, such as more complex level data. Made with Python3, `Pillow`, and `tkinter`. Has both a GUI and CLI.
 
@@ -15,44 +15,6 @@ MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib
 **Linux**: See "Launching (Ubuntu)" below.
 
 <center><img src="screenshot.png" alt="Screenshot of MMagEdit" /></center>
-
-## Shared Library
-
-You can build [mmagedit.cpp](./libmmagedit/mmagedit.cpp) as a shared library. To do so, you must compile the cpp file and link it to libpython35 or higher. Documentation for the library interface can be found in [mmagedit.h](./libmmagedit/mmagedit.h). A pre-compiled linux SO can be found [here](https://github.com/nstbayless/mmagedit/releases/tag/v1.25-lib).
-
-Here's a simple example of usage:
-
-```C++
-// The .py files in this repository are required
-mmagedit_init("/path/to/mmagedit.py");
-
-// Check for errors
-// (This should be done after every library call,
-// but is omitted hereafter for clarity.)
-if (mmagedit_get_error_occurred())
-{
-    printf("%s", mmagedit_get_error());
-    exit(1);
-}
-
-// A micro mages ROM is necessary.
-mmagedit_load_rom("/path/to/micromages.nes");
-
-// dump the entire state of the ROM to JSON
-const char* json_state = mmagedit_get_state();
-
-// select individual elements of the ROM state
-const char* objects_in_tower_2_1 = mmagedit_get_state_select(".levels[3].objects");
-
-// remove all objects from level 2
-mmagedit_apply_state("{\"levels\": [{}, {\"objects\": []}]}");
-
-// export modified ROM
-mmagedit_write_rom("/path/to/modified_micromages.nes");
-
-// shutdown
-mmagedit_end();
-```
 
 ## GUI Usage
 

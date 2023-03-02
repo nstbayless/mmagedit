@@ -21,27 +21,9 @@ install:
     #- SET PATH=%PATH%;C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin
 
 build_script:
-    - copy python38\* libmmagedit
-    - cd libmmagedit
-    - g++ --version
-    - dir
-    # build libmmagedit.dll
-    - g++ -shared mmagedit.cpp -static-libgcc -static-libstdc++ -o libmmagedit.dll -L. -I. -lpython38 -DLOCAL_PYTHON_H -Wl,-Bstatic -lstdc++ -lpthread
-    # build mmagedit test
-    - g++ mmagedit.cpp -static-libgcc -static-libstdc++ -o mmagedit_test.exe -L. -I. -lpython38 -DLOCAL_PYTHON_H -DMAIN -Wl,-Bstatic -lstdc++ -lpthread
-    - dir
-    # - mmagedit_test.exe ../mmagedit.py
-    - cd ..
     - C:\Python36\Scripts\pyinstaller.exe mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
     - move dist\\mmagedit mmagedit
     - move examples mmagedit
-    - cd mmagedit
-    - mkdir libmmagedit
-    - cd ..
-    # commenting this out, we don't need libmmagedit.
-    #- move libmmagedit\libmmagedit.dll mmagedit\libmmagedit
-    #- move libmmagedit\mmagedit_test.exe mmagedit\libmmagedit
-    #- move python38\* mmagedit\libmmagedit
 
 after_build:
     - C:\\Python36\\python.exe mmagedit.py --help

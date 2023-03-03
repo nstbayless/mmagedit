@@ -45,6 +45,9 @@ def usage():
     print("--json: serialize data to json")
     print("--select .field[a].field2[b:c]: (etc) select elements of json out")
     print("--apply {...}: apply json to data")
+    print("--level x: exported rom jumps to level x at start (x can be 1-13)")
+    print("--hard: start in hard mode (requires --level)")
+    print("--hell: start in hell mode (requires --level)")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -73,6 +76,8 @@ def main():
     dojson = "--json" in sys.argv
     jsonpath = ""
     jsonapply = None
+    startlevel = 0
+    starthard = 0
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -120,6 +125,15 @@ def main():
 
     if "--apply" in sys.argv[2:-1]:
         jsonapply = sys.argv[sys.argv.index("--apply") + 1]
+        
+    if "--level" in sys.argv[2:-1]:
+        startlevel = int(sys.argv[sys.argv.index("--level") + 1])
+        
+    if "--hard" in sys.argv[2:]:
+        starthard = 1
+        
+    if "--hell" in sys.argv[2:]:
+        starthard = 2
 
     if dojson:
         gui = False
@@ -209,6 +223,9 @@ def main():
             j = mmdata.serialize_json_str(jsonpath)
             result = result and j != "null"
             print(j)
+            
+        mmdata.startlevel = startlevel
+        mmdata.startdifficulty = starthard
 
         if exportnes != "":
             result = result and mmdata.write(exportnes)

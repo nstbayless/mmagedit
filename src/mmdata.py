@@ -322,15 +322,16 @@ class LevelMacroRow:
             b |= (self.macro_tiles[i]) << 1
             self.data.write_byte(rom + 3 - i, b)
 
+def idx_to_level_and_world(idx):
+    if idx == 0xc:
+        return 3,3
+    else:
+        return idx % 3, int(idx / 3)
+
 class Level:
     def __init__(self, data, idx):
         self.level_idx = idx
-        if idx == 0xc:
-            self.world_idx = 3
-            self.world_sublevel = 3
-        else:
-            self.world_idx = int(idx / 3)
-            self.world_sublevel = idx % 3
+        self.world_idx, self.world_sublevel = idx_to_level_and_world(idx)
         self.world = data.worlds[self.world_idx]
         self.data = data
         self.macro_rows = []
@@ -1735,6 +1736,62 @@ class MMData:
     
     def has_mod(self, mod):
         return mod in self.mods and self.mods[mod]
+        
+    def write_quickstart_patch(self):
+        # writes code that will jump straight to a certain level and difficulty
+        if self.startlevel == 0:
+            return
+        addr = self.ram_to_rom(constants.ram_intro_update)
+        
+        # LDA startlevel
+        self.write_byte(addr, 0xA9)
+        addr += 1
+        self.write_byte(addr, self.startlevel-1)
+        addr += 1
+        
+        # STA level
+        self.write_byte(addr, 0x85)
+        addr += 1
+        self.write_byte(addr, 0xBC)
+        addr += 1
+        
+        # LDA startworld
+        world, level = idx_to_level_and_world(self.startlevel)
+        self.write_byte(addr, 0xA9)
+        addr += 1
+        self.write_byte(addr, world)
+        addr += 1
+        
+        # STA world
+        self.write_byte(addr, 0x85)
+        addr += 1
+        self.write_byte(addr, 0xBD)
+        addr += 1
+        
+        #LDA difficulty
+        difficulty = [0x00, 0x80, 0xC0][clamp_hoi(int(self.startdifficulty), 0, 3)]
+        self.write_byte(addr, 0xA9)
+        addr += 1
+        self.write_byte(addr, difficulty)
+        addr += 1
+        
+        # STA difficulty
+        self.write_byte(addr, 0x85)
+        addr += 1
+        self.write_byte(addr, 0x6F)
+        addr += 1
+        
+        # LDA 0
+        self.write_byte(addr, 0xA9)
+        addr += 1
+        self.write_byte(addr, 0x0)
+        addr += 1
+        
+        # JMP game start
+        self.write_byte(addr, 0x4C)
+        addr += 1
+        self.write_word(addr, constants.ram_gamestart)
+        addr += 2
     
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
@@ -1898,6 +1955,8 @@ class MMData:
                     self.ram_to_rom(constants.ram_mod_extended_objects[i]),
                     constants.ram_mod_extended_objects_replacement[i]
                 )
+                
+        self.write_quickstart_patch()
         
         return True
         
@@ -1942,6 +2001,8 @@ class MMData:
         self.mapper_extension = False
         self.bin = None
         self.errors = []
+        self.startlevel = 0
+        self.startdifficulty = 0
         self.object_config = [
             constants.object_data[gid]["config"](self, gid) if "config" in constants.object_data[gid] else None
             for gid in range(len(constants.object_data))

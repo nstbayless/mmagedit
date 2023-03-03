@@ -8,7 +8,7 @@ on:
   schedule:
     # run every saturday at 4:43 AM
     - cron: '43 4 * * SAT'
-  workflow_dispatch:
+  workflow_dispatch: # can run this manually
 jobs:  
   # 32-bit windows build
   build-win32:

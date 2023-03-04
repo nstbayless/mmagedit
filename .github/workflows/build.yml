@@ -18,6 +18,9 @@ jobs:
     # sdl2
     - run: vcpkg install sdl2 --triplet x86-windows
     
+    - run: find -iname "*.cmake" C:/vcpkg
+      continue-on-error: true
+    
     # python 3.6 is required for pyinstaller
     - name: Set up Python3.6
       uses: actions/setup-python@v4

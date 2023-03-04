@@ -16,11 +16,8 @@ jobs:
     steps:
     
     # sdl2
-    - run: vcpkg install sdl2
-    
-    - env:
-        VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      run: tree /F ${{ env.VCPKG_ROOT }}
+    - run: where vcpkg; which vcpkg;
+    - run: vcpkg install sdl2 --triplet x86-windows
     
     # python 3.6 is required for pyinstaller
     - name: Set up Python3.6

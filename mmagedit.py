@@ -2,7 +2,6 @@ import sys
 from array import array
 from src.mmdata import MMData
 import os
-from src import emulaunch
 
 mmageditpath = os.path.dirname(os.path.realpath(__file__))
 

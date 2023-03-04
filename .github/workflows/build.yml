@@ -31,7 +31,7 @@ jobs:
     - name: NESM
       env:
         VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      run: cd nesm && cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake . && make
+      run: cd nesm && cmake -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake . && make
 
     # download dependencies
     - run: pwd

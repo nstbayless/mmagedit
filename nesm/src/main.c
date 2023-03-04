@@ -19,6 +19,7 @@ SDL_Renderer*       renderer = 0;
 SDL_Texture*        texture = 0;
 SDL_GameController* controller[2];
 SDL_AudioDeviceID   audio_device_id;
+static int quit = 0;
 
 typedef struct ring_buf_t ring_buf_t;
 struct ring_buf_t
@@ -93,14 +94,16 @@ nes_controller_state on_nes_input(int controller_id, void* client)
     if (controller_id == 0)
     {
         const uint8_t* keys = SDL_GetKeyboardState(0);
-        state.up    = keys[SDL_SCANCODE_W];
-        state.down  = keys[SDL_SCANCODE_S];
-        state.left  = keys[SDL_SCANCODE_A];
-        state.right = keys[SDL_SCANCODE_D];
-        state.A     = keys[SDL_SCANCODE_J];
-        state.B     = keys[SDL_SCANCODE_K];
+        state.up    = keys[SDL_SCANCODE_W] | keys[SDL_SCANCODE_UP];
+        state.down  = keys[SDL_SCANCODE_S] | keys[SDL_SCANCODE_DOWN];
+        state.left  = keys[SDL_SCANCODE_A] | keys[SDL_SCANCODE_LEFT];
+        state.right = keys[SDL_SCANCODE_D] | keys[SDL_SCANCODE_RIGHT];
+        state.A     = keys[SDL_SCANCODE_J] | keys[SDL_SCANCODE_Z];
+        state.B     = keys[SDL_SCANCODE_K] | keys[SDL_SCANCODE_X];
         state.select = keys[SDL_SCANCODE_TAB];
         state.start  = keys[SDL_SCANCODE_RETURN];
+        
+        if (keys[SDL_SCANCODE_ESCAPE]) quit = 1;
 
         if (controller[0])
         {
@@ -238,6 +241,10 @@ void handle_shortcut_key(SDL_Scancode key)
             SDL_SetWindowSize(wnd, TEXTURE_WIDTH * wnd_scale, TEXTURE_HEIGHT * wnd_scale);
         }
     }
+    if (keys[SDL_SCANCODE_ESCAPE])
+    {
+        quit = 1;
+    }
 }
 
 void handle_joystick_added(uint32_t index)
@@ -261,7 +268,6 @@ int main(int argc, char** argv)
 {
     const char*     rom_path = argc > 1 ? argv[1] : "rom.nes";
     char            title[256];
-    int             quit = 0;
     nes_config      config;
     nes_system*     system = 0;
     SDL_AudioSpec   audio_spec_desired, audio_spec_obtained;

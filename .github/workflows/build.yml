@@ -23,6 +23,13 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.6'
+        
+    # pull ------------------------
+    - uses: actions/checkout@v2
+    
+    # nesm build
+    - name: NESM
+      run: cd nesm && cmake . && make
 
     # download dependencies
     - run: pwd
@@ -38,13 +45,6 @@ jobs:
      
     - name: check-dependencies (2)
       run: python3 -c "from tkinter import ttk"
-      
-    # pull ------------------------
-    - uses: actions/checkout@v2
-      
-    # nesm build
-    - name: NESM
-      run: cd nesm && cmake . && make 
       
     # pyinstaller build
     - name: build with pyinstaller

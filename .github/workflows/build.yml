@@ -16,8 +16,6 @@ jobs:
     steps:
     
     # sdl2
-    - run: where vcpkg; which vcpkg;
-    - run: tree /F C:/vcpkg; tree /F C:\\vcpkg;
     - run: vcpkg install sdl2 --triplet x86-windows
     
     # python 3.6 is required for pyinstaller
@@ -32,8 +30,8 @@ jobs:
     # nesm build
     - name: NESM
       env:
-        VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      run: cd nesm && cmake -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake . && make
+        VCPKG_ROOT: C:\\vcpkg
+      run: cd nesm && cmake -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}\\scripts\\buildsystems\\vcpkg.cmake . && make
 
     # download dependencies
     - run: pwd

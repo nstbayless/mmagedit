@@ -16,7 +16,7 @@ jobs:
     steps:
     
     # sdl2
-    - run: vcpkg install sdl2 --triplet x86-windows
+    - run: vcpkg install sdl2 --triplet x64-windows
     - run: tree /f /a C:/vcpkg/installed/
     - run: tree /f /a C:/vcpkg/
     

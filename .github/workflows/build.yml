@@ -17,7 +17,7 @@ jobs:
     
     # sdl2
     - run: where vcpkg; which vcpkg;
-    - run: tree /F C:\\vcpkg\\vcpkg
+    - run: tree /F C:/vcpkg; tree /F C:\\vcpkg;
     - run: vcpkg install sdl2 --triplet x86-windows
     
     # python 3.6 is required for pyinstaller

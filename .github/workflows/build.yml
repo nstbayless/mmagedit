@@ -17,6 +17,8 @@ jobs:
     
     # sdl2
     - run: vcpkg install sdl2 --triplet x86-windows
+    - run: tree /a C:/vcpkg
+    - run: tree /a %AppData%
     
     - run: find -iname "*.cmake" C:/vcpkg
       continue-on-error: true

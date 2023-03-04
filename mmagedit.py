@@ -2,6 +2,9 @@ import sys
 from array import array
 from src.mmdata import MMData
 import os
+from src import emulaunch
+
+mmageditpath = os.path.dirname(os.path.realpath(__file__))
 
 # as-lib
 as_lib = "--as-lib" in sys.argv
@@ -170,7 +173,7 @@ def main():
             else:
                 # load whatever nes file is in the folder.
                 nesfiles = []
-                for file in os.listdir(os.path.dirname(os.path.realpath(__file__))):
+                for file in os.listdir(mmageditpath):
                     if file.lower().endswith(".nes"):
                         nesfiles.append(file)
                 if len(nesfiles) > 1:

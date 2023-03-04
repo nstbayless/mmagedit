@@ -1,4 +1,5 @@
 from src.util import *
+from src import emulaunch
 
 mmname = "MMagEdit v1.27"
 mmrepo = "https://github.com/nstbayless/mmagedit"
@@ -15,12 +16,15 @@ def get_version_and_date():
     day = sf[6:8]
     return mmname + ": " + day + " " + months[month] + " " + year
 
+def emucredits():
+    return ""
+
 mminfo = """
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
 """ + get_version_and_date() + """.
 
-Special thanks to Julius and Leaf_It.
+Special thanks to Julius, Leaf_It, Geek_Joystick, and dayofni.""" + emucredits() + """
 
 Please support Morphcat Games.
 """.strip()

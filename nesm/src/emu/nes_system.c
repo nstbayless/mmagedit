@@ -33,10 +33,10 @@ struct nes_system
     uint8_t         ram[0x800];
 };
 
-nes_system* nes_system_create(const char* rom_path, nes_config* config)
+nes_system* nes_system_create(FILE* rom_file, nes_config* config)
 {
     nes_system* system = (nes_system*)malloc(sizeof(nes_system));
-    system->cartridge = nes_rom_load_cartridge(rom_path);
+    system->cartridge = nes_rom_load_cartridge(rom_file);
     if (system->cartridge == NULL)
     {
         return NULL;

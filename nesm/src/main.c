@@ -264,34 +264,68 @@ void handle_joystick_removed(uint32_t index)
     }
 }
 
-int main(int argc, char** argv)
+#ifdef _WIN32
+#include <windows.h>
+#include <stringapiset.h>
+typedef wchar_t xchar_t;
+#define xstr(s) L##s
+#define snxprintf snwprintf
+#define xprintf wprintf
+#define xstrcmp wcscmp
+#define xstrlen wcslen
+#define xfopen _wfopen
+#else
+typedef char xchar_t;
+#define snxprintf snprintf
+#define xprintf printf
+#define xstrcmp strcmp
+#define xstr(s) s
+#define xstrlen strlen
+#define xfopen fopen
+#endif
+
+
+int main(int argc, xchar_t** argv)
 {
-    return 52;
-    const char*     rom_path = argc > 1 ? argv[1] : "rom.nes";
+    const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
     char            title[256];
     nes_config      config;
     nes_system*     system = 0;
     SDL_AudioSpec   audio_spec_desired, audio_spec_obtained;
     
-    if (strcmp(rom_path, "-h") == 0 || strcmp(rom_path, "--help") == 0 || argc <= 1)
+    if (xstrcmp(rom_path, xstr("-h")) == 0 || xstrcmp(rom_path, xstr("--help")) == 0 || argc <= 1)
     {
-        printf("Usage:\n  %s path/to/rom.nes\n", argv[0]);
+        xprintf("Usage:\n  %s path/to/rom.nes\n", argv[0]);
         return argc <= 1;
     }
 
     init_audio_ring_buf();
 
-    snprintf(title, 256, "NESM - %s", rom_path);
+    #ifdef _WIN32
+    title = "NESM"
+    #else
+    snxprintf(title, 256, "NESM - %s", rom_path);
+    #endif
 
     config.client_data = 0;
     config.input_callback = &on_nes_input;
     config.video_callback = &on_nes_video;
     config.audio_callback = &on_nes_audio;
-
-    system = nes_system_create(rom_path, &config);
+    
+    // open ROM file
+    FILE* rom_file = xfopen(rom_path, xstr("rb"));
+    if (!rom_file)
+    {
+        fprintf(stderr, "Unable to open ROM file.");
+        return -1;
+    }
+    
+    system = nes_system_create(rom_file, &config);
+    fclose(rom_file);
+    
     if (!system)
     {
-        fprintf(stderr, "Failed to initialized nes system. Please ensure a valid ROM is provided.\n");
+        fprintf(stderr, "Failed to initialized nes system.\n");
         return -1;
     }
 
@@ -422,9 +456,10 @@ int main(int argc, char** argv)
 }
 
 #ifdef _WIN32
-int WinMain(int argc, char** argv)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 {
-    return 53;
-    //return main(argc, argv);
+    int argc;
+    char** argv = CommandLineToArgvW(lpCmdLine, &argc);
+    return main(argc, argv);
 }
 #endif

@@ -70,6 +70,7 @@ jobs:
     - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe']).returncode)"
       continue-on-error: true
     - run: dumpbin /dependents nesm\\Release\\nesm.exe
+      continue-on-error: true
       
     # pyinstaller build
     - name: build with pyinstaller

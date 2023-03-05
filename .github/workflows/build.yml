@@ -67,6 +67,8 @@ jobs:
       run: dir && nesm.exe --help
       continue-on-error: true
       working-directory: nesm/Release
+    - run: & "nesm/Release/nesm.exe" --help
+      continue-on-error: true
       
     # pyinstaller build
     - name: build with pyinstaller

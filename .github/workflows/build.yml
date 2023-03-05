@@ -36,7 +36,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          ${{ env.RUNNER_TOOL_CACHE }}/windows/Python/3.6.8/x64
+          ${{ env.RUNNER_TOOL_CACHE }}/python/3.6.8/x64
         key: ${{ runner.os }}-py36
       
     # python 3.6 is required for pyinstaller

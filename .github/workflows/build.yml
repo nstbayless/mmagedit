@@ -37,6 +37,7 @@ jobs:
     - run: python3 -m pip install setuptools==50.3.2
     - run: python3 -m pip install pyinstaller==4.0 -vvv
     - run: python3 -m pip install Pillow
+    - run: python3 -m pip list -v
     
     # check that dependencies installed.
     - name: check-dependencies (1)
@@ -53,7 +54,7 @@ jobs:
       env:
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
-      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build --config Release .
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build . --config Release
       
     # pyinstaller build
     - name: build with pyinstaller

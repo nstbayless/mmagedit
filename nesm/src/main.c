@@ -264,7 +264,7 @@ void handle_joystick_removed(uint32_t index)
     }
 }
 
-int main(int argc, char** argv)
+int __cdecl main(int argc, char** argv)
 {
     const char*     rom_path = argc > 1 ? argv[1] : "rom.nes";
     char            title[256];

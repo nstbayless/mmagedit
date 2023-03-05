@@ -29,21 +29,68 @@ jobs:
     - name: Install SDL2
       if: steps.vcpkg-sdl2.outputs.cache-hit != 'true'
       run: vcpkg install sdl2 --triplet x64-windows
+        
+    # pull ------------------------
+    - uses: actions/checkout@v2
+    
+    # nesm build
+    - name: build nesm
+      env:
+        CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
+        INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build . --config Release
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe', '-h']).returncode)"
+      continue-on-error: true
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe']).returncode)"
+      continue-on-error: true
+    - run: dumpbin /dependents nesm\\Release\\nesm.exe
+      continue-on-error: true
+    - run: ldd nesm\\Release\\nesm.exe
+      continue-on-error: true
       
-    - name: Cached MingW
-      id: mingw-cache
+    # python
+    - name: Cached Python3.6
+      id: py36
       uses: actions/cache@v3
       with:
         path: |
-          C:/ProgramData/chocolatey
-        key: ${{ runner.os }}-mingw
+          ${{ env.RUNNER_TOOL_CACHE }}/python/3.6.8/x64
+        key: ${{ runner.os }}-py36
       
-    - name: Set up MinGW
-      if: steps.mingw-cache.outputs.cache-hit != 'true'
-      uses: egor-tensin/setup-mingw@v2
+    # python 3.6 is required for pyinstaller
+    # TODO: cache this.
+    - name: Set up Python3.6
+      uses: actions/setup-python@v4
       with:
-        platform: x64
+        python-version: '3.6'
+    - run: python3 -m pip install setuptools==50.3.2
+    - run: python3 -m pip install pyinstaller==4.0 -vvv
+    - run: python3 -m pip install Pillow==8.4.0
     
-    - run: where gcc
-      continue-on-error: true
-        
+    # check that dependencies installed.
+    - name: check-dependencies (1)
+      run: python3 -c "from PIL import Image, ImageDraw, ImageOps"
+     
+    - name: check-dependencies (2)
+      run: python3 -c "from tkinter import ttk"
+      
+    # pyinstaller build
+    - name: build with pyinstaller
+      run: pyinstaller mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
+      
+    - run: move dist\\mmagedit mmagedit
+    - run: move examples mmagedit
+    - run: copy nesm/Release/nesm.exe mmagedit
+    - run: copy C:\\vcpkg\\installed\\x64-windows\\bin\\SDL2.dll mmagedit
+    
+    # test
+    - run: python3 mmagedit.py --help
+    - run: python3 mmagedit.py --deps
+    - run: mmagedit\\mmagedit.exe --help
+    - run: mmagedit\\mmagedit.exe --deps
+    
+    # release
+    - uses: actions/upload-artifact@v2
+      with:
+        name: mmagedit
+        path: mmagedit/

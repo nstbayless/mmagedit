@@ -266,6 +266,7 @@ void handle_joystick_removed(uint32_t index)
 
 int main(int argc, char** argv)
 {
+    return 52;
     const char*     rom_path = argc > 1 ? argv[1] : "rom.nes";
     char            title[256];
     nes_config      config;
@@ -423,6 +424,7 @@ int main(int argc, char** argv)
 #ifdef _WIN32
 int WinMain(int argc, char** argv)
 {
-    return main(argc, argv);
+    return 53;
+    //return main(argc, argv);
 }
 #endif

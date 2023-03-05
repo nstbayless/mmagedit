@@ -35,7 +35,7 @@ jobs:
 
     - name: Install SDL2
       if: steps.vcpkg-sdl2.outputs.cache-hit != 'true'
-    - run: vcpkg install sdl2 --triplet x64-windows
+      run: vcpkg install sdl2 --triplet x64-windows
     
     - run: tree /f /a C:/vcpkg/installed/
     - run: tree /f /a C:/vcpkg/

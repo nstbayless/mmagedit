@@ -56,18 +56,7 @@ jobs:
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
       run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build . --config Release
-    - run: chmod a+x nesm.exe
-      continue-on-error: true
-      working-directory: nesm/Release
-    - run: Set-ItemProperty -Path nesm.exe -Name IsReadOnly -Value $false
-      continue-on-error: true
-      working-directory: nesm/Release
-    - env:
-        PATH: ${{env.PATH}}:${{ github.workspace }}/nesm/Release
-      run: dir && nesm.exe --help
-      continue-on-error: true
-      working-directory: nesm/Release
-    - run: "\"nesm/Release/nesm.exe\" --help"
+    - run: "\"nesm/Release/nesm.exe\""
       continue-on-error: true
       
     # pyinstaller build

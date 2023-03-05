@@ -40,7 +40,7 @@ jobs:
         VCPKG_ROOT: C:\\vcpkg
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
-      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=${{ env.VCPKG_ROOT }}/include/SDL2 -DSDL2_LIBRARY=${{ env.VCPKG_ROOT }}/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build .
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=${{ env.VCPKG_ROOT }}/include/SDL2 -DSDL2_LIBRARY=${{ env.VCPKG_ROOT }}/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake -DSDL2_LIBRARY=${{ env.VCPKG_ROOT }}/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" --build .
 
     # python 3.6 is required for pyinstaller
     - name: Set up Python3.6

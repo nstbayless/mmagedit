@@ -38,7 +38,7 @@ jobs:
     - name: NESM
       env:
         VCPKG_ROOT: C:\\vcpkg
-      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=${{ env.VCPKG_ROOT }}/include/SDL2 -DSDL2_LIBRARY=${{ env.VCPKG_ROOT }}/lib/SDL2.lib . && cmake --build .
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=${{ env.VCPKG_ROOT }}/include/SDL2 -DSDL2_LIBRARY=${{ env.VCPKG_ROOT }}/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\include\\SDL2" . && cmake --build .
 
     # python 3.6 is required for pyinstaller
     - name: Set up Python3.6

@@ -25,6 +25,6 @@ def emulator_test():
     if not emu:
         return False
     
-    result = subprocess.run([emu, "--help"], capture_output=True).returncode
+    result = subprocess.run([emu, "--help"], stdout=subprocess.PIPE).returncode
     
     return result == 0

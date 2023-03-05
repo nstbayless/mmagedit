@@ -51,12 +51,12 @@ void ring_buf_write(ring_buf_t* ring, void* data, size_t data_size)
 
     if (data_size <= wrap_size)
     {
-        memcpy(ring->buffer + ring->write, data, data_size);
+        memcpy((char*)ring->buffer + ring->write, data, data_size);
     }
     else
     {
-        memcpy(ring->buffer + ring->write, data, wrap_size);
-        memcpy(ring->buffer, data + wrap_size, data_size - wrap_size);
+        memcpy((char*)ring->buffer + ring->write, data, wrap_size);
+        memcpy((char*)ring->buffer, data + wrap_size, data_size - wrap_size);
     }
 
     ring->write = (ring->write + data_size) % ring->capacity;

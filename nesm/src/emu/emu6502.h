@@ -4,7 +4,6 @@
 #include "emu6502_opcodes.h"
 #include <stdint.h>
 #include <memory.h>
-#include <unistd.h>
 
 enum cpu_rw_mode
 {

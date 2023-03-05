@@ -56,7 +56,9 @@ jobs:
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
       run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build . --config Release
-    - run: "\"nesm/Release/nesm.exe\""
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe', '-h']).returncode)"
+      continue-on-error: true
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe']).returncode)"
       continue-on-error: true
       
     # pyinstaller build

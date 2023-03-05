@@ -414,7 +414,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-#ifndef _WIN32
+#ifdef _WIN32
 int WinMain(int argc, char** argv)
 {
     return main(argc, argv);

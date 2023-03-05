@@ -10,6 +10,7 @@ as_lib = "--as-lib" in sys.argv
 
 gui_available=False
 img_available=False
+nesm_available=False
 if not as_lib:
     try:
         import src.mmimage
@@ -21,6 +22,10 @@ if not as_lib:
         gui_available=True
     except ImportError as e:
         pass
+
+nesmname = "nesm.exe" if os.name == 'nt' else "nesm"
+if os.path.isfile(os.path.join(mmageditpath, nesmname)) or os.path.isfile(os.path.join(mmageditpath, "nesm", nesmname)):
+    nesm_available = True
     
 from src import constants
 from src import util
@@ -62,6 +67,9 @@ def main():
             sys.exit(1)
         elif not gui_available:
             print("Not available: gui")
+            sys.exit(1)
+        elif not nesm_available:
+            print("Not available: nesm")
             sys.exit(1)
         print("All modules available.")
         sys.exit(0)

@@ -34,12 +34,15 @@ jobs:
       uses: egor-tensin/setup-mingw@v2
       with:
         platform: x64
+    
+    - run: where gcc
+      continue-on-error: true
         
     # pull ------------------------
     - uses: actions/checkout@v2
     
     # nesm build
-    - name: NESM
+    - name: build nesm
       env:
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2

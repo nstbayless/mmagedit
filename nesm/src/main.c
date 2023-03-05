@@ -272,7 +272,7 @@ int main(int argc, char** argv)
     nes_system*     system = 0;
     SDL_AudioSpec   audio_spec_desired, audio_spec_obtained;
     
-    if (strcmp(rom_path, "-h") == 0 || strcmp(rom_path, "--help") == 0)
+    if (strcmp(rom_path, "-h") == 0 || strcmp(rom_path, "--help") == 0 || argc <= 1)
     {
         printf("Usage:\n  %s path/to/rom.nes\n", argv[0]);
         return 0;

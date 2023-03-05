@@ -53,7 +53,7 @@ jobs:
       env:
         CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
         INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
-      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build .
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" -DCMAKE_BUILD_TYPE=Release . && cmake --build .
       
     # pyinstaller build
     - name: build with pyinstaller
@@ -61,7 +61,7 @@ jobs:
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit
-    - run: move nesm/nesm.exe mmagedit
+    - run: move nesm/Release/nesm.exe mmagedit
     - run: move C:\\vcpkg\\installed\\x64-windows\\lib\\SDL2.dll mmagedit
     
     # test

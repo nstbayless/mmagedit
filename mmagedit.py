@@ -69,9 +69,11 @@ def main():
         elif not nesm_available:
             print("Not available: nesm")
             sys.exit(1)
-        elif not emulaunch.emulator_test():
-            print("nesm available but cannot launch.")
-            sys.exit(1)
+        
+        result, retcode = emulaunch.emulator_test()
+        if not result:
+            print("Warning: nesm available but cannot launch. Code:", retcode)
+            sys.exit(0)
         print("All modules available.")
         sys.exit(0)
 

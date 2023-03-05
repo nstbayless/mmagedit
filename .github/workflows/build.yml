@@ -30,6 +30,15 @@ jobs:
       if: steps.vcpkg-sdl2.outputs.cache-hit != 'true'
       run: vcpkg install sdl2 --triplet x64-windows
       
+    # python
+    - name: Cached Python3.6
+      id: py36
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ env.RUNNER_TOOL_CACHE }}/windows/Python/3.6.8/x64
+        key: ${{ runner.os }}-py36
+      
     # python 3.6 is required for pyinstaller
     # TODO: cache this.
     - name: Set up Python3.6

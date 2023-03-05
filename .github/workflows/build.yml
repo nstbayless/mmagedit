@@ -62,7 +62,9 @@ jobs:
     - run: Set-ItemProperty -Path nesm.exe -Name IsReadOnly -Value $false
       continue-on-error: true
       working-directory: nesm/Release
-    - run: dir nesm.exe --help
+    - env:
+        PATH: ${{env.PATH}}:${{ github.workspace }}/nesm/Release
+      run: dir && nesm.exe --help
       continue-on-error: true
       working-directory: nesm/Release
       

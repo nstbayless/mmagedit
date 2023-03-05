@@ -17,7 +17,7 @@ def find_emulator():
     nesmname = "nesm.exe" if os.name == 'nt' else "nesm"
     for root, dirs, files in os.walk(mmageditpath):
         if nesmname in files:
-            return os.path.join(root, nesmname)
+            return os.path.abspath(os.path.join(root, nesmname))
     return None
 
 def emulator_test():
@@ -25,6 +25,6 @@ def emulator_test():
     if not emu:
         return False
     
-    result = subprocess.run([emu, "--help"], stdout=subprocess.PIPE).returncode
-    
-    return result == 0
+    result = subprocess.run([emu, "--help"], stdout=subprocess.PIPE)
+    print(result.stdout.decode())
+    return result.returncode == 0

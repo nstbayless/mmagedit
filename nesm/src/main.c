@@ -271,6 +271,12 @@ int main(int argc, char** argv)
     nes_config      config;
     nes_system*     system = 0;
     SDL_AudioSpec   audio_spec_desired, audio_spec_obtained;
+    
+    if (strcmp(rom_path, "-h") == 0 || strcmp(rom_path, "--help") == 0)
+    {
+        printf("Usage:\n  %s path/to/rom.nes\n", argv[0]);
+        return 0;
+    }
 
     init_audio_ring_buf();
 
@@ -284,7 +290,7 @@ int main(int argc, char** argv)
     system = nes_system_create(rom_path, &config);
     if (!system)
     {
-        fprintf(stderr, "Failed to initialized nes system.\n");
+        fprintf(stderr, "Failed to initialized nes system. Please ensure a valid ROM is provided.\n");
         return -1;
     }
 

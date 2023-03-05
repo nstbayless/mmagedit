@@ -1,6 +1,7 @@
 import sys
 from array import array
 from src.mmdata import MMData
+from src import emulaunch
 import os
 
 mmageditpath = os.path.dirname(os.path.realpath(__file__))
@@ -22,10 +23,7 @@ if not as_lib:
         gui_available=True
     except ImportError as e:
         pass
-
-nesmname = "nesm.exe" if os.name == 'nt' else "nesm"
-if os.path.isfile(os.path.join(mmageditpath, nesmname)) or os.path.isfile(os.path.join(mmageditpath, "nesm", nesmname)):
-    nesm_available = True
+    nesm_available = emulaunch.find_emulator()
     
 from src import constants
 from src import util
@@ -70,6 +68,9 @@ def main():
             sys.exit(1)
         elif not nesm_available:
             print("Not available: nesm")
+            sys.exit(1)
+        elif not emulaunch.emulator_test():
+            print("nesm available but cannot launch.")
             sys.exit(1)
         print("All modules available.")
         sys.exit(0)

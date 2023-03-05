@@ -2,12 +2,12 @@ name: 'Build'
 
 on:
   push:
-    branches: [ master, main, dev, emulator ]
+    branches: [ master, main, dev ]
   pull_request:
-    branches: [ master, main, dev, emulator ]
+    branches: [ master, main, dev ]
   schedule:
-    # run every saturday at 4:43 AM
-    - cron: '43 4 * * SAT'
+    # run every saturday at 4:43 AM PST
+    - cron: '43 12 * * SAT'
   workflow_dispatch: # can run this manually
 jobs:  
   # 32-bit windows build
@@ -69,7 +69,7 @@ jobs:
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit
-    - run: move nesm/Release/nesm.exe mmagedit
+    - run: copy nesm/Release/nesm.exe mmagedit
     - run: move C:\\vcpkg\\installed\\x64-windows\\bin\\SDL2.dll mmagedit
     
     # test

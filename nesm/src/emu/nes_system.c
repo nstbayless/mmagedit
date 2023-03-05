@@ -37,6 +37,10 @@ nes_system* nes_system_create(const char* rom_path, nes_config* config)
 {
     nes_system* system = (nes_system*)malloc(sizeof(nes_system));
     system->cartridge = nes_rom_load_cartridge(rom_path);
+    if (system->cartridge == NULL)
+    {
+        return NULL;
+    }
     system->own_cartridge = 1;
     system->config = *config;
     system->mapper = system->cartridge->mapper;

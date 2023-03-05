@@ -274,6 +274,14 @@ typedef wchar_t xchar_t;
 #define xstrcmp wcscmp
 #define xstrlen wcslen
 #define xfopen _wfopen
+
+int main(int argc, xchar_t** argv);
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+{
+    int argc;
+    char** argv = CommandLineToArgvW(lpCmdLine, &argc);
+    return main(argc, argv);
+}
 #else
 typedef char xchar_t;
 #define snxprintf snprintf
@@ -454,12 +462,3 @@ int main(int argc, xchar_t** argv)
     SDL_Quit();
     return 0;
 }
-
-#ifdef _WIN32
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-{
-    int argc;
-    char** argv = CommandLineToArgvW(lpCmdLine, &argc);
-    return main(argc, argv);
-}
-#endif

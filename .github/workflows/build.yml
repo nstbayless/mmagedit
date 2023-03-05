@@ -36,7 +36,7 @@ jobs:
     - name: NESM
       env:
         VCPKG_ROOT: C:\\vcpkg
-      run: cd nesm && cmake -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}\\scripts\\buildsystems\\vcpkg.cmake . && make
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=${{ env.VCPKG_ROOT }}/include/SDL2 -DSDL2_PATH=${{ env.VCPKG_ROOT }}/lib/SDL2.lib . && make
 
     # download dependencies
     - run: pwd

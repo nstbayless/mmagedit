@@ -275,17 +275,10 @@ typedef wchar_t xchar_t;
 #define xfopen _wfopen
 #define XFMT "%ls"
 
-#ifdef main
-    #undef main
-#endif
-#define main wmain
-
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    printf("A\n");
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    printf("B\n");
 #else
 typedef char xchar_t;
 #define xprintf printf
@@ -298,9 +291,7 @@ int main(int argc, char** argv)
 {
 #endif
 
-    printf("argc: %d\n", argc);
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
-    wprintf(L"rom_path: %s\n", rom_path);
     char            title[256];
     nes_config      config;
     nes_system*     system = 0;
@@ -311,7 +302,6 @@ int main(int argc, char** argv)
         xprintf(xstr("Usage:\n  %s path/to/rom.nes\n"), argv[0]);
         return argc <= 1;
     }
-    return 506;
 
     init_audio_ring_buf();
 

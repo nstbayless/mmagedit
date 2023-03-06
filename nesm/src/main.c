@@ -284,7 +284,8 @@ int main(int argc, xchar_t** argv);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    wprintf("%s", GetCommandLineW()[0]);
+    printf("Hello, world.\n");
+    wprintf(L"%s\n", GetCommandLineW());
     return 56;
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     return main(argc, argv);
@@ -310,7 +311,7 @@ int main(int argc, xchar_t** argv)
     
     if (xstrcmp(rom_path, xstr("-h")) == 0 || xstrcmp(rom_path, xstr("--help")) == 0 || argc <= 1)
     {
-        xprintf("Usage:\n  %s path/to/rom.nes\n", argv[0]);
+        xprintf(xstr("Usage:\n  %s path/to/rom.nes\n"), argv[0]);
         return argc <= 1;
     }
 

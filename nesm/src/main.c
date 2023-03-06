@@ -278,7 +278,9 @@ typedef wchar_t xchar_t;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
+    printf("A\n");
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    printf("B\n");
 #else
 typedef char xchar_t;
 #define xprintf printf
@@ -291,7 +293,9 @@ int main(int argc, char** argv)
 {
 #endif
 
+    printf("argc: %d\n", argc);
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
+    wprintf(L"rom_path: %s\n", rom_path);
     char            title[256];
     nes_config      config;
     nes_system*     system = 0;

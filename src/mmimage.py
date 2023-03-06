@@ -192,6 +192,10 @@ def export_images(data, path=".", only=None):
     for level in data.levels:
         for hard in [False, True]:
             outfile = "mm-" + str(level.world_idx + 1) + "-" + str(level.world_sublevel + 1) + ("h" if hard else "") + ".png"
+            if level.level_idx == constants.level_idx_finale:
+                if hard:
+                    continue
+                outfile = "mm-finale.png"
             print("exporting " + outfile + " ...")
             outfile = os.path.join(path, outfile)
             
@@ -202,7 +206,7 @@ def export_images(data, path=".", only=None):
             object_images = produce_object_images(data)
                 
             w = 256
-            h = 32 * constants.macro_rows_per_level
+            h = 32 * level.macro_row_count
             img = Image.new('RGB', (w, h), color = 'black')
             draw = ImageDraw.Draw(img)
             
@@ -210,7 +214,7 @@ def export_images(data, path=".", only=None):
             
             y = h
             
-            dangerous_tiles = [[False for y in range(constants.macro_rows_per_level * 4)] for x in range(0x20)]
+            dangerous_tiles = [[False for y in range(level.macro_row_count * 4)] for x in range(0x20)]
             
             for row in tile_rows:
                 x = -16
@@ -252,7 +256,7 @@ def export_images(data, path=".", only=None):
                 elif obj.flipy:
                     text += "|"
                 if objimg is None:
-                    draw.text((x, y), text, fill="white" if self.data.get_object_name(obj.gid)[0:4] != "unk-" else "red")
+                    draw.text((x, y), text, fill="white" if data.get_object_name(obj.gid)[0:4] != "unk-" else "red")
                 else:
                     x += 4 - objimg.width//2 + objimg._mm_offset[0]
                     y += 8 - objimg.height + objimg._mm_offset[1]

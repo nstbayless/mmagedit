@@ -150,9 +150,9 @@ class PatchStream:
 
 # represents the bit sequence for the object data in a level
 class ObjectStream:
-    def __init__(self, data):
+    def __init__(self, data, maxy):
         self.entries = []
-        self.y = constants.objects_start_y # in microtiles (8 pixels)
+        self.y = maxy # in microtiles (8 pixels)
         self.complete = False
         self.data = data
     
@@ -323,10 +323,16 @@ class LevelMacroRow:
             self.data.write_byte(rom + 3 - i, b)
 
 def idx_to_level_and_world(idx):
-    if idx == 0xc:
+    if idx >= constants.level_idx_44:
         return 3,3
     else:
         return idx % 3, int(idx / 3)
+
+def idx_to_level_name(idx, towerprefix=True):
+    if idx == constants.level_idx_finale:
+        return "Finale"
+    level, world = idx_to_level_and_world(idx)
+    return ("Tower " if towerprefix else "") + str(world+1) + "-" + str(level+1)
 
 class Level:
     def __init__(self, data, idx):
@@ -334,6 +340,7 @@ class Level:
         self.world_sublevel, self.world_idx = idx_to_level_and_world(idx)
         self.world = data.worlds[self.world_idx]
         self.data = data
+        self.macro_row_count = constants.finale_macro_rows if idx == constants.level_idx_finale else constants.standard_macro_rows
         self.macro_rows = []
         self.objects = []
         self.hardmode_patches = []
@@ -421,7 +428,8 @@ class Level:
         return True
     
     def get_name(self, hard=False):
-        s = "Tower " + str(self.world_idx + 1) + "-" + str(self.world_sublevel + 1)
+        
+        s = idx_to_level_name(self.level_idx)
         if hard:
             s += " (Hard)"
         return s
@@ -439,7 +447,8 @@ class Level:
         # read data from start address...
         hardmode_length = self.data.read_byte(self.data.ram_to_rom(ram))
         
-        row_count = constants.macro_rows_per_level
+        # read rows
+        row_count = self.macro_row_count
         for i in range(row_count):
             row = LevelMacroRow(self.data)
             row.read(self.data.ram_to_rom(ram + i * 4 + 1))
@@ -468,7 +477,7 @@ class Level:
             patch_x += gap + 1
             
         # read object data
-        object_y = constants.objects_start_y
+        object_y = self.macro_row_count * 4
         
         ram_objects_start = ram + hardmode_length + 1 + row_count * 4
         bs = BitStream(self.data.bin, self.data.ram_to_rom(ram_objects_start))
@@ -508,10 +517,10 @@ class Level:
             if obj.y >= 0:
                 self.objects.append(obj)
         
-    def length_bytes(self):
+    def length_bytes(self, include_macro_rows=True):
         ps = self.produce_patches_stream()
         os = self.produce_objects_stream()
-        return os.length_bytes() + ps.length_bytes() + 4 * constants.macro_rows_per_level + 1
+        return os.length_bytes() + ps.length_bytes() + (4 * self.macro_row_count if include_macro_rows else 0) + 1
     
     def length_unitile_bytes(self):
         us = self.produce_unitile_stream()
@@ -520,7 +529,7 @@ class Level:
         return us.length_bytes()
     
     def produce_unitile_rows(self):
-        out = [[[None] * 3 for x in range(0x10)] for y in range(constants.macro_rows_per_level * 2)]
+        out = [[[None] * 3 for x in range(0x10)] for y in range(self.macro_row_count * 2)]
         
         for ut in self.unitile_patches:
             for j in range(3):
@@ -668,17 +677,17 @@ class Level:
         self.data.write_byte(rom, ps.length_bytes())
             
         # write tile data
-        for i in range(constants.macro_rows_per_level):
+        for i in range(self.macro_row_count):
             macro_row = self.macro_rows[i]
             macro_row.commit(rom + i * 4 + 1)
         
         # write hardmode patch data
         for i in range(len(ps.entries)):
             entry = ps.entries[i]
-            self.data.write_byte(rom + 4 * constants.macro_rows_per_level + 1 + i, entry)
+            self.data.write_byte(rom + 4 * self.macro_row_count + 1 + i, entry)
         
         # write objects data
-        bs = BitStream(self.data.bin, rom + 4 * constants.macro_rows_per_level + 1 + ps.length_bytes())
+        bs = BitStream(self.data.bin, rom + 4 * self.macro_row_count + 1 + ps.length_bytes())
         for entry in os.entries:
             bs.write_bits_list(entry)
         
@@ -697,7 +706,7 @@ class Level:
         return ps
         
     def produce_objects_stream(self):
-        os = ObjectStream(self.data)
+        os = ObjectStream(self.data, self.macro_row_count * 4)
         
         # add objects to stream sorted by y position.
         for obj in sorted(self.objects, key=lambda obj : -obj.y):
@@ -723,7 +732,9 @@ class Level:
         
     # constructs rows of medtiles (and macrotiles) from bottom up.
     # dimensions should be YX, 64x16
-    def produce_med_tiles(self, hardmode=False, orows=range(constants.macro_rows_per_level)):
+    def produce_med_tiles(self, hardmode=False, orows=None):
+        if orows is None:
+            orows = range(self.macro_row_count)
         rows = []
         macro_tile_idxs = []
         if self.data.mapper_extension:
@@ -941,7 +952,7 @@ class World:
     def commit(self):
         # assert lengths not exceeded
         if self.total_length < len(self.med_tiles) + len(self.macro_tiles):
-            self.data.errors += ["size exceeded for world " + str(world_idx + 1)]
+            self.data.errors += ["size exceeded for world " + str(self.idx + 1)]
             return False
         
         # max symmetry index
@@ -1467,16 +1478,6 @@ class TextData:
         return True
             
 class MMData:
-
-    def get_total_usage(self):
-        total_level_length = 0
-        for level in self.levels:
-            total_level_length += level.length_bytes()
-        return total_level_length - 13 * 4 * constants.macro_rows_per_level
-
-    def get_max_usage(self):
-        return constants.ram_range_levels[1] - constants.ram_range_levels[0] - 13 * 4 * constants.macro_rows_per_level
-
     # convert ram address to rom address
     def ram_to_rom(self, address, chunk=""):
         if self.mapper_extension and len(self.bin) > 0xa010:
@@ -2521,9 +2522,9 @@ class MMData:
                             level.objects = []
                             level.hardmode_patches = []
                             level.unitile_patches = []
-                            row = constants.macro_rows_per_level - 1
+                            row = level.macro_row_count - 1
                             obji = 0
-                            unitile_row_idx = [constants.macro_rows_per_level * 2 - 1] * 3
+                            unitile_row_idx = [level.macro_row_count * 2 - 1] * 3
                     
                     # object config is different
                     elif cfg is not None:

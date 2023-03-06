@@ -34,7 +34,7 @@ objheight = 33
 screenwidth = 256
 screenheight = 224
 level_width = 256
-level_height = macro_height * constants.macro_rows_per_level
+level_height = macro_height * constants.standard_macro_rows
 gridcol = "#333"
 seamcol = "#ddd"
 linecol = "#888"
@@ -957,7 +957,7 @@ class Gui:
         # clearable elts
         self.elts_object_select = []
         self.elts_stage_horizontal_lines = []
-        self.elts_row_lines = [[] for i in range(constants.macro_rows_per_level)]
+        self.elts_row_lines = [[] for i in range(constants.standard_macro_rows)]
         self.elts_objects = []
         self.elts_patch_rects = []
         self.elt_object_select_rect = None
@@ -974,18 +974,19 @@ class Gui:
     def zoom(self):
         return int(max(0, self.zoom_idx) + 1)
         
-    def play_hack(self, currentlevel=False):
+    def play_hack(self, currentlevel=False, difficulty=None, ending=False):
         if self.data is None:
             return False
         
         path = os.path.join(tempfile.gettempdir(), "mmagedit-hack.nes")
-        self.startscreen=False
-        if currentlevel:
+        if currentlevel or ending:
             self.data.startlevel = self.level.level_idx+1
-            self.data.startdifficulty = 1 if self.hard else 0
+            self.data.startdifficulty = difficulty if difficulty is not None else (1 if self.hard else 0)
+            self.data.startscreen = ending
         success = self.data.write(path)
         self.data.startlevel=0
         self.data.startdifficulty=0
+        self.data.startscreen=False
         if not success:
             self.errorbox()
             return False
@@ -1097,6 +1098,8 @@ class Gui:
                         self.filemenu.entryconfig(self.menu_base_rom, state=tk.DISABLED)
                         for m in self.menu_fio:
                             self.filemenu.entryconfig(m, state=tk.NORMAL)
+                        for m in self.menu_play:
+                            self.playmenu.entryconfig(m, state=tk.NORMAL)
                         self.file[type] = path
                         self.errorbox(True)
                         return True
@@ -1267,14 +1270,14 @@ class Gui:
             self.refresh_objects()
         if "show_lines" in kw:
             self.show_lines = kw["show_lines"]
-            for i in range(constants.macro_rows_per_level):
+            for i in range(constants.standard_macro_rows):
                 self.refresh_row_lines(i)
             self.refresh_horizontal_lines()
             if self.show_crosshairs and self.show_lines:
                 self.refresh_objects() # necessary to prevent crosshairs from falling behind grid
         if "show_mirror" in kw:
             self.show_mirror = kw["show_mirror"]
-            for i in range(constants.macro_rows_per_level):
+            for i in range(constants.standard_macro_rows):
                 self.refresh_row_lines(i)
             if self.show_crosshairs and self.show_lines:
                 self.refresh_objects() # necessary to prevent crosshairs from falling behind grid
@@ -1357,7 +1360,7 @@ Please remember to save frequently and make backups.
                 return
     
     def get_tile_dangerous(self, x, y):
-        if x in range(0x20) and y in range(4 * constants.macro_rows_per_level):
+        if x in range(0x20) and y in range(4 * constants.standard_macro_rows):
             if self.stage_micro_dangerous[x][y]:
                 return True
         return False
@@ -1985,7 +1988,7 @@ Please remember to save frequently and make backups.
             
             # med-tile placement
             if self.get_stage_placement_type() == "med-tile":
-                med_y = clamp_hoi(constants.macro_rows_per_level * 2 - int(y / med_height) - 1, 0, constants.macro_rows_per_level * 2)
+                med_y = clamp_hoi(constants.standard_macro_rows * 2 - int(y / med_height) - 1, 0, constants.standard_macro_rows * 2)
                 med_x = clamp_hoi(x // med_width, 0, 0x10)
                 macro_row_idx = med_y // 2
                 
@@ -2020,7 +2023,7 @@ Please remember to save frequently and make backups.
                 
             # tile adjustment
             if self.get_stage_placement_type() in ["macro-tile", "macro-patch"] or (action == "seam" and not place_duplicates):
-                macro_row_idx = clamp_hoi(constants.macro_rows_per_level - int(y / macro_height) - 1, 0, constants.macro_rows_per_level)
+                macro_row_idx = clamp_hoi(constants.standard_macro_rows - int(y / macro_height) - 1, 0, constants.standard_macro_rows)
                 macro_row = level.macro_rows[macro_row_idx]
                 seam_x = macro_row.seam * med_width
                 macro_col_x = (max(int(x - seam_x + level_width), 0) % level_width) // macro_width
@@ -2135,9 +2138,12 @@ Please remember to save frequently and make backups.
     def add_hotkey(self, command, accelerator):
         self.menu_commands[accelerator] = command
 
-    def add_menu_command(self, menu, label, command, accelerator):
-        self.add_hotkey(command, accelerator)
-        menu.add_command(label=label, command=command, accelerator=accelerator)
+    def add_menu_command(self, menu, label, command, accelerator=None):
+        if accelerator is not None:
+            self.add_hotkey(command, accelerator)
+            menu.add_command(label=label, command=command, accelerator=accelerator)
+        else:
+            menu.add_command(label=label, command=command)
         return menu.index(label)
     
     # sets up windows and widgets
@@ -2156,6 +2162,14 @@ Please remember to save frequently and make backups.
         
         filemenu = tk.Menu(menu, tearoff=0)
         self.filemenu = filemenu
+        editmenu = tk.Menu(menu, tearoff=0)
+        self.editmenu = editmenu
+        viewmenu = tk.Menu(menu, tearoff=0)
+        self.viewmenu = viewmenu
+        stagemenu = tk.Menu(viewmenu, tearoff=0)
+        self.playmenu = tk.Menu(menu, tearoff=0)
+        helpmenu = tk.Menu(menu, tearoff=0)
+        
         self.menu_base_rom = self.add_menu_command(filemenu, "Load Base ROM...", partial(self.fio_prompt, "rom", False), "Ctrl+Shift+R")
         self.menu_fio = [self.add_menu_command(filemenu, "Open Hack...", partial(self.fio_prompt, "hack", False), "Ctrl+O")]
         self.menu_fio += [
@@ -2166,12 +2180,6 @@ Please remember to save frequently and make backups.
             self.add_menu_command(filemenu, "Save Hack", partial(self.fio_prompt, "hack", True, True), "Ctrl+S"),
             self.add_menu_command(filemenu, "Save Hack As...", partial(self.fio_prompt, "hack", True), "Ctrl+Shift+S")
         ]
-        filemenu.add_separator()
-        self.menu_play = [
-            self.add_menu_command(filemenu, "Play this level", partial(self.play_hack, True), "Ctrl+G"),
-            self.add_menu_command(filemenu, "Play from start", partial(self.play_hack, False), "Ctrl+Shift+G")
-        ]
-        self.menu_fio += self.menu_play
         filemenu.add_separator()
         self.menu_fio += [
             self.add_menu_command(filemenu, "Export Patched ROM...", partial(self.fio_prompt, "rom", True), "Ctrl+E"),
@@ -2188,8 +2196,6 @@ Please remember to save frequently and make backups.
         self.add_menu_command(filemenu, "Quit", partial(self.soft_quit), "Ctrl+Q")
         menu.add_cascade(label="File", menu=filemenu)
         
-        editmenu = tk.Menu(menu, tearoff=0)
-        self.editmenu = editmenu
         self.menu_edit_undo = self.add_menu_command(editmenu, "Undo", lambda: self.apply_action(self.undo_buffer[-1], True) if len(self.undo_buffer) > 0 else 0, "Ctrl+Z")
         self.menu_edit_redo = self.add_menu_command(editmenu, "Redo", lambda: self.apply_action(self.redo_buffer[-1]) if len(self.redo_buffer) > 0 else 0, "Ctrl+Y")
         editmenu.add_separator()
@@ -2208,17 +2214,13 @@ Please remember to save frequently and make backups.
         #self.add_menu_command(editmenu, "Screen...", lambda: self.subwindowctl(GuiScreenEditor), "Ctrl+Shift+T")
         menu.add_cascade(label="Edit", menu=editmenu)
         
-        viewmenu = tk.Menu(menu, tearoff=0)
-        self.viewmenu = viewmenu
-        stagemenu = tk.Menu(viewmenu, tearoff=0)
-        
+        # view menu
         for level_idx in range(constants.level_count):
             if level_idx in [3, 6, 9]:
                 stagemenu.add_separator()
-            
-            sublevel = (level_idx % 3) + 1 if level_idx < 12 else 4
-            world_idx = (level_idx // 3) + 1 if level_idx < 12 else 4
-            name = "Tower " + str(world_idx) + "-" + str(sublevel)
+            if level_idx == constants.level_idx_finale:
+                continue
+            name = mmdata.idx_to_level_name(level_idx)
             accelerator = ("Shift+F" + str(24 - level_idx)) if level_idx >= 12 else "F" + str(level_idx + 1)
             self.add_menu_command(stagemenu, name, partial(self.select_stage, level_idx), accelerator)
             
@@ -2242,7 +2244,23 @@ Please remember to save frequently and make backups.
         
         menu.add_cascade(label="View", menu=viewmenu)
         
-        helpmenu = tk.Menu(menu, tearoff=0)
+        # play menu
+        self.menu_play = [
+            self.add_menu_command(self.playmenu, "Play this level", partial(self.play_hack, True), "Ctrl+G"),
+            self.add_menu_command(self.playmenu, "Play on hell", partial(self.play_hack, True, 2), "Shift+G"),
+            self.add_menu_command(self.playmenu, "Play from Start", partial(self.play_hack, False), "Ctrl+Shift+G")
+        ]
+        self.playmenu.add_separator()
+        self.menu_play += [
+            self.add_menu_command(self.playmenu, "Play Ending", partial(self.play_hack, False, 0, True)),
+            self.add_menu_command(self.playmenu, "Play Ending (Hard)", partial(self.play_hack, False, 1, True)),
+            self.add_menu_command(self.playmenu, "Play Ending (Hell)", partial(self.play_hack, False, 2, True))
+        ]
+        for m in self.menu_play:
+            self.playmenu.entryconfig(m, state=tk.DISABLED)
+        menu.add_cascade(label="Play", menu=self.playmenu)
+        
+        # help menu
         self.add_menu_command(helpmenu, "About", self.about, None)
         self.add_menu_command(helpmenu, "Mouse Button Mappings", self.usage, None)
         menu.add_cascade(label="Help", menu=helpmenu)
@@ -2466,7 +2484,7 @@ Please remember to save frequently and make backups.
         self.refresh_selection_rect()
         
         # refresh the stage view
-        for i in range(constants.macro_rows_per_level):
+        for i in range(constants.standard_macro_rows):
             self.refresh_row_tiles(i)
             self.refresh_row_lines(i)
         self.refresh_horizontal_lines()
@@ -2482,9 +2500,19 @@ Please remember to save frequently and make backups.
         
         # sets the music dropdown value
         self.refresh_music_dropdown()
+        
+        # refreshes "play" actions in menu
+        self.refresh_play_menu()
 
         # deselect all
         self.set_selection(None)
+    
+    def refresh_play_menu(self):
+        playstr = "Play " + mmdata.idx_to_level_name(self.level.level_idx, False)
+        playstrd = (playstr + " (Hard)") if (self.hard and self.level.level_idx != 0xD) else playstr
+        playstrhell = playstr + " (Hell)"
+        self.playmenu.entryconfig(self.menu_play[0], label=playstrd)
+        self.playmenu.entryconfig(self.menu_play[1], label=playstrhell)
     
     def refresh_music_dropdown(self):
         # set options
@@ -2518,12 +2546,12 @@ Please remember to save frequently and make backups.
             self.level.music_idx = n
         
     def refresh_on_macro_tile_update(self, macro_tile_idx):
-        for i in range(constants.macro_rows_per_level):
+        for i in range(constants.standard_macro_rows):
             self.refresh_row_tiles(i, macro_tile_idx=macro_tile_idx)
         self.refresh_tile_select()
     
     def refresh_on_med_tile_update(self, macro_tile_idx):
-        for i in range(constants.macro_rows_per_level):
+        for i in range(constants.standard_macro_rows):
             self.refresh_row_tiles(i, med_tile_idx=macro_tile_idx)
         self.refresh_tile_select()
     
@@ -2716,7 +2744,7 @@ Please remember to save frequently and make backups.
         
         # horizontal grid lines
         if self.show_lines:
-            for i in range(constants.macro_rows_per_level - 1):
+            for i in range(constants.standard_macro_rows - 1):
                 y = (level_height - macro_height * (i + 1)) * self.zoom()
                 self.elts_stage_horizontal_lines.append(
                     self.stage_canvas.create_line(
@@ -2774,7 +2802,7 @@ Please remember to save frequently and make backups.
         med_tile_idx_filter = kwargs["med_tile_idx"] if "med_tile_idx" in kwargs else None
         level = self.level
         if level is not None:
-            micro_y = (constants.macro_rows_per_level - row_idx - 1) * (macro_height // micro_height)
+            micro_y = (constants.standard_macro_rows - row_idx - 1) * (macro_height // micro_height)
             med_tile_rows, macro_tile_idxs = level.produce_med_tiles(self.hard, range(row_idx, row_idx + 1))
             if macro_tile_idx_filter is not None and macro_tile_idx_filter not in macro_tile_idxs:
                 # skip row if row does not contain the filter macro tile
@@ -2872,7 +2900,7 @@ Please remember to save frequently and make backups.
                     seam = macro_row.seam
                     for mirror in [False, True]:
                         for loop in [-1, 0, 1]:
-                            y = (constants.macro_rows_per_level -  patch.y - 1) * macro_height
+                            y = (constants.standard_macro_rows - patch.y - 1) * macro_height
                             x = (((7 - patch.x) if mirror else patch.x) * 2 + seam) * med_width
                             x += level_width * loop
                             x *= self.zoom()

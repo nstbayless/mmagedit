@@ -1,7 +1,7 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.30"
+mmname = "MMagEdit v1.31"
 mmrepo = "https://github.com/nstbayless/mmagedit"
 mmfmt = 202204032250
 
@@ -65,7 +65,7 @@ text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
 
 # space available
 ram_range_music = [0x8000, 0x860A]
-ram_range_levels = [0xdaec, 0xe6c3]
+ram_range_levels = [0xdaec, 0xe6c3+49]
 ram_range_text = [0xEC67, 0xEE67]
 ram_range_uncompressed_text = [0xEE67, 0xEE67+5] # pause text
 ram_pause_text_offset = 0xBAD3
@@ -93,11 +93,14 @@ ram_ending_dispatch = 0xD61F
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4
-level_count = 0xd
+level_count = 0xE
+level_idx_finale = 0xD
+level_idx_44 = 0xC
 global_macro_tiles_count = 0x24
 global_med_tiles_count = 0x4c
-macro_rows_per_level = 0x20
-objects_start_y = macro_rows_per_level * 4
+
+standard_macro_rows = 0x20
+finale_macro_rows = 0x08
 
 hidden_micro_tiles = range(0x78, 0x7e)
 dangerous_micro_tiles = [0x01]
@@ -368,7 +371,7 @@ object_names = [
     ["beer", "barrel-thrower", "beer-bros"],
     
     # 6
-    ["boss-final", "boss-5"], # eye boss, but in space.
+    ["boss-final", "boss-5", "boss-finale"], # eye boss, but in space.
     
     # 7
     ["goat"],
@@ -548,8 +551,8 @@ object_data = [
     # 5 -- beer
     { "palette": 1, "chr": [[0x58, 0x59], [0x5a, 0x5b]], "offset": [4, -24] },
     
-    # 6 -- glowy-eye ??
-    { },
+    # 6 -- finale boss
+    { "palette": 2, "chr": [[0x70, 0x71, 0x271, 0x270], [0x80, 0x81, 0x281, 0x280], [0x480, 0x481, 0x681, 0x680], [0x470, 0x471, 0x671, 0x670]], "offset": (0, 8) },
     
     # 7 -- goat
     { "palette": 1, "chr":  [[0xa0, 0xa1], [0xb0, 0xb1]] },

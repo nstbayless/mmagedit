@@ -264,6 +264,19 @@ void handle_joystick_removed(uint32_t index)
     }
 }
 
+// regenerate via gimp C source export
+#include "icon.c"
+SDL_Surface* getIcon(void)
+{
+    // Create a 32x32 RGBA surface
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, icon.width, icon.height, icon.bytes_per_pixel * 8, SDL_PIXELFORMAT_ABGR8888);
+
+    // Set each pixel to a unique color based on its coordinates
+    memcpy(surface->pixels, icon.pixel_data, icon.width * icon.height * icon.bytes_per_pixel);
+    
+    return surface;
+}
+
 #ifdef _WIN32
 #include <windows.h>
 #include <stringapiset.h>
@@ -378,6 +391,8 @@ int main(int argc, char** argv)
 
     memset(&controller, 0, 2 * sizeof(SDL_GameController*));
 
+    SDL_Surface* iconsrf = getIcon();
+    SDL_SetWindowIcon(wnd, iconsrf);
     SDL_ShowWindow(wnd);
 
     while(!quit)
@@ -444,6 +459,7 @@ int main(int argc, char** argv)
     }
 
     SDL_DestroyWindow(wnd);
+    SDL_FreeSurface(iconsrf);
     if (audio_device_id >= 0)
         SDL_CloseAudioDevice(audio_device_id);
 

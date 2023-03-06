@@ -285,7 +285,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
     int argc;
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    return 54;//main(argc, argv);
+    return main(argc, argv);
 }
 #else
 typedef char xchar_t;

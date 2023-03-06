@@ -3,6 +3,7 @@ __pycache__/
 *hack.txt
 mm-*.png
 *.deb
+*.dbg
 *.nl
 *.ips
 *.bps

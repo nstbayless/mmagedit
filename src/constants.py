@@ -89,6 +89,7 @@ ram_mod_no_relic_4_replacement = [[0xEA, 0xEA, 0xEA]]
 
 ram_intro_update = 0xA6CC
 ram_gamestart = 0xB8F0
+ram_ending_dispatch = 0xD61F
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4

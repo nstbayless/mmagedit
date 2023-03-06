@@ -50,9 +50,11 @@ def usage():
     print("--json: serialize data to json")
     print("--select .field[a].field2[b:c]: (etc) select elements of json out")
     print("--apply {...}: apply json to data")
-    print("--level x: exported rom jumps to level x at start (x can be 1-13)")
-    print("--hard: start in hard mode (requires --level)")
-    print("--hell: start in hell mode (requires --level)")
+    print("--level x: exported rom jumps to level x at start (x can be 1-14)")
+    print("--ending: exported rom jumps to ending screen at start")
+    print("--players x: exported rom has x players (x can be 1-4)")
+    print("--hard: exported rom starts in hard mode (requires --level or --ending)")
+    print("--hell: exported rom starts in hell mode (requires --level or --ending)")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -90,7 +92,9 @@ def main():
     jsonpath = ""
     jsonapply = None
     startlevel = 0
+    startplayers = 1
     starthard = 0
+    startending = False
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -141,6 +145,13 @@ def main():
         
     if "--level" in sys.argv[2:-1]:
         startlevel = int(sys.argv[sys.argv.index("--level") + 1])
+        
+    if "--players" in sys.argv[2:-1]:
+        startplayers = int(sys.argv[sys.argv.index("--players") + 1])
+        startplayers = max(1, min(4, startlevel))
+    
+    if "--ending" in sys.argv[2:]:
+        startending = True
         
     if "--hard" in sys.argv[2:]:
         starthard = 1
@@ -239,6 +250,8 @@ def main():
             
         mmdata.startlevel = startlevel
         mmdata.startdifficulty = starthard
+        mmdata.startscreen = startending
+        mmdata.startplayers = startplayers
 
         if exportnes != "":
             result = result and mmdata.write(exportnes)

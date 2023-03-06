@@ -979,6 +979,7 @@ class Gui:
             return False
         
         path = os.path.join(tempfile.gettempdir(), "mmagedit-hack.nes")
+        self.startscreen=False
         if currentlevel:
             self.data.startlevel = self.level.level_idx+1
             self.data.startdifficulty = 1 if self.hard else 0

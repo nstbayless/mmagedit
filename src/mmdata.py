@@ -1739,34 +1739,14 @@ class MMData:
         
     def write_quickstart_patch(self):
         # writes code that will jump straight to a certain level and difficulty
-        if self.startlevel == 0:
+        if self.startlevel == 0 and self.startscreen == False:
             return
+        
+        # level 14 cannot be played on normal mode:
+        if self.startlevel == 0xE and self.startdifficulty == 0:
+            self.startdifficulty = 1;
+        
         addr = self.ram_to_rom(constants.ram_intro_update)
-        
-        # LDA startlevel
-        self.write_byte(addr, 0xA9)
-        addr += 1
-        self.write_byte(addr, self.startlevel-1)
-        addr += 1
-        
-        # STA level
-        self.write_byte(addr, 0x85)
-        addr += 1
-        self.write_byte(addr, 0xBC)
-        addr += 1
-        
-        # LDA startworld
-        world, level = idx_to_level_and_world(self.startlevel)
-        self.write_byte(addr, 0xA9)
-        addr += 1
-        self.write_byte(addr, world)
-        addr += 1
-        
-        # STA world
-        self.write_byte(addr, 0x85)
-        addr += 1
-        self.write_byte(addr, 0xBD)
-        addr += 1
         
         #LDA difficulty
         difficulty = [0x00, 0x80, 0xC0][clamp_hoi(int(self.startdifficulty), 0, 3)]
@@ -1781,16 +1761,48 @@ class MMData:
         self.write_byte(addr, 0x6F)
         addr += 1
         
-        # LDA 0
+        # LDA startplayers
         self.write_byte(addr, 0xA9)
         addr += 1
-        self.write_byte(addr, 0x0)
+        self.write_byte(addr, max(self.startplayers-1, 0))
         addr += 1
+        
+        # STA numplayers
+        self.write_byte(addr, 0x85)
+        addr += 1
+        self.write_byte(addr, 0x03)
+        addr += 1
+        
+        if not self.startscreen:
+            # LDA startlevel
+            self.write_byte(addr, 0xA9)
+            addr += 1
+            self.write_byte(addr, self.startlevel-1)
+            addr += 1
+            
+            # STA level
+            self.write_byte(addr, 0x85)
+            addr += 1
+            self.write_byte(addr, 0xBC)
+            addr += 1
+        else:
+            # LDA 1
+            self.write_byte(addr, 0xA9)
+            addr += 1
+            self.write_byte(addr, 0x01)
+            addr += 1
+            
+            for i in range(0, 4):
+                # STA activeplayers,i
+                self.write_byte(addr, 0x85)
+                addr += 1
+                self.write_byte(addr, 0x73+i)
+                addr += 1
         
         # JMP game start
         self.write_byte(addr, 0x4C)
         addr += 1
-        self.write_word(addr, constants.ram_gamestart)
+        self.write_word(addr, constants.ram_ending_dispatch if self.startscreen else constants.ram_gamestart)
         addr += 2
     
     # edits the binary data to be in line with everything else
@@ -2003,6 +2015,8 @@ class MMData:
         self.errors = []
         self.startlevel = 0
         self.startdifficulty = 0
+        self.startscreen = False
+        self.startplayers = 1
         self.object_config = [
             constants.object_data[gid]["config"](self, gid) if "config" in constants.object_data[gid] else None
             for gid in range(len(constants.object_data))

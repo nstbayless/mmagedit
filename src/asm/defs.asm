@@ -2,6 +2,9 @@
 ; memory address values
 ENUM $0
 
+BASE $03
+num_players: ; players minus 1. (0 ~ singleplayer)
+
 BASE $BC
 current_level:
 

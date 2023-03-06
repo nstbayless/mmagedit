@@ -308,7 +308,6 @@ int main(int argc, char** argv)
     
     if (xstrcmp(rom_path, xstr("-h")) == 0 || xstrcmp(rom_path, xstr("--help")) == 0 || argc <= 1)
     {
-        return 505;
         xprintf(xstr("Usage:\n  %s path/to/rom.nes\n"), argv[0]);
         return argc <= 1;
     }

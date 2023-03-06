@@ -300,7 +300,9 @@ typedef char xchar_t;
 
 int main(int argc, xchar_t** argv)
 {
+    printf("argc: %d\n", argc);
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
+    printf("rom_path: %d\n", rom_path);
     char            title[256];
     nes_config      config;
     nes_system*     system = 0;

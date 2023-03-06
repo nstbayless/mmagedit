@@ -299,6 +299,7 @@ int main(int argc, char** argv)
 #endif
 
     printf("argc: %d\n", argc);
+    return 503;
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
     printf("rom_path: %d\n", rom_path);
     char            title[256];

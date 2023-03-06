@@ -94,3 +94,27 @@ jobs:
       with:
         name: mmagedit
         path: mmagedit/
+    
+    - name: Zip directory for release
+      if: ${{ github.event_name == 'release' && github.event.action != 'deleted' }}
+      run: |
+        powershell -command "Compress-Archive -Path 'mmagedit' -DestinationPath 'mmagedit.zip'"
+    
+    - name: Get release
+      if: ${{ github.event_name == 'release' && github.event.action != 'deleted' }}
+      id: get_release
+      uses: bruceadams/get-release@v1.2.2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Release Asset
+      if: ${{ github.event_name == 'release' && github.event.action != 'deleted' }}
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release.outputs.upload_url }}
+        asset_path: mmagedit.zip
+        asset_name: mmagedit-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
+

@@ -26,5 +26,4 @@ def emulator_test():
         return False
     
     result = subprocess.run([emu, "--help"], stdout=subprocess.PIPE)
-    print(result.stdout.decode())
     return result.returncode == 0, result.returncode

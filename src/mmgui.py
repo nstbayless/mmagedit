@@ -2,12 +2,13 @@ from src import constants
 from src.util import *
 import os
 import copy
+import math
+import tempfile
+from functools import partial
 
 from src import mmimage
 from src import mmdata
 import src.mappermages
-from functools import partial
-import math
 
 try:
     from PIL import Image, ImageDraw, ImageOps, ImageTk
@@ -971,6 +972,18 @@ class Gui:
     
     def zoom(self):
         return int(max(0, self.zoom_idx) + 1)
+        
+    def play_hack(self, currentlevel=False):
+        if self.data is None:
+            return False
+        
+        path = os.path.join(tempfile.gettempdir(), "mmagedit-hack.nes")
+        if currentlevel:
+            self.data.startlevel = self.level.level_idx+1
+            self.data.startdifficulty = 1 if self.hard else 0
+        self.data.write(path)
+        self.data.startlevel=0
+        self.data.startdifficulty=0
         
     # perform fileio, possibly ask for prompt (if auto is True, may not ask.)
     def fio_prompt(self, type, save=False, auto=False):
@@ -2142,6 +2155,11 @@ Please remember to save frequently and make backups.
         self.menu_fio += [
             self.add_menu_command(filemenu, "Save Hack", partial(self.fio_prompt, "hack", True, True), "Ctrl+S"),
             self.add_menu_command(filemenu, "Save Hack As...", partial(self.fio_prompt, "hack", True), "Ctrl+Shift+S")
+        ]
+        filemenu.add_separator()
+        self.menu_fio += [
+            self.add_menu_command(filemenu, "Play", partial(self.play_hack, False), "Ctrl+Shift+G"),
+            self.add_menu_command(filemenu, "Play this level", partial(self.play_hack, True), "Ctrl+G")
         ]
         filemenu.add_separator()
         self.menu_fio += [

@@ -57,15 +57,6 @@ jobs:
     - run: ldd nesm\\Release\\nesm.exe
       continue-on-error: true
       
-    # python
-    - name: Cached Python3.6
-      id: py36
-      uses: actions/cache@v3
-      with:
-        path: |
-          ${{ env.RUNNER_TOOL_CACHE }}/python/3.6.8/x64
-        key: ${{ runner.os }}-py36
-      
     # python 3.6 is required for pyinstaller
     # TODO: cache this.
     - name: Set up Python3.6

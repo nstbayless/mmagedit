@@ -274,7 +274,6 @@ typedef wchar_t xchar_t;
 #define xstrlen wcslen
 #define xfopen _wfopen
 #define XFMT "%ls"
-#pragma optimize( "", off )
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;

@@ -284,8 +284,8 @@ int main(int argc, xchar_t** argv);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    printf("%s", lpCmdLine[0]);
     wprintf("%s", GetCommandLineW()[0]);
+    return 56;
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     return main(argc, argv);
 }

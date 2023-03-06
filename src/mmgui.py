@@ -1193,8 +1193,7 @@ class Gui:
                 # cancel
                 return
             elif response:
-                if not self.fio_prompt("hack", True):
-                    # user aborted save -- don't quit.
+                if not self.fio_prompt("hack", True, True):
                     return
         self.window.quit()
     
@@ -1474,7 +1473,7 @@ Please remember to save frequently and make backups.
             # action.y
             # action.med_tile_idx [array of idxs per difficulty]
             # action.prev_med_tile_idx [array of idxs per difficulty]
-            # action.difficulty_flag
+            # action.difficulty_flag: the difficulties NOT to apply this tile on.
             level.split_unitiles_by_difficulty()
             
             fill_in_prev = False
@@ -2168,10 +2167,11 @@ Please remember to save frequently and make backups.
             self.add_menu_command(filemenu, "Save Hack As...", partial(self.fio_prompt, "hack", True), "Ctrl+Shift+S")
         ]
         filemenu.add_separator()
-        self.menu_fio += [
-            self.add_menu_command(filemenu, "Play", partial(self.play_hack, False), "Ctrl+Shift+G"),
-            self.add_menu_command(filemenu, "Play this level", partial(self.play_hack, True), "Ctrl+G")
+        self.menu_play = [
+            self.add_menu_command(filemenu, "Play this level", partial(self.play_hack, True), "Ctrl+G"),
+            self.add_menu_command(filemenu, "Play from start", partial(self.play_hack, False), "Ctrl+Shift+G")
         ]
+        self.menu_fio += self.menu_play
         filemenu.add_separator()
         self.menu_fio += [
             self.add_menu_command(filemenu, "Export Patched ROM...", partial(self.fio_prompt, "rom", True), "Ctrl+E"),

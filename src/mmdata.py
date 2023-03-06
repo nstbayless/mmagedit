@@ -528,6 +528,18 @@ class Level:
                     out[ut.y][ut.x][j] = ut
         
         return out
+        
+    # for debugging
+    def print_unitiles(self):
+        for u in self.unitile_patches:
+            dif = ""
+            if u.get_flags() & 0x80 == 0:
+                dif += "e"
+            if u.get_flags() & 0x40 == 0:
+                dif += "h"
+            if u.get_flags() & 0x20 == 0:
+                dif += "l"
+            print("U.", u.x, u.y, u.med_tile_idx, dif)
     
     # there is some redundancy in the ways the unitiles can be expressed
     # these two functions re-express the same data in different ways
@@ -540,15 +552,11 @@ class Level:
                 for j in range(3):
                     flag = 1 << (7 - j)
                     if u.get_flags() & flag == 0:
-                        if u.get_flags() == 0x80 or u.get_flags == 0x40 or u.get_flags == 0x20 or u.get_flags == 0:
-                            # we make a copy so that we can have exactly one of the flags active.
-                            uc = UnitilePatch()
-                            uc.x = u.x
-                            uc.y = u.y
-                            uc.med_tile_idx = u.med_tile_idx
-                        else:
-                            # tile already has exactly one flag active, so we reuse it; no need to copy.
-                            uc = u
+                        # we make a copy so that we can have exactly one of the flags active.
+                        uc = UnitilePatch()
+                        uc.x = u.x
+                        uc.y = u.y
+                        uc.med_tile_idx = u.med_tile_idx
                         uc.flag_normal = j == 0
                         uc.flag_hard = j == 1
                         uc.flag_hell = j == 2

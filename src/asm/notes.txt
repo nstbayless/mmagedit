@@ -107,3 +107,7 @@ ROM offsets
 BOUNCE ROUTINE
 55e6: (5 bytes) int yspeed value (LDA/A9) then (STA/9D)
 5617: (5 bytes) frac yspeed value (LDA/A9) then (STA/99)
+
+LEVEL/WORLD MAPPING
+F2C6: routine that sets world/lvl from level idx.
+World 0-3 as normal, world 4 means go straight to ending cutscene.

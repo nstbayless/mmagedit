@@ -296,7 +296,6 @@ int main(int argc, char** argv)
     printf("argc: %d\n", argc);
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
     wprintf(L"rom_path: %s\n", rom_path);
-    return 505;
     char            title[256];
     nes_config      config;
     nes_system*     system = 0;

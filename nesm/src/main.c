@@ -280,13 +280,11 @@ typedef wchar_t xchar_t;
 #endif
 #define main wmain
 
-int main(int argc, xchar_t** argv);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    return main(argc, argv);
-}
+
 #else
 typedef char xchar_t;
 #define xprintf printf
@@ -295,11 +293,10 @@ typedef char xchar_t;
 #define xstrlen strlen
 #define xfopen fopen
 #define XFMT "%s"
+int main(int argc, char** argv)
+{
 #endif
 
-
-int main(int argc, xchar_t** argv)
-{
     printf("argc: %d\n", argc);
     const xchar_t*  rom_path = argc > 1 ? argv[1] : xstr("rom.nes");
     printf("rom_path: %d\n", rom_path);

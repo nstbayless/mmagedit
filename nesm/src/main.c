@@ -274,13 +274,17 @@ typedef wchar_t xchar_t;
 #define xstrlen wcslen
 #define xfopen _wfopen
 #define XFMT "%ls"
+
+#ifdef main
+    #undef main
+#endif
 #define main wmain
 
 int main(int argc, xchar_t** argv);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    xchar_t** argv = CommandLineToArgvW(lpCmdLine, &argc);
+    xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     return 54;//main(argc, argv);
 }
 #else

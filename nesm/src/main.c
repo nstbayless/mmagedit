@@ -276,10 +276,10 @@ typedef wchar_t xchar_t;
 #define xfopen _wfopen
 
 int main(int argc, xchar_t** argv);
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    char** argv = CommandLineToArgvW(lpCmdLine, &argc);
+    xchar_t** argv = CommandLineToArgvW(lpCmdLine, &argc);
     return main(argc, argv);
 }
 #else

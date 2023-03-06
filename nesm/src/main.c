@@ -269,11 +269,11 @@ void handle_joystick_removed(uint32_t index)
 #include <stringapiset.h>
 typedef wchar_t xchar_t;
 #define xstr(s) L##s
-#define snxprintf snwprintf
 #define xprintf wprintf
 #define xstrcmp wcscmp
 #define xstrlen wcslen
 #define xfopen _wfopen
+#define XFMT "%ls"
 
 int main(int argc, xchar_t** argv);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -284,12 +284,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 #else
 typedef char xchar_t;
-#define snxprintf snprintf
 #define xprintf printf
 #define xstrcmp strcmp
 #define xstr(s) s
 #define xstrlen strlen
 #define xfopen fopen
+#define XFMT "%s"
 #endif
 
 
@@ -309,11 +309,7 @@ int main(int argc, xchar_t** argv)
 
     init_audio_ring_buf();
 
-    #ifdef _WIN32
-    title = "NESM"
-    #else
-    snxprintf(title, 256, "NESM - %s", rom_path);
-    #endif
+    snprintf(title, 256, "NESM - " XFMT, rom_path);
 
     config.client_data = 0;
     config.input_callback = &on_nes_input;

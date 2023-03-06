@@ -1,7 +1,7 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.28"
+mmname = "MMagEdit v1.29"
 mmrepo = "https://github.com/nstbayless/mmagedit"
 mmfmt = 202204032250
 
@@ -621,7 +621,7 @@ object_data = [
     { },
     
     # 1f -- fanv
-    { "palette": 2, "chr":  [[0x60, 0x61]] },
+    { "palette": 2, "chr":  [[0x460, 0x461]] },
     
     # 20 -- feather
     { "palette": 1, "chr":  [[0xCD]] },

@@ -278,9 +278,7 @@ typedef wchar_t xchar_t;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
-    printf("A\n");
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    printf("B\n");
 #else
 typedef char xchar_t;
 #define xprintf printf
@@ -330,6 +328,10 @@ int main(int argc, char** argv)
         fprintf(stderr, "Failed to initialized nes system.\n");
         return -1;
     }
+    
+    #ifdef _WIN32
+    SDL_setenv(“SDL_AUDIODRIVER”, “directsound”, 1);
+    #endif
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) < 0)
     {

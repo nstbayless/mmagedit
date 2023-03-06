@@ -1,4 +1,5 @@
 from src.util import *
+from src import emulaunch
 
 mmname = "MMagEdit v1.27"
 mmrepo = "https://github.com/nstbayless/mmagedit"
@@ -15,15 +16,20 @@ def get_version_and_date():
     day = sf[6:8]
     return mmname + ": " + day + " " + months[month] + " " + year
 
-mminfo = """
+def emucredits():
+    if emulaunch.find_emulator() is not None:
+        return "\n\nLightweight NES Emulator \"nesm\" by gtoni."
+    return ""
+
+mminfo = ("""
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
 """ + get_version_and_date() + """.
 
-Special thanks to Julius and Leaf_It.
+Special thanks to Julius, Leaf_It, Geek_Joystick, and dayofni.""" + emucredits() + """
 
 Please support Morphcat Games.
-""".strip()
+""").strip()
 
 ram_object_i_gid_lookup = 0xdab1
 ram_level_table = 0xDAD0
@@ -80,6 +86,9 @@ ram_mod_no_relic_3 = [0xCD9D]
 ram_mod_no_relic_3_replacement = [[0xEA, 0xEA, 0xEA]]
 ram_mod_no_relic_4 = [0xBCBE]
 ram_mod_no_relic_4_replacement = [[0xEA, 0xEA, 0xEA]]
+
+ram_intro_update = 0xA6CC
+ram_gamestart = 0xB8F0
 
 mirror_pairs_count = 6 # (x2).
 world_count = 4

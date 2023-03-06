@@ -5,32 +5,67 @@ on:
     branches: [ master, main, dev ]
   pull_request:
     branches: [ master, main, dev ]
+  release:
+    types: [created]
   schedule:
-    # run every saturday at 4:43 AM
-    - cron: '43 4 * * SAT'
-  workflow_dispatch:
+    # run every saturday at 4:43 AM PST
+    - cron: '43 12 * * SAT'
+  workflow_dispatch: # can run this manually
 jobs:  
   # 32-bit windows build
   build-win32:
     runs-on: windows-latest
     steps:
+    
+    # sdl2
+    - name: Cached SDL2
+      id: vcpkg-sdl2
+      uses: actions/cache@v3
+      with:
+        path: |
+          C:/vcpkg/installed/
+        key: ${{ runner.os }}-vcpkg-sdl
 
-    # pull
+    - name: Install SDL2
+      if: steps.vcpkg-sdl2.outputs.cache-hit != 'true'
+      run: vcpkg install sdl2 --triplet x64-windows
+      
+    - name: Download Visual C++ Redistributable
+      run: curl -L -o vc_redist.x64.exe https://aka.ms/vs/17/release/vc_redist.x64.exe
+    - name: Install Visual C++ Redistributable
+      run: Start-Process -Wait -FilePath .\\vc_redist.x64.exe -ArgumentList '/install', '/passive', '/norestart'
+
+        
+    # pull ------------------------
     - uses: actions/checkout@v2
     
+    # nesm build
+    - name: build nesm
+      env:
+        CPATH: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
+        INCLUDE: C:\\vcpkg\\installed\\x64-windows\\include\\SDL2
+      run: cd nesm && cmake -DSDL2_INCLUDE_DIR=C:/vcpkg/installed/x64-windows/include/SDL2 -DSDL2_LIBRARY=C:/vcpkg/installed/x64-windows/lib/SDL2.lib -DCMAKE_CXX_FLAGS="-IC:\\vcpkg\\installed\\x64-windows\\include\\SDL2" . && cmake --build . --config Release
+    - run: copy C:\\vcpkg\\installed\\x64-windows\\bin\\SDL2.dll nesm\Release\SDL2.dll
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe', '-h']).returncode)"
+      continue-on-error: true
+    - run: python3 -c "import subprocess; print (subprocess.run(['nesm/Release/nesm.exe']).returncode)"
+      continue-on-error: true
+    - run: "nesm/Release/nesm.exe"
+      continue-on-error: true
+    - run: nesm/Release/nesm.exe -h
+      continue-on-error: true
+    - run: ldd nesm\\Release\\nesm.exe
+      continue-on-error: true
+      
     # python 3.6 is required for pyinstaller
+    # TODO: cache this.
     - name: Set up Python3.6
       uses: actions/setup-python@v4
       with:
         python-version: '3.6'
-
-    # download dependencies
-    - run: pwd
-    - run: python3 --version
-    - run: where python3
     - run: python3 -m pip install setuptools==50.3.2
     - run: python3 -m pip install pyinstaller==4.0 -vvv
-    - run: python3 -m pip install Pillow
+    - run: python3 -m pip install Pillow==8.4.0
     
     # check that dependencies installed.
     - name: check-dependencies (1)
@@ -39,14 +74,14 @@ jobs:
     - name: check-dependencies (2)
       run: python3 -c "from tkinter import ttk"
       
-    - name: Tree
-      run: Tree C:\hostedtoolcache\windows\Python\3.6.8/x86/Tools /F
-      
+    # pyinstaller build
     - name: build with pyinstaller
       run: pyinstaller mmagedit.py --windowed -i "icon.ico" --paths=. --hidden-import mmdata --add-data="icon.png;."
       
     - run: move dist\\mmagedit mmagedit
     - run: move examples mmagedit
+    - run: copy nesm/Release/nesm.exe mmagedit
+    - run: copy C:\\vcpkg\\installed\\x64-windows\\bin\\SDL2.dll mmagedit
     
     # test
     - run: python3 mmagedit.py --help

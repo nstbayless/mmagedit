@@ -1,13 +1,17 @@
 import sys
 from array import array
 from src.mmdata import MMData
+from src import emulaunch
 import os
+
+mmageditpath = os.path.dirname(os.path.realpath(__file__))
 
 # as-lib
 as_lib = "--as-lib" in sys.argv
 
 gui_available=False
 img_available=False
+nesm_available=False
 if not as_lib:
     try:
         import src.mmimage
@@ -19,6 +23,7 @@ if not as_lib:
         gui_available=True
     except ImportError as e:
         pass
+    nesm_available = emulaunch.find_emulator()
     
 from src import constants
 from src import util
@@ -45,6 +50,9 @@ def usage():
     print("--json: serialize data to json")
     print("--select .field[a].field2[b:c]: (etc) select elements of json out")
     print("--apply {...}: apply json to data")
+    print("--level x: exported rom jumps to level x at start (x can be 1-13)")
+    print("--hard: start in hard mode (requires --level)")
+    print("--hell: start in hell mode (requires --level)")
 
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
@@ -58,6 +66,14 @@ def main():
         elif not gui_available:
             print("Not available: gui")
             sys.exit(1)
+        elif not nesm_available:
+            print("Not available: nesm")
+            sys.exit(1)
+        
+        result, retcode = emulaunch.emulator_test()
+        if not result:
+            print("Warning: nesm available but cannot launch. Code:", retcode)
+            sys.exit(0)
         print("All modules available.")
         sys.exit(0)
 
@@ -73,6 +89,8 @@ def main():
     dojson = "--json" in sys.argv
     jsonpath = ""
     jsonapply = None
+    startlevel = 0
+    starthard = 0
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -120,6 +138,15 @@ def main():
 
     if "--apply" in sys.argv[2:-1]:
         jsonapply = sys.argv[sys.argv.index("--apply") + 1]
+        
+    if "--level" in sys.argv[2:-1]:
+        startlevel = int(sys.argv[sys.argv.index("--level") + 1])
+        
+    if "--hard" in sys.argv[2:]:
+        starthard = 1
+        
+    if "--hell" in sys.argv[2:]:
+        starthard = 2
 
     if dojson:
         gui = False
@@ -156,7 +183,7 @@ def main():
             else:
                 # load whatever nes file is in the folder.
                 nesfiles = []
-                for file in os.listdir(os.path.dirname(os.path.realpath(__file__))):
+                for file in os.listdir(mmageditpath):
                     if file.lower().endswith(".nes"):
                         nesfiles.append(file)
                 if len(nesfiles) > 1:
@@ -209,6 +236,9 @@ def main():
             j = mmdata.serialize_json_str(jsonpath)
             result = result and j != "null"
             print(j)
+            
+        mmdata.startlevel = startlevel
+        mmdata.startdifficulty = starthard
 
         if exportnes != "":
             result = result and mmdata.write(exportnes)

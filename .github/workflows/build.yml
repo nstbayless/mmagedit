@@ -30,10 +30,10 @@ jobs:
       if: steps.vcpkg-sdl2.outputs.cache-hit != 'true'
       run: vcpkg install sdl2 --triplet x64-windows
       
+    - name: Download Visual C++ Redistributable
+      run: curl -L -o vc_redist.x64.exe https://aka.ms/vs/17/release/vc_redist.x64.exe
     - name: Install Visual C++ Redistributable
-      run: |
-        curl -L -o vc_redist.x64.exe https://aka.ms/vs/17/release/vc_redist.x64.exe
-        Start-Process -Wait -FilePath .\vc_redist.x64.exe -ArgumentList '/install', '/passive', '/norestart'
+      run: Start-Process -Wait -FilePath .\\vc_redist.x64.exe -ArgumentList '/install', '/passive', '/norestart'
 
         
     # pull ------------------------

@@ -285,10 +285,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
     int argc;
     printf("Hello, world.\n");
-    wprintf(L"%s\n", GetCommandLineW());
+    //wprintf(L"%s\n", GetCommandLineW());
     return 56;
-    xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    return main(argc, argv);
+    //xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    //return main(argc, argv);
 }
 #else
 typedef char xchar_t;

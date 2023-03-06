@@ -990,7 +990,7 @@ class Gui:
             return False
         
         if not emulaunch.find_emulator():
-            tkinter.messagebox.showerror("Emulator not found", "please ensure " + emulaunch.nesmname() + " exists in the same directory as mmagedit.")
+            tkinter.messagebox.showerror("Emulator not found", "Emulator \"nesm\" not found. To test the hack directly from mmagedit, please ensure " + emulaunch.nesmname() + " exists in the same directory as mmagedit.")
             
         return emulaunch.launch(path)
         

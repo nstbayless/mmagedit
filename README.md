@@ -7,10 +7,7 @@
  
 This utility can edit levels, worlds, and tile information for Micro Mages (by [Morphcat games](http://morphcat.de/)), and it can extend the game's basic features with new elements, such as more complex level data. Made with Python3, `Pillow`, and `tkinter`. Has both a GUI and CLI.
 
-MMagEdit is also available as a **[shared library](#shared-library) (.so, .dylib, or .dll)** so that other projects can use MMagEdit's back-end to create hacks for Micro Mages, even if they aren't written in python. C, C++, C#, Unity, Lua, or any other language that can link to a shared library should all be supported. If compiled with [emscripten](https://emscripten.org/), it can even run in the browser.
-
-**Windows**: [Download](https://ci.appveyor.com/api/projects/nstbayless/mmagedit/artifacts/mmagedit.zip).
-*Note: Appveyor deletes builds after 1 month. If this link doesnt work, please ping NaOH on [Discord](https://discord.gg/3WJYQ6a) to manually rebuild. We will migrate to github for builds soon, which will solve this problem.*
+**Windows**: [Download]https://github.com/nstbayless/mmagedit/releases).
 
 **Linux**: See "Launching (Ubuntu)" below.
 
@@ -42,9 +39,10 @@ To launch with python3 on Ubuntu Linux, first make sure the dependencies are met
 ```
 sudo apt-get install python3-tk python3-pil.imagetk
 sudo python3 -m pip install pillow
+(cd nesm && cmake . && make)
 ```
 
-Simply run `mmagedit.py` in python:
+Then simply run `mmagedit.py` in python:
 
 ```
 python3 mmagedit.py

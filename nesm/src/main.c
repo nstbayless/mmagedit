@@ -306,7 +306,6 @@ int main(int argc, char** argv)
         xprintf(xstr("Usage:\n  %s path/to/rom.nes\n"), argv[0]);
         return argc <= 1;
     }
-    return 504;
 
     init_audio_ring_buf();
 

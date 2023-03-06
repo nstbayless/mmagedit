@@ -1,7 +1,7 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.27"
+mmname = "MMagEdit v1.28"
 mmrepo = "https://github.com/nstbayless/mmagedit"
 mmfmt = 202204032250
 

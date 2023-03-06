@@ -9,6 +9,7 @@ from functools import partial
 from src import mmimage
 from src import mmdata
 import src.mappermages
+from src import emulaunch
 
 try:
     from PIL import Image, ImageDraw, ImageOps, ImageTk
@@ -981,9 +982,18 @@ class Gui:
         if currentlevel:
             self.data.startlevel = self.level.level_idx+1
             self.data.startdifficulty = 1 if self.hard else 0
-        self.data.write(path)
+        success = self.data.write(path)
         self.data.startlevel=0
         self.data.startdifficulty=0
+        if not success:
+            self.errorbox()
+            return False
+        
+        if not emulaunch.find_emulator():
+            tkinter.messagebox.showerror("Emulator not found", "please ensure " + emulaunch.nesmname() + " exists in the same directory as mmagedit.")
+            
+        return emulaunch.launch(path)
+        
         
     # perform fileio, possibly ask for prompt (if auto is True, may not ask.)
     def fio_prompt(self, type, save=False, auto=False):
@@ -1031,7 +1041,7 @@ class Gui:
         return result
         
     # display error boxes if data has errors.
-    def errorbox(self, warning):
+    def errorbox(self, warning=False):
         if len(self.data.errors) > 0:
             title = "Warning" if warning else "Error"
             message = "" if warning else "An error occurred, preventing the file I/O operation:\n\n"

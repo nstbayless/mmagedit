@@ -17,9 +17,11 @@ def get_version_and_date():
     return mmname + ": " + day + " " + months[month] + " " + year
 
 def emucredits():
+    if emulaunch.find_emulator() is not None:
+        return "\n\nLightweight NES Emulator \"nesm\" by gtoni."
     return ""
 
-mminfo = """
+mminfo = ("""
 MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 
 """ + get_version_and_date() + """.
@@ -27,7 +29,7 @@ MMagEdit created by NaOH, with contributions by -7 (negativeseven)
 Special thanks to Julius, Leaf_It, Geek_Joystick, and dayofni.""" + emucredits() + """
 
 Please support Morphcat Games.
-""".strip()
+""").strip()
 
 ram_object_i_gid_lookup = 0xdab1
 ram_level_table = 0xDAD0

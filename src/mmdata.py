@@ -331,7 +331,7 @@ def idx_to_level_and_world(idx):
 class Level:
     def __init__(self, data, idx):
         self.level_idx = idx
-        self.world_idx, self.world_sublevel = idx_to_level_and_world(idx)
+        self.world_sublevel, self.world_idx = idx_to_level_and_world(idx)
         self.world = data.worlds[self.world_idx]
         self.data = data
         self.macro_rows = []

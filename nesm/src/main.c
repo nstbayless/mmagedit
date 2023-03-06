@@ -283,8 +283,9 @@ typedef wchar_t xchar_t;
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     int argc;
+    printf("A\n");
     xchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
+    printf("B\n");
 #else
 typedef char xchar_t;
 #define xprintf printf

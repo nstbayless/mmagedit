@@ -157,7 +157,7 @@ def main():
         startplayers = max(1, min(4, startplayers))
         
     if "--flag" in sys.argv[2:-1]:
-        startflag = int(sys.argv[sys.argv.index("--flag") + 1])
+        startflag = max(int(sys.argv[sys.argv.index("--flag") + 1])-1, 0)
     
     if "--ending" in sys.argv[2:]:
         startending = True

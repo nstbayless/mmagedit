@@ -351,7 +351,7 @@ class Level:
             for obj in self.objects:
                 if obj.gid < len(constants.object_data) and constants.object_data[obj.gid].get("checkpoint", False):
                     if idx == 0:
-                        return 0xFFFF - obj.y * 8 - 0x80
+                        return 0xFFFF - self.macro_row_count * 0x20 + 1 + obj.y * 8 - 0xA0
                     else:
                         idx -= 1
         return None #0xFF01
@@ -1638,7 +1638,7 @@ class MMData:
                 # don't fail; just use this as a warning.
                 
             if len(self.bin) <= 0x10:
-                self.errors += ["NES file " + filepath + " is empty."]
+                self.errors += ["NES file " + file + " is empty."]
                 return False
                 
             if len(self.bin) != 0xa010:
@@ -1888,7 +1888,7 @@ class MMData:
                 self.write_byte(addr, 0xBF)
                 addr += 1
                 
-                print(hex(ppuscroll))
+                print(self.startflag, hex(ppuscroll))
                 
             # RET
             self.write_byte(addr, 0x60)

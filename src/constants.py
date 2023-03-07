@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.31"
+mmname = "MMagEdit v1.32"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202204032250
+mmfmt = 202303012229
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -546,7 +546,7 @@ object_data = [
     { "palette": 0, "chr": [[0x70, 0x71, 0x271, 0x270], [0x80, 0x81, 0x281, 0x280], [0x480, 0x481, 0x681, 0x680], [0x470, 0x471, 0x671, 0x670]], "offset": (0, 8) },
     
     # 4 -- flag
-    { "palette": 0, "chr": [[0xc2], [0xc0]] },
+    { "palette": 0, "chr": [[0xc2], [0xc0]], "checkpoint": True },
     
     # 5 -- beer
     { "palette": 1, "chr": [[0x58, 0x59], [0x5a, 0x5b]], "offset": [4, -24] },
@@ -675,7 +675,7 @@ object_data = [
     
     { },
     
-    # 30 -- pipe-C
+    # 33 -- pipe-C
     { "chr":  [[0x1E6]] },
 ]
 

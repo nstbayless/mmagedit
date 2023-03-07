@@ -5,11 +5,20 @@ ENUM $0
 BASE $03
 num_players: ; players minus 1. (0 ~ singleplayer)
 
+BASE $A4
+screen_timer: ; fadeout timer
+
 BASE $BC
 current_level:
 
 BASE $BD
 current_world:
+
+BASE $BE
+checkpoint_ppu_scroll_hi:
+
+BASE $BF
+checkpoint_ppu_scroll_lo:
 
 BASE $72
 current_lives:
@@ -19,6 +28,9 @@ game_state: ; 01 -> normal, 05 -> star-spin flying?
 
 BASE $6F
 game_state_b: ; bit 7: hard mode. bit 6: hell mode.
+
+BASE $CE
+camera_screen:
 
 BASE $D0
 camera_speed:

@@ -111,3 +111,50 @@ BOUNCE ROUTINE
 LEVEL/WORLD MAPPING
 F2C6: routine that sets world/lvl from level idx.
 World 0-3 as normal, world 4 means go straight to ending cutscene.
+
+RELIC 1:
+flame-damage:
+ 01:CAFE: A5 BC    LDA $BC map
+ 01:CB00: C9 01    CMP #$01
+ 01:CB02: D0 0D    BNE $CB11
+ 01:CB04: 8A       TXA
+ 01:CB05: 48       PHA
+ 01:CB06: A9 1A    LDA #$1A
+ 01:CB08: A0 AA    LDY #$AA
+ 01:CB0A: A2 02    LDX #$02
+ 01:CB0C: 20 92 8C JSR $8C92 spawn-relic
+ 01:CB0F: 68       PLA
+ 01:CB10: AA       TAX
+ 
+RELIC 2:
+pipe-enter:
+ 01:E87F: A5 BC    LDA $BC map
+ 01:E881: C9 05    CMP #$05
+ 01:E883: D0 13    BNE $E898
+ 01:E885: A5 CE    LDA $CE = #$FF camera-scroll
+ 01:E887: C9 FC    CMP #$FC
+ 01:E889: B0 0D    BCS $E898
+ 01:E88B: 20 A7 E8 JSR $E8A7 ; teleport player?
+ 01:E88E: A9 80    LDA #$80
+ 01:E890: A0 78    LDY #$78
+ 01:E892: A2 01    LDX #$01
+ 01:E894: 20 92 8C JSR $8C92 spawn-relic
+ 01:E897: 60       RTS-------------------------
+ 
+RELIC 3:
+ 01:CD85: A5 BC    LDA $BC map
+ 01:CD87: C9 07    CMP #$07
+ 01:CD89: D0 17    BNE $CDA2
+ 01:CD8B: 24 DC    BIT $DC ; what?
+ 01:CD8D: 30 13    BMI $CDA2
+ 01:CD8F: A5 30    LDA $30 collision_x
+ 01:CD91: C9 DC    CMP #$DC
+ 01:CD93: 90 0D    BCC $CDA2
+ 01:CD95: 8A       TXA
+ 01:CD96: 48       PHA
+ 01:CD97: A9 E6    LDA #$E6
+ 01:CD99: A0 68    LDY #$68
+ 01:CD9B: A2 03    LDX #$03
+ 01:CD9D: 20 92 8C JSR $8C92 spawn-relic
+ 01:CDA0: 68       PLA
+ 01:CDA1: AA       TAX

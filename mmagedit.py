@@ -45,12 +45,17 @@ def usage():
     print("")
     print("debug options:")
     print("")
+    print("--help: show this message")
     print("--deps: check dependencies")
     print("--brx: breakpoint on byte edit")
     print("--json: serialize data to json")
     print("--select .field[a].field2[b:c]: (etc) select elements of json out")
     print("--apply {...}: apply json to data")
+    print("")
+    print("playtest options:")
+    print("")
     print("--level x: exported rom jumps to level x at start (x can be 1-14)")
+    print("--flag x: exported rom starts at the given checkpoint (requires --level)")
     print("--ending: exported rom jumps to ending screen at start")
     print("--players x: exported rom has x players (x can be 1-4)")
     print("--hard: exported rom starts in hard mode (requires --level or --ending)")
@@ -95,6 +100,7 @@ def main():
     startplayers = 1
     starthard = 0
     startending = False
+    startflag = None
 
     if "-i" in sys.argv[2:-1]:
         infile = sys.argv[sys.argv.index("-i") + 1]
@@ -148,7 +154,10 @@ def main():
         
     if "--players" in sys.argv[2:-1]:
         startplayers = int(sys.argv[sys.argv.index("--players") + 1])
-        startplayers = max(1, min(4, startlevel))
+        startplayers = max(1, min(4, startplayers))
+        
+    if "--flag" in sys.argv[2:-1]:
+        startflag = int(sys.argv[sys.argv.index("--flag") + 1])
     
     if "--ending" in sys.argv[2:]:
         startending = True
@@ -252,6 +261,7 @@ def main():
         mmdata.startdifficulty = starthard
         mmdata.startscreen = startending
         mmdata.startplayers = startplayers
+        mmdata.startflag = startflag
 
         if exportnes != "":
             result = result and mmdata.write(exportnes)

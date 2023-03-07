@@ -345,6 +345,16 @@ class Level:
         self.objects = []
         self.hardmode_patches = []
         self.unitile_patches = []
+        
+    def get_ppu_scroll_for_checkpoint(self, idx):
+        if idx is not None:
+            for obj in self.objects:
+                if obj.gid < len(constants.object_data) and constants.object_data[obj.gid].get("checkpoint", False):
+                    if idx == 0:
+                        return 0xFFFF - obj.y * 8 - 0x80
+                    else:
+                        idx -= 1
+        return None #0xFF01
     
     def serialize_json(self):
         j = {
@@ -1747,6 +1757,10 @@ class MMData:
         return mod in self.mods and self.mods[mod]
         
     def write_quickstart_patch(self):
+        # bounds check
+        if self.startlevel not in range(constants.level_count):
+            self.startlevel = 0
+            
         # writes code that will jump straight to a certain level and difficulty
         if self.startlevel == 0 and self.startscreen == False:
             return
@@ -1794,6 +1808,90 @@ class MMData:
             addr += 1
             self.write_byte(addr, 0xBC)
             addr += 1
+            
+            # LDA defaultlives
+            self.write_byte(addr, 0xA9)
+            addr += 1
+            self.write_byte(addr, self.default_lives)
+            addr += 1
+            
+            # JSR game start
+            self.write_byte(addr, 0x20)
+            addr += 1
+            self.write_word(addr, constants.ram_gamestart)
+            addr += 2
+            
+            # (jump here again when fading in after game start)
+            wpatch = self.ram_to_rom(0xD684)
+            w = self.read_word(wpatch)
+            self.write_word(wpatch, addr - self.ram_to_rom(constants.ram_intro_update) + constants.ram_intro_update) # was FAB5
+            
+            # TSX
+            self.write_byte(addr, 0xBA)
+            addr += 1
+            
+            # CPX FB
+            self.write_byte(addr, 0xE0)
+            addr += 1
+            self.write_byte(addr, 0xFB)
+            addr += 1
+            
+            # BEQ +3
+            self.write_byte(addr, 0xF0)
+            addr += 1
+            self.write_byte(addr, 0x1)
+            addr += 1
+            
+            # JMP FAB5
+            self.write_byte(addr, 0x4C)
+            addr += 1
+            self.write_word(addr, w)
+            addr += 2
+            
+            # LDA 8
+            self.write_byte(addr, 0xA9)
+            addr += 1
+            self.write_byte(addr, 0x08)
+            addr += 1
+            
+            # STA fade timer
+            self.write_byte(addr, 0x85)
+            addr += 1
+            self.write_byte(addr, 0xA4)
+            addr += 1
+            
+            # get PPU scroll for startlevel
+            ppuscroll = self.levels[self.startlevel-1].get_ppu_scroll_for_checkpoint(self.startflag)
+            if ppuscroll is not None:
+                #ppuscroll = 0xFF01
+                # LDA <ppuscroll
+                self.write_byte(addr, 0xA9)
+                addr += 1
+                self.write_byte(addr, ppuscroll & 0xFF)
+                addr += 1
+                
+                # STA <checkpoint
+                self.write_byte(addr, 0x85)
+                addr += 1
+                self.write_byte(addr, 0xBE)
+                addr += 1
+                
+                # LDA >ppuscroll
+                self.write_byte(addr, 0xA9)
+                addr += 1
+                self.write_byte(addr, (ppuscroll >> 8) & 0xFF)
+                addr += 1
+                
+                # STA >checkpoint
+                self.write_byte(addr, 0x85)
+                addr += 1
+                self.write_byte(addr, 0xBF)
+                addr += 1
+                
+                print(hex(ppuscroll))
+                
+            # RET
+            self.write_byte(addr, 0x60)
         else:
             # LDA 1
             self.write_byte(addr, 0xA9)
@@ -1808,11 +1906,11 @@ class MMData:
                 self.write_byte(addr, 0x73+i)
                 addr += 1
         
-        # JMP game start
-        self.write_byte(addr, 0x4C)
-        addr += 1
-        self.write_word(addr, constants.ram_ending_dispatch if self.startscreen else constants.ram_gamestart)
-        addr += 2
+            # JMP game start
+            self.write_byte(addr, 0x4C)
+            addr += 1
+            self.write_word(addr, constants.ram_ending_dispatch)
+            addr += 2
     
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
@@ -2025,6 +2123,7 @@ class MMData:
         self.startlevel = 0
         self.startdifficulty = 0
         self.startscreen = False
+        self.startflag = None
         self.startplayers = 1
         self.object_config = [
             constants.object_data[gid]["config"](self, gid) if "config" in constants.object_data[gid] else None

@@ -986,6 +986,7 @@ class Gui:
         success = self.data.write(path)
         self.data.startlevel=0
         self.data.startdifficulty=0
+        self.data.startflag = None
         self.data.startscreen=False
         if not success:
             self.errorbox()

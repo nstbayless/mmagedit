@@ -114,7 +114,7 @@ meta_colour_str = "#" + hx(meta_colour[0]) + hx(meta_colour[1]) + hx(meta_colour
 meta_colour_str_b = "#c020e0"
 
 # hashes for base roms which will not warn on load
-base_hashes = ["1062df5838a11e0e17ed590bdc1095c6"]
+base_hashes = ["1062df5838a11e0e17ed590bdc1095c6", "11c3f3f8d6473d9672dd8aabb842c3a0"]
 
 # music names
 songs = ["Mysterious", "Heroic", "Spooky", "Dreamy", "Evil", "Intro", "Fanfare", "Boss", "March"]

@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.33"
+mmname = "MMagEdit v1.34"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202303012230
+mmfmt = 202303012232
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -94,6 +94,7 @@ ram_ending_dispatch = 0xD61F
 mirror_pairs_count = 6 # (x2).
 world_count = 4
 level_count = 0xE
+standard_level_count = 0xD
 level_idx_finale = 0xD
 level_idx_44 = 0xC
 global_macro_tiles_count = 0x24

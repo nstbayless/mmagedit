@@ -1758,7 +1758,7 @@ class MMData:
         
     def write_quickstart_patch(self):
         # bounds check
-        if self.startlevel not in range(constants.level_count):
+        if self.startlevel-1 not in range(constants.level_count):
             self.startlevel = 0
             
         # writes code that will jump straight to a certain level and difficulty
@@ -1766,7 +1766,7 @@ class MMData:
             return
         
         # level 14 cannot be played on normal mode:
-        if self.startlevel == 0xE and self.startdifficulty == 0:
+        if self.startlevel == constants.level_idx_finale+1 and self.startdifficulty == 0:
             self.startdifficulty = 1;
         
         addr = self.ram_to_rom(constants.ram_intro_update)
@@ -1995,7 +1995,7 @@ class MMData:
                 return False
             
             # optional unitile extension
-            if self.mapper_extension:
+            if self.mapper_extension and level.level_idx < constants.level_count:
                 result, unitile_location = level.commit_unitile(unitile_location)
                 
                 if not result:
@@ -2390,7 +2390,7 @@ class MMData:
                     out(hx(row.seam) + ":", hb(row.macro_tiles[0]), hb(row.macro_tiles[1]), hb(row.macro_tiles[2]), hb(row.macro_tiles[3]), "    " + hmode)
                 out()
                 
-                if self.mapper_extension:
+                if self.mapper_extension and level.level_idx < constants.level_count:
                     out("# unitile (med-tile patch) rows (from top/end of level to bottom/start).")
                     out("# Each row is 256x16 pixels.")
                     out()

@@ -384,7 +384,7 @@ ifdef UNITILE
     
     FROM $DCD1
         objects_table:
-    SKIP $1A
+    SKIP $1C
         unitile_level_table:
     ;FROM $E6C3
     ;    unitile_level_table_end:

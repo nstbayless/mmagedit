@@ -974,6 +974,22 @@ class Gui:
     def zoom(self):
         return int(max(0, self.zoom_idx) + 1)
         
+    def getSelectedFlagIdx(self):
+        if self.select_rect is not None:
+            level = self.level
+            flags = []
+            flag_idx = -1
+            for obj in level.objects:
+                if obj.gid < len(constants.object_data) and constants.object_data[obj.gid].get("checkpoint", False):
+                    flag_idx += 1
+                    if obj.x * micro_width >= self.select_rect[0] and obj.x * micro_width < self.select_rect[2]:
+                        if obj.y * micro_height >= self.select_rect[1] and obj.y * micro_height < self.select_rect[3]:
+                            flags.append(flag_idx)
+            if len(flags) >= 1:
+                return flags[0]
+                            
+        return None
+        
     def play_hack(self, currentlevel=False, difficulty=None, ending=False):
         if self.data is None:
             return False
@@ -983,6 +999,9 @@ class Gui:
             self.data.startlevel = self.level.level_idx+1
             self.data.startdifficulty = difficulty if difficulty is not None else (1 if self.hard else 0)
             self.data.startscreen = ending
+        if currentlevel and not ending:
+            # check if selection contains flag
+            self.data.startflag = self.getSelectedFlagIdx()
         success = self.data.write(path)
         self.data.startlevel=0
         self.data.startdifficulty=0
@@ -1308,6 +1327,20 @@ class Gui:
         
     def about(self):
         tkinter.messagebox.showinfo(constants.mmname, constants.mminfo)
+        
+    def playtest_info(self):
+        tkinter.messagebox.showinfo(constants.mmname + "- Playtesting", """
+You can jump directly into playtesting a level via the Ctrl+G hotkey.
+
+If you are selecting a flag in the editor (shift-click and drag), you will start at that flag in the emulator.
+
+If you are testing the ending cutscenes, note that some graphical bugs may be present that wouldn't normally be.
+
+Note that nesm is a lightweight emulator and the key mapping is not configurable. You can resize the window with Ctrl+- and Ctrl+=.
+
+If you would rather use a different emulator, replace nesm.exe in the mmagedit directory with your preferred emulator.
+It must have the filename "nesm.exe" and it must take command line arguments like "nesm.exe path/to/rom.nes" or it won't work.
+    """.strip())
         
     def usage(self):
         tkinter.messagebox.showinfo(constants.mmname + " - Usage", """
@@ -2263,6 +2296,7 @@ Please remember to save frequently and make backups.
         
         # help menu
         self.add_menu_command(helpmenu, "About", self.about, None)
+        self.add_menu_command(helpmenu, "Play-testing", self.playtest_info, None)
         self.add_menu_command(helpmenu, "Mouse Button Mappings", self.usage, None)
         menu.add_cascade(label="Help", menu=helpmenu)
         

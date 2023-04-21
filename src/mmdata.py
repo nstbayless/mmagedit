@@ -1657,6 +1657,8 @@ class MMData:
             # read special mods
             self.mods = dict()
             self.mods["no_bounce"] = self.read_byte(self.ram_to_rom(constants.ram_mod_bounce)) == constants.ram_mod_bounce_replacement[0]
+            self.mods["no_wall_cling"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_wall_cling)) == constants.ram_mod_no_wall_cling_replacement[0]
+            self.mods["no_wall_jump"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_wall_jump[0])) == constants.ram_mod_no_wall_jump_replacement[0][0]
             self.mods["no_auto_scroll"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_auto_scroll[0])) == constants.ram_mod_no_auto_scroll_replacement[0][0]
             self.mods["extended_objects"] = False
             self.mods["no_relic_1"] = False
@@ -2037,6 +2039,17 @@ class MMData:
                 self.ram_to_rom(constants.ram_mod_bounce),
                 constants.ram_mod_bounce_replacement
             )
+        if self.mods["no_wall_cling"]:
+            self.write_patch(
+                self.ram_to_rom(constants.ram_mod_no_wall_cling),
+                constants.ram_mod_no_wall_cling_replacement
+            )
+        if self.mods["no_wall_jump"]:
+            for addr, replacement in zip(constants.ram_mod_no_wall_jump, constants.ram_mod_no_wall_jump_replacement):
+                self.write_patch(
+                    self.ram_to_rom(addr),
+                    replacement
+                )
         if self.mods["no_auto_scroll"]:
             for i in range(len(constants.ram_mod_no_auto_scroll)):
                 self.write_patch(

@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.34"
+mmname = "MMagEdit v1.35"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202303012232
+mmfmt = 202304211214
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -86,6 +86,10 @@ ram_mod_no_relic_3 = [0xCD9D]
 ram_mod_no_relic_3_replacement = [[0xEA, 0xEA, 0xEA]]
 ram_mod_no_relic_4 = [0xBCBE]
 ram_mod_no_relic_4_replacement = [[0xEA, 0xEA, 0xEA]]
+ram_mod_no_wall_cling = 0xA933
+ram_mod_no_wall_cling_replacement = [0xF0]
+ram_mod_no_wall_jump = [0xD3BC, 0xD3AA]
+ram_mod_no_wall_jump_replacement = [[0xA9, 0x00, 0xEA], [0xA9, 0x00, 0xEA]]
 
 ram_intro_update = 0xA6CC
 ram_gamestart = 0xB8F0

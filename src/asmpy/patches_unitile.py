@@ -8,7 +8,7 @@ PATCHES = [
     (0x5644, bytearray.fromhex("20 36 DB")),
 
     (0x5b46, bytearray.fromhex("""
-        A2 20 A9 CC 20 09 E9 AD F9 FF F0 1B A8 AD F8 FF
+        A2 20 A9 CC 20 09 E9 AD F9 FF F0 19 A8 AD F8 FF
         A6 BC 8E 82 05 A2 01 8E E8 FF 20 24 E9 20 45 E9
         A2 00 8E F0 FF A2 56 18 60 25 30 85 30 A5 CE 85
         0B A5 31 38 E5 18 C5 CD B0 02 E6 0B A9 F8 25 31

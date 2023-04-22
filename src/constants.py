@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.37"
+mmname = "MMagEdit v1.38"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202304221036
+mmfmt = 202304221055
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():

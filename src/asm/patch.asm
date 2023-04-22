@@ -79,9 +79,9 @@ stage_name:
     LDX #$0
     STX $FFF0
     
+skip:
     ; 'Tower ' text coordinates
     ldx #$56
-skip:
     clc
     RTS
 endif

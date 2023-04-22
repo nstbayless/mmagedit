@@ -55,13 +55,44 @@ endif
 
 FROM $db36:
 
+ifdef STAGE_NAMES
+stage_name:
+    ; where to write stage name
+    ldx #$20
+    lda #($66 << 1)
+    JSR $E909
+    LDA stagename_table_ptr+1
+    beq skip
+    TAY
+    LDA stagename_table_ptr
+    LDX current_level
+    STX $0582
+    
+    ; switch bank
+    LDX #$1
+    STX $FFE8
+    JSR $E924
+    
+    JSR $E945
+    
+    ; restore bank
+    LDX #$0
+    STX $FFF0
+    
+    ; 'Tower ' text coordinates
+    ldx #$56
+skip:
+    clc
+    RTS
+endif
+
 ifdef PLACE_OBJECTS
     colx=$30
     coly=$31
-    place_objects_mask_coords:
+place_objects_mask_coords:
     AND colx
     STA colx
-    LDA $CE
+    LDA camera_screen
     STA $B
     LDA coly
     SEC
@@ -74,7 +105,7 @@ ifdef PLACE_OBJECTS
     STA coly
     RTS
     
-    place_objects_chest:
+place_objects_chest:
     LDA #$F0
     JSR place_objects_mask_coords
     JSR place_objects_scan
@@ -86,7 +117,7 @@ ifdef PLACE_OBJECTS
     AND #$F
     JMP $C49B
     
-    place_objects_crate:
+place_objects_crate:
     LDA #$F8
     JSR place_objects_mask_coords
     JSR place_objects_scan
@@ -116,7 +147,7 @@ ifdef PLACE_OBJECTS
     LDY current_level
     LDA objects_table,Y
     STA $8
-    LDA objects_table+13,Y
+    LDA objects_table+$E,Y ; + number of levels
     STA $9
     BEQ place_objects_failure
     LDY #$0
@@ -150,7 +181,7 @@ ifdef PLACE_OBJECTS
     RTS
 endif
 
-ifdef UNITILE    
+ifdef UNITILE
     next0:
         LDY #$0
         LDA ($00),Y
@@ -378,11 +409,11 @@ ifdef UNITILE
         ; return from unitile calculation
         RTS
         
-    if $ > $DCD1
+    if $ > $DCFE
         error "unitile patch space exceeded"
     endif
     
-    FROM $DCD1
+    FROM $DCFE
         objects_table:
     SKIP $1C
         unitile_level_table:
@@ -508,6 +539,13 @@ ifdef PLACE_OBJECTS
     FROM $C497
         JMP place_objects_chest
         NOP
+endif
+
+ifdef STAGE_NAMES
+    FROM $D634
+        JSR stage_name
+    FROM $FFF8
+        stagename_table_ptr:
 endif
 
 FROM $E94F:

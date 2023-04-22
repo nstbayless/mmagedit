@@ -7,7 +7,7 @@ BASE $C000
 FROM $DAEC
 new_reset_vector:
     lda #$0
-    sta $fff8
+    sta $fff0
     jmp $9957 # jump to old entry point
 
 FROM $DAF4
@@ -17,7 +17,7 @@ unknown_a:
     sta $ffe8
     ldy #$0
     lda ($c0), y
-    sty $fff8
+    sty $fff0
     rts
 
 # TODO...

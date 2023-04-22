@@ -1392,14 +1392,16 @@ class TitleScreen:
                 self.palettes[k].append(palette)
 
 class TextData:
-    def __init__(self, data):
+    def __init__(self, data, ramrange=None, chunk=""):
         self.data = data
         self.text = []
         self.table = constants.text_lookup
+        self.range = ramrange or constants.ram_range_text
+        self.chunk = chunk
     
     def read(self):
         for i in range(29):
-            bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+            bs = BitStream(self.data.bin, self.data.ram_to_rom(self.range[0], self.chunk))
             text = ""
             # skip to marker
             for j in range(i + 1):
@@ -1425,7 +1427,7 @@ class TextData:
                     text += self.table[b - 4]
         
     def write(self):
-        bs = BitStream(self.data.bin, self.data.ram_to_rom(constants.ram_range_text[0]))
+        bs = BitStream(self.data.bin, self.data.ram_to_rom(self.range[0], self.chunk))
         unique_diacritics = []
         for text in self.text:
             # start-of-text marker
@@ -1467,7 +1469,7 @@ class TextData:
                                 unique_diacritics.append(diacritic)
                                 if len(unique_diacritics) > src.mappermages.diacritics_table_range[1] - src.mappermages.diacritics_table_range[0]:
                                     self.data.errors += ["Too many unique diacritics. Please use fewer types of diacritics."]
-                                    return False
+                                    return False, None
                                 addr = src.mappermages.diacritics_table_range[0] + len(unique_diacritics) - 1
                                 self.data.write_byte(self.data.ram_to_rom(addr), diacritic)
                             # extended character: diacritic.
@@ -1476,16 +1478,17 @@ class TextData:
                             bs.write_bits(outb, 5)
                         else:
                             self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo enable diacritics, please set the mapper_extension mod to true."]
-                            return False
+                            return False, None
                     else:
                         self.data.errors += ["Invalid text symbol: \"" + t + "\"\nTo add new symbols, please export images, edit chr-rom, then reimport chr-rom."]
-                        return False
+                        return False, None
             
         # bounds check
-        if bs.offset + (bs.bitoffset / 8) > self.data.ram_to_rom(constants.ram_range_text[1]):
-            self.data.errors += ["text section exceeds range (" + HX(math.ceil(bs.offset + (bs.bitoffset / 8))) + " > " + HX(self.data.ram_to_rom(constants.ram_range_text[1])) + ")" ]
-            return False
-        return True
+        bs_end = bs.offset + (bs.bitoffset / 8)
+        if bs_end > self.data.ram_to_rom(self.range[1], self.chunk):
+            self.data.errors += ["text section exceeds range (" + HX(math.ceil(bs_end)) + " > " + HX(self.data.ram_to_rom(constants.ram_range_text[1])) + ")" ]
+            return False, None
+        return True, self.data.rom_to_ram(int(math.ceil(bs_end)), self.chunk)
             
 class MMData:
     # convert ram address to rom address
@@ -1496,6 +1499,16 @@ class MMData:
             if chunk == "level":
                 return 0x10 + (address - 0x8000 + 0x4000)
         return 0x10 + (address - 0x8000)
+        
+    def rom_to_ram(self, address, chunk=""):
+        if self.mapper_extension and len(self.bin) > 0xa010:
+            if chunk == "level":
+                return address + 0x4000 - 0x10
+            elif address > 0x4010:
+                return ((address - 0x10) % 0x4000) + 0x8000
+            else:
+                return address - 0x10
+        return address + 0x8000 - 0x10
         
     def chr_to_rom(self, address):
         return 0x10 + 0x8000 + address + (src.mappermages.EXTENSION_LENGTH if self.mapper_extension and len(self.bin) > 0xa010 else 0)
@@ -1751,6 +1764,10 @@ class MMData:
             # read text data
             self.text = TextData(self)
             self.text.read()
+            
+            # empty text data for stage names (mapper extension only)
+            self.stagenames = TextData(self, [0x8000, 0x8400], "level")
+            self.stagenames.text = []
                 
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
@@ -1987,9 +2004,20 @@ class MMData:
         # write worlds
         for world in self.worlds:
             world.commit()
-        
+            
+        # write mapper extension text
+        mapper_extension_level_start = 0x8000
+        if self.mapper_extension and len(self.stagenames.text) > 0:
+            while len(self.stagenames.text) < constants.level_count:
+                self.stagenames.text += [""]
+            success, mapper_extension_level_start = self.stagenames.write()
+            if not success:
+                return False
+            else:
+                self.write_word(self.ram_to_rom(src.mappermages.extended_text_ptr), 0x8000)
+            
         # write levels
-        level_ram_location = 0x8000 if self.mapper_extension else constants.ram_range_levels[0]
+        level_ram_location = mapper_extension_level_start if self.mapper_extension else constants.ram_range_levels[0]
         unitile_location = src.mappermages.unitile_table_range[0] + 10 * constants.level_count
         for level in self.levels:
             # write level data
@@ -2031,7 +2059,7 @@ class MMData:
             return False
         
         # write text
-        if not self.text.write():
+        if not self.text.write()[0]:
             return False
                 
         # patches over
@@ -2285,7 +2313,21 @@ class MMData:
             out()
             for text in self.text.text:
                 out(">" + text + "<")
-            
+                
+            if self.mapper_extension:
+                out()
+                out("stagenames")
+                out()
+                if len(self.stagenames.text) == 0:
+                    out("# To set custom stage names, uncomment all of the following lines")
+                    out()
+                    for i in range(constants.level_count):
+                        out("#>" + idx_to_level_name(i).upper() + " SUBTITLE<")
+                else:
+                    out()
+                    for name in self.stagenames.text:
+                        out(">" + str(name) + "<")
+                
             # sprite palettes
             out()
             out("# sprite palettes")
@@ -2603,6 +2645,7 @@ class MMData:
                             cfg = self.object_config[int(tokens[2], 16)]
                         
                         if tokens[1] == "global":
+                            optext = self.text
                             self.text.text = []
                             world = None
                             
@@ -2856,9 +2899,11 @@ class MMData:
                     if directive == "long":
                         for i in range(len(tokens[1])):
                             self.text.table = self.text.table[:i + 24] + tokens[1][i] + self.text.table[i+25:]
+                    if directive == "stagenames":
+                        optext = self.stagenames
                     if directive[0] == ">":
                         text = line.split(">")[1].split("<")[0]
-                        self.text.text.append(text)
+                        optext.text.append(text)
                     
                     # song directives
                     if directive == "name" and song_idx is not None:

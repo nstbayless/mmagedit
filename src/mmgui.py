@@ -5,6 +5,7 @@ import copy
 import math
 import tempfile
 from functools import partial
+import traceback
 
 from src import mmimage
 from src import mmdata
@@ -1169,10 +1170,10 @@ class Gui:
             # note: do not refresh anything directly
             # the caller is expected to call the refresh functions
             # this allows the caller to invoke several fio_direct commands before refreshing
-        except Exception as e:
+        except Exception as ex:
             # catch any save/load error, and return false if one occurs.
-            print(e)
-            tkinter.messagebox.showerror("Internal Error", "An internal error occurred during the I/O process:\n\n" + str(e))
+            print(type(ex), ex, ex.__traceback__)
+            tkinter.messagebox.showerror("Internal Error", "An internal error occurred during the I/O process:\n\n" + str(ex))
         return False
         
     def set_zoom(self, zoom_idx, force=False):

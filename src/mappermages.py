@@ -17,35 +17,35 @@ PATCHES = [
 
 	#	$daec:
 	#		lda #0
-	#		sta $fff8 ; has to be a value #0
+	#		sta $fff0 ; has to be a value #0
 	#		jmp $9557 ; jump to old entry point
-	(0xdafc, bytearray.fromhex("a9 00 8d f8 ff 4c 57 95")),
+	(0xdafc, bytearray.fromhex("a9 00 8d f0 ff 4c 57 95")),
 
 	#	$daf4:
 	#		lda #1
 	#		sta $ffe8
 	#		ldy #0
 	#		lda ($c0),y
-	#		sty $fff8
+	#		sty $fff0
 	#		rts
-	(0xdb04, bytearray.fromhex("a9 01 8d e8 ff a0 00 b1 c0 8c f8 ff 60")),
+	(0xdb04, bytearray.fromhex("a9 01 8d e8 ff a0 00 b1 c0 8c f0 ff 60")),
 
 	#	$db01:
 	#		lda #1
 	#		sta $ffe8
 	#		ldy #0
 	#		lda ($84),y
-	#		sty $fff8
+	#		sty $fff0
 	#		rts
-	(0xdb11, bytearray.fromhex("a9 01 8d e8 ff a0 00 b1 84 8c f8 ff 60")),
+	(0xdb11, bytearray.fromhex("a9 01 8d e8 ff a0 00 b1 84 8c f0 ff 60")),
 
 	# 	$db0e:
 	#		lda #1
 	#		sta $ffe8
 	#		jsr $cab7
-	#		sty $fff8
+	#		sty $fff0
 	#		rts
-	(0xdb1e, bytearray.fromhex("a9 01 8d e8 ff 20 b7 ca 8c f8 ff 60")),
+	(0xdb1e, bytearray.fromhex("a9 01 8d e8 ff 20 b7 ca 8c f0 ff 60")),
 
 	#	$db1a:
 	#		ldy #4
@@ -62,9 +62,9 @@ PATCHES = [
 	#		sty $ffe8
 	#		dey
 	#		lda ($ca),y
-	#		sty $fff8
+	#		sty $fff0
 	#		rts
-	(0xdb34, bytearray.fromhex("a0 01 8c e8 ff 88 b1 ca 8c f8 ff 60 ")),
+	(0xdb34, bytearray.fromhex("a0 01 8c e8 ff 88 b1 ca 8c f0 ff 60 ")),
 
 	#	$db30:
 	#		sta $5d3
@@ -131,7 +131,8 @@ for i, patch in enumerate(unitile_patches):
 
 diacritics_table_range = [0xE650, 0xE650 + 5]
 # we could get as far as 0xE6C3, but we need some space for the diacritics hack.
-unitile_table_range = [0xDCD1, diacritics_table_range[0]]
+unitile_table_range = [0xDCFE, diacritics_table_range[0]]
+extended_text_ptr = 0xfff8
 
 """
 # add PRG banks 1-2, pushing the old bank 1 to bank 3

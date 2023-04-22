@@ -205,6 +205,19 @@ class ObjectStream:
         self.complete = True
         self.entries.append( [1, 1] )
 
+class Patch:
+    def __init__(self, is_rom):
+        self.is_rom = is_rom
+        self.addr = None
+        self.data = []
+
+class Password:
+    def __init__(self):
+        self.stage = 0
+        self.digits = []
+        self.hard = False
+        self.hell = False
+        
 class Object:
     def __init__(self, data):
         self.data = data
@@ -1768,10 +1781,45 @@ class MMData:
             # empty text data for stage names (mapper extension only)
             self.stagenames = TextData(self, [0x8000, 0x8400], "level")
             self.stagenames.text = []
+            
+            # passwords
+            self.passwords = []
+            self.read_passwords()
+            
+            # patch data
+            self.patches = []
                 
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
         return False
+        
+    def write_passwords(self):
+        pwaddr = self.ram_to_rom(constants.ram_range_passwords[0])
+        for password in self.passwords:
+            for digit in reversed(password.digits):
+                self.write_byte(pwaddr, digit)
+                pwaddr += 1
+            b = (password.stage << 2) | (2 if password.hard else 0) | (1 if password.hell else 0)
+            self.write_byte(pwaddr, b)
+            pwaddr += 1
+        if pwaddr > self.ram_to_rom(constants.ram_range_passwords[1]):
+            self.errors += ["Passwords exceed range"]
+            return False
+        return True
+    
+    def read_passwords(self):
+        for addr in range(*constants.ram_range_passwords, 5):
+            p = Password()
+            for i in range(4):
+                d = self.read_byte(self.ram_to_rom(addr + i))
+                p.digits = [d] + p.digits
+            s = self.read_byte(self.ram_to_rom(addr + 4))
+            if s & 1:
+                p.hell = True
+            if s & 2:
+                p.hard = True
+            p.stage = s >> 2
+            self.passwords.append(p)
     
     def has_mod(self, mod):
         return mod in self.mods and self.mods[mod]
@@ -2061,6 +2109,10 @@ class MMData:
         # write text
         if not self.text.write()[0]:
             return False
+            
+        # write passwords:
+        if not self.write_passwords():
+            return False
                 
         # patches over
         if self.mods["no_bounce"]:
@@ -2122,7 +2174,11 @@ class MMData:
                     self.ram_to_rom(constants.ram_mod_extended_objects[i]),
                     constants.ram_mod_extended_objects_replacement[i]
                 )
-                
+        
+        for patch in self.patches:
+            addr = patch.addr if patch.is_rom else self.ram_to_rom(patch.addr)
+            self.write_patch(addr, patch.data)
+        
         self.write_quickstart_patch()
         
         return True
@@ -2295,6 +2351,23 @@ class MMData:
             # global tile data
             
             out("-- global --")
+            
+            out()
+            out("# passwords")
+            out()
+            for password in self.passwords:
+                s = "password "
+                s += str(password.stage) + " "
+                if password.hell:
+                    assert(password.hard)
+                    s += "hell"
+                elif password.hard:
+                    s += "hard"
+                else:
+                    s += "easy"
+                for digit in password.digits:
+                    s += " " + str(digit)
+                out(s)
             
             # text data
             out()
@@ -2561,6 +2634,21 @@ class MMData:
                 s += "; " + HW(oaddr)[1:] + ": " + "".join([HX(nibble) for nibble in nibbles])
                 out(s)
             out()
+            out("-- patch --")
+            out()
+            out("# modify the rom arbitrarily with patches, which are applied after everything else.\n# Prefer to use rampatch, especially when a mapper mod is used.")
+            out()
+            
+            if len(self.patches) == 0:
+                out("#rampatch 8000 20 40 ")
+                out("#rompatch 0010 20 40 ")
+            else:
+                for patch in self.patches:
+                    s = "rompatch" if patch.is_rom else "rampatch"
+                    s += " " + HW(patch.addr)
+                    for b in patch.data:
+                        s += " " + HX(b)
+                    out(s)
                 
             return True
         finally:
@@ -2611,6 +2699,7 @@ class MMData:
             music = None
             music_nibble = 0
             cfg = None
+            passwords_dirty = True
             title_screen = None
             
             for line in f.readlines():
@@ -2687,6 +2776,9 @@ class MMData:
                             row = level.macro_row_count - 1
                             obji = 0
                             unitile_row_idx = [level.macro_row_count * 2 - 1] * 3
+                        
+                        if tokens[1] == "patch":
+                            self.patches = []
                     
                     # object config is different
                     elif cfg is not None:
@@ -2915,6 +3007,26 @@ class MMData:
                     if directive == "entry" and song_idx is not None:
                         vchannel = constants.mus_vchannel_names.index(tokens[1])
                         self.music.song_channel_entries[song_idx][vchannel] = tokens[2]
+                    
+                    if directive in ["rampatch", "rompatch"]:
+                        patch = Patch(directive == "rompatch")
+                        patch.addr = int(tokens[1], 16)
+                        for token in tokens[2:]:
+                            patch.data.append(int(token, 16))
+                        self.patches.append(patch)
+                        
+                    if directive == "password":
+                        if passwords_dirty:
+                            passwords_dirty = False
+                            self.passwords = []
+                        p = Password()
+                        p.stage = int(tokens[1])
+                        p.hard = tokens[2] in ["hard", "hell"]
+                        p.hell = tokens[2] == "hell"
+                        p.digits = []
+                        for token in tokens[3:]:
+                            p.digits.append(int(token))
+                        self.passwords.append(p)
                 
                 if level_complete is not None:
                     level_complete = None

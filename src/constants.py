@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.35"
+mmname = "MMagEdit v1.37"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202304211214
+mmfmt = 202304221036
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -22,11 +22,11 @@ def emucredits():
     return ""
 
 mminfo = ("""
-MMagEdit created by NaOH, with contributions by -7 (negativeseven)
+MMagEdit created by NaOH, with contributions by -7 (negativeseven) and dayofni.
 
 """ + get_version_and_date() + """.
 
-Special thanks to Julius, Leaf_It, Geek_Joystick, and dayofni.""" + emucredits() + """
+Special thanks to Julius, Leaf_It, and Geek_Joystick.""" + emucredits() + """
 
 Please support Morphcat Games.
 """).strip()
@@ -69,6 +69,7 @@ ram_range_levels = [0xdaec, 0xe6c3+49]
 ram_range_text = [0xEC67, 0xEE67]
 ram_range_uncompressed_text = [0xEE67, 0xEE67+5] # pause text
 ram_pause_text_offset = 0xBAD3
+ram_range_passwords = [0xE824, 0xE856]
 
 # ~ special mods ~
 # the source for these hacks: https://github.com/nstbayless/mm-patches

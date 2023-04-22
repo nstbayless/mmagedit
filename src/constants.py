@@ -90,6 +90,8 @@ ram_mod_no_wall_cling = 0xA933
 ram_mod_no_wall_cling_replacement = [0xF0]
 ram_mod_no_wall_jump = [0xD3BC, 0xD3AA]
 ram_mod_no_wall_jump_replacement = [[0xA9, 0x00, 0xEA], [0xA9, 0x00, 0xEA]]
+ram_mod_no_relic_ui = [0xD734, 0xD7D8]
+ram_mod_no_relic_ui_replacement = [[0xEA, 0xEA, 0xEA], [0x60]]
 
 ram_intro_update = 0xA6CC
 ram_gamestart = 0xB8F0

@@ -1665,6 +1665,7 @@ class MMData:
             self.mods["no_relic_2"] = False
             self.mods["no_relic_3"] = False
             self.mods["no_relic_4"] = False
+            self.mods["no_relic_display"] = self.read_byte(self.ram_to_rom(constants.ram_mod_no_relic_ui[0])) == constants.ram_mod_no_relic_ui_replacement[0][0]
             self.mapper_extension = False
             
             self.pause_text = [self.read_byte(self.ram_to_rom(constants.ram_range_uncompressed_text[0] + i)) for i in range(5)]
@@ -2046,6 +2047,12 @@ class MMData:
             )
         if self.mods["no_wall_jump"]:
             for addr, replacement in zip(constants.ram_mod_no_wall_jump, constants.ram_mod_no_wall_jump_replacement):
+                self.write_patch(
+                    self.ram_to_rom(addr),
+                    replacement
+                )
+        if self.mods["no_relic_display"]:
+            for addr, replacement in zip(constants.ram_mod_no_relic_ui, constants.ram_mod_no_relic_ui_replacement):
                 self.write_patch(
                     self.ram_to_rom(addr),
                     replacement

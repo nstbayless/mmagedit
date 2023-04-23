@@ -1009,6 +1009,7 @@ class World:
             bprev = self.data.read_byte(data_ptr)
             bprev &= ~(0x3 << bit)
             bprev |= self.med_tile_palettes[i] << bit
+            self.data.write_byte(data_ptr, bprev)
             data_ptr += 1 # if loop ends here.
         
         # macro-tiles
@@ -1955,8 +1956,6 @@ class MMData:
                 addr += 1
                 self.write_byte(addr, 0xBF)
                 addr += 1
-                
-                print(self.startflag, hex(ppuscroll))
                 
             # RET
             self.write_byte(addr, 0x60)

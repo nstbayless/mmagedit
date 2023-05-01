@@ -278,7 +278,7 @@ def main():
             else:
                 src.mmimage.export_images(mmdata)
 
-        if not expimage and exportnes == "" and outfile != "":
+        if not expimage and exportnes == "" and outfile != "" and result and len(mmdata.errors) == 0:
             mmdata.stat(outfile)
 
         if len(mmdata.errors) > 0:

@@ -8,6 +8,7 @@ import src.ips
 import src.bps
 import src.mappermages
 import src.jsonpath
+import src.asm6502
 import copy
 import os
 
@@ -1789,6 +1790,22 @@ class MMData:
             
             # patch data
             self.patches = []
+            
+            # code data
+            self.asm = """
+; write simple asm code here
+; for example:
+; 
+; ent_x: $4A
+;
+; org $C000
+; label:
+;   lda #$52
+;   sta [ent_x, x]
+;   rts
+;   db #15
+; max $C010 ; ensure code does not exceed patch region 
+"""
                 
             return True
         self.errors += ["Failed to open file \"" + file + "\" for reading."]
@@ -2178,6 +2195,19 @@ class MMData:
             addr = patch.addr if patch.is_rom else self.ram_to_rom(patch.addr)
             self.write_patch(addr, patch.data)
         
+        # asm patch
+        try:
+            asmpatch = src.asm6502.assemble(self.asm)
+        except src.asm6502.AsmException as e:
+            if hasattr(e, "message"):
+                self.errors += [e.message]
+            else:
+                self.errors += [f"{e}"]
+            return False
+        for chunk in asmpatch:
+            romaddr = self.ram_to_rom(chunk["addr"])
+            self.write_patch(romaddr, chunk["data"])
+        
         self.write_quickstart_patch()
         
         return True
@@ -2262,6 +2292,7 @@ class MMData:
             out("#", constants.mmrepo)
             out()
             out("format " + str(constants.mmfmt))
+            out("editor " + str(constants.mmname))
             out()
             out("-- config --")
             out()
@@ -2648,6 +2679,9 @@ class MMData:
                     for b in patch.data:
                         s += " " + HX(b)
                     out(s)
+            out()
+            out("-- asm --")
+            out(self.asm.rstrip())
                 
             return True
         finally:
@@ -2700,13 +2734,20 @@ class MMData:
             cfg = None
             passwords_dirty = True
             title_screen = None
+            fmt = None
+            edname = None
+            readasm = False
             
             for line in f.readlines():
-                if "#" in line:
+                if "#" in line and not readasm:
                     line = line[:line.index("#")]
-                if ";" in line:
+                if ";" in line and not readasm:
                     line = line[:line.index(";")]
                 tokens = line.split()
+                if readasm:
+                    if len(tokens) == 0 or tokens[0] != "--":
+                        self.asm += line
+                        continue
                 if len(tokens) > 0:
                     directive = tokens[0]
                     if directive == "--" and len(tokens) >= 3:
@@ -2719,6 +2760,7 @@ class MMData:
                         song_idx = None
                         cfg = None
                         title_screen = None
+                        readasm = False
                         
                         # configuration
                         if tokens[1] == "config":
@@ -2778,6 +2820,10 @@ class MMData:
                         
                         if tokens[1] == "patch":
                             self.patches = []
+                            
+                        if tokens[1] == "asm":
+                            self.asm = ""
+                            readasm = True
                     
                     # object config is different
                     elif cfg is not None:
@@ -2977,11 +3023,15 @@ class MMData:
                             self.errors += ["Hack does not appear to be created with MMagEdit. It cannot be opened with this tool."]
                             return False
                         if fmt > constants.mmfmt:
-                            self.errors += ["Hack uses a more recent version of MMagEdit. An update is required."]
+                            if edname is None:
+                                self.errors += ["Hack uses a more recent version of MMagEdit. An update is required."]
                             return False
                         if fmt < constants.mmfmt:
                             # this is a warning, not an error.
                             self.errors += ["Hack uses an older version of MMagEdit. Please be wary of errors or artifacts caused by updating."]
+                    
+                    if directive == "editor":
+                        edname = " ".join(tokens[1:])
                     
                     # text        
                     if directive == "short":

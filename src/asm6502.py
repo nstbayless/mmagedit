@@ -39,7 +39,7 @@ mnemonics = {
 'lda': ['adc', 0xa0-0x60],
 'ldx': {'imm': 0xa2, 'z': 0xa6, 'zy': 0xb6, 'abs': 0xae, 'aby': 0xbe},
 'ldy': {'imm': 0xa0, 'z': 0xa4, 'zx': 0xb4, 'abs': 0xac, 'abx': 0xbc},
-'lsr': ['lsr', 0x40],
+'lsr': ['asl', 0x40],
 'nop': {'a': 0xea},
 'ora': ['adc', -0x60],
 'tax': {'a': 0xaa},
@@ -463,7 +463,7 @@ def assemble(source):
                 outbuff = []
             elif op == "end":
                 if addr > value:
-                    raise AsmException(f"exceeded max address: {line}")
+                    raise AsmException(f"exceeded max address: ${addr:04X} > ${value:04X}")
             elif value is None:
                 pass
             elif type(value) == Expression:

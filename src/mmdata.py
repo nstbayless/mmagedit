@@ -1053,7 +1053,9 @@ class MusicOp:
     
     def get_nibbles(self, music, address):
         nibbles = []
-        if self.op == constants.note_opcode["name"]:
+        if self.op == "dn":
+            return [int(self.args[0], 16)]
+        elif self.op == constants.note_opcode["name"]:
             nibbles.append(self.get_duration_idx(music))
             # duration
             type = self.args[0]
@@ -1105,7 +1107,7 @@ class MusicOp:
                     return nibbles
             
             # opcode not found
-            assert(False)
+            assert False, f"Not found: {self.op}"
             return []
 
 class Music:
@@ -2630,7 +2632,7 @@ class MMData:
             out("# ")
             out("# The following opcode are recognized:")
             out("# ")
-            for opcode in [constants.note_opcode] + constants.music_opcodes:
+            for opcode in [constants.note_opcode] + constants.music_opcodes + [constants.dn_opcode]:
                 out("#   " + opcode["name"])
                 out("#     " + opcode["doc"])
                 out("#")

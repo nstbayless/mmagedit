@@ -138,6 +138,9 @@ mus_vchannel_names = ["Lead", "Counterpoint", "Triangle", "Noise", "SFX0", "SFX1
 # note: not actually proper opcodes
 note_opcode = {"name": "-", "doc": "Plays the given note with the given duration (in hex). '_' is a tie. '*' represents a portamento. Duration must be one of [1, 2, 3, 4, 6, 8, 10, 20], and the note must be _, *, or in the range 0-C inclusive"}
 
+# dn: dump nibble
+dn_opcode = {"name": "dn", "doc": "Dump nibble"}
+
 music_opcodes = [
     # note: opcodes 0-7 inclusive are actually interpreted as WAIT codes, but will execute
     # if the wait-postfix code is 0xF.

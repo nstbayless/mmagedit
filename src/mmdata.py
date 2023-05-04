@@ -1097,7 +1097,8 @@ class MusicOp:
                                 nibbles += [None, None]
                             else:
                                 addr = address + len(nibbles) + 2 - music.resolve_address(arg)
-                                assert(addr in range(0x100))
+                                if addr not in range(0x100):
+                                    raise Exception(f"Relative address out of range: {arg}")
                                 nibbles.append(addr & 0x0f)
                                 nibbles.append((addr & 0xf0) >> 4)
                     
@@ -1122,7 +1123,7 @@ class Music:
             return self.label_to_addr[arg].addr
         if arg[0] == "$":
             return int(arg[1:], 16)
-        assert(False)
+        raise Exception(f"Unable to resolve label: {arg}")
         return 0
     
     # TODO: optimize this with a datastructure..?
@@ -1230,9 +1231,11 @@ class Music:
         for op in self.code:
             addr = bs.get_nibble_offset(self.data.ram_to_rom(constants.ram_range_music[0]))
             for nibble in op.get_nibbles(self, addr):
-                # bounds check
-                assert(bs.offset < self.data.ram_to_rom(constants.ram_range_music[1]))
                 bs.write_bits(nibble, 4)
+        
+        end = self.data.ram_to_rom(constants.ram_range_music[1])
+        if bs.offset > end:
+            raise Exception(f"Music data exceeds section: ${bs.offset:04X} > ${end:04X}")
         
         return True
 
@@ -1730,8 +1733,8 @@ class MMData:
                 self.chest_objects.append(self.read_byte(self.ram_to_rom(constants.ram_chest_table + i)))
                 
             # read object-specific data
-            for cfg in self.object_config:
-                if cfg is not None:
+            for cfgs in self.object_config:
+                for cfg in cfgs:
                     cfg.read()
                 
             # read global med-tile types (how 16x16 tiles can be composed of 8x8 tiles)
@@ -2045,8 +2048,8 @@ class MMData:
         self.write_byte(self.ram_to_rom(constants.title_screen_players_text_position[1]), self.title_screen_players_text_position % 0x100)
         
         # write object-specific data
-        for cfg in self.object_config:
-            if cfg is not None:
+        for cfgs in self.object_config:
+            for cfg in cfgs:
                 cfg.commit()
         
         # write global med-tile types (how 16x16 tiles can be composed of 8x8 tiles)
@@ -2259,7 +2262,7 @@ class MMData:
         self.startflag = None
         self.startplayers = 1
         self.object_config = [
-            constants.object_data[gid]["config"](self, gid) if "config" in constants.object_data[gid] else None
+            [cfg(self, gid) for cfg in constants.object_data[gid]["config"]]
             for gid in range(len(constants.object_data))
         ]
         pass
@@ -2371,12 +2374,14 @@ class MMData:
             
             # config data
             for gid in range(len(self.object_config)):
-                cfg = self.object_config[gid]
-                if cfg is not None:
+                if len(self.object_config[gid]) > 0:
                     out("-- object", HX(gid), "--")
-                    out("#", constants.object_names[gid][0])
+                    name = constants.object_names[gid][0]
+                    out("#", "mage" if name == "spawn" else name)
                     out()
-                    cfg.stat(out)
+                    for cfg in self.object_config[gid]:
+                        cfg.stat(out)
+                        out()
             
             # global tile data
             
@@ -2731,7 +2736,7 @@ class MMData:
             song_idx = None
             music = None
             music_nibble = 0
-            cfg = None
+            cfgs = []
             passwords_dirty = True
             title_screen = None
             fmt = None
@@ -2758,7 +2763,7 @@ class MMData:
                             level.combine_unitiles_by_difficulty()
                         level = None
                         song_idx = None
-                        cfg = None
+                        cfgs = []
                         title_screen = None
                         readasm = False
                         
@@ -2772,7 +2777,7 @@ class MMData:
                             parsing_globals = False
                         
                         if tokens[1] == "object":
-                            cfg = self.object_config[int(tokens[2], 16)]
+                            cfgs = self.object_config[int(tokens[2], 16)]
                         
                         if tokens[1] == "global":
                             optext = self.text
@@ -2826,8 +2831,9 @@ class MMData:
                             readasm = True
                     
                     # object config is different
-                    elif cfg is not None:
-                        cfg.parse(tokens)
+                    elif len(cfgs) > 0:
+                        for cfg in cfgs:
+                            cfg.parse(tokens)
                         
                         # next line
                         continue
@@ -3009,7 +3015,7 @@ class MMData:
                         if not obj.drop:
                             compressible = obj.compressible()
                             if force_compress and not compressible:
-                                assert(False)
+                                raise Exception(f"Object marked as force-compress, but it isn't compressible")
                             obj.compressed = compressible
                         
                         level.objects.append(obj)

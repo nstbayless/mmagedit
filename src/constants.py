@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.40"
+mmname = "MMagEdit v1.41"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202304302046
+mmfmt = 202305041257
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -43,7 +43,13 @@ ram_chest_table = 0xC45B
 ram_chest_table_length = 0xD
 ram_default_lives = 0xB8F1
 
-ram_object_hp_table = 0xBD9A # first entry is likely omitted.
+ram_object_flags_table = 0xBE6D # first entry omitted
+ram_object_flags_table_length = 0x46
+ram_object_bbox_table = 0xBEF9 # first entry omitted
+ram_object_bbox_table_length = 0x3B
+ram_object_points_table = 0xBE56 # first entry omitted
+ram_object_points_table_length = 0x19
+ram_object_hp_table = 0xBD9A # first entry omitted.
 ram_object_hp_table_length = 0x19 # speculative
 
 ram_music_table = 0xdaa3 # music for each level
@@ -138,15 +144,15 @@ music_opcodes = [
     
     # 0
     # sets the hold duration to 0?
-    {"name": "hold0", "doc": "unknown"},
+    {"name": "hold0", "doc": "Sets duty cycle 0."},
     
     # 1
     # sets the hold duration to 70?
-    {"name": "hold1", "doc": "unknown"}, 
+    {"name": "hold1", "doc": "Sets duty cycle 1."}, 
     
     # 2
     # sets hold duration to 80?
-    {"name": "hold2", "doc": "unknown"}, 
+    {"name": "hold2", "doc": "Sets duty cycle 2."}, 
     
     # sets articulation to arg, and (for music only) zeroes $4ba and $4be.
     {"name": "art", "argc": [1], "doc": "sets articulation"},
@@ -175,7 +181,7 @@ music_opcodes = [
     #   key += arg[0:1] >> 1 ?
     # else:
     #   key -= arg[0:1] >> 1 ?
-    {"name": "mod", "argc": [2], "doc": "modulates by the given amount, causing notes played after this to be adjusted."},
+    {"name": "mod", "argc": [2], "doc": "modulates by the given amount, causing notes played after this to be adjusted. The number of notes modulated is given by 4*(low nibble) + (bit6 + 2*bit7 + bit5)*(1 - 2*bit5). For example, 'mod 63' modulates by +10 semitones; 'mod A0' by -3. The meaning of bit4 is unknown."},
     
     # A
     # - if not in a subroutine, does nothing.
@@ -193,7 +199,7 @@ music_opcodes = [
     # then nibble pc -= arg[1:2]
     #
     # repeat count for subroutine is arg[3]
-    {"name": "sub", "argc":[1, "rels", 1], "doc": "executes the given subroutine, modulated by the first argument. The final argument is the number of repetitions. The subroutine must be before the current line by at most 0x100 nibbles (half-bytes)"},
+    {"name": "sub", "argc":[1, "rels", 1], "doc": "Executes the given subroutine, modulated by the first argument. The final argument is the number of repetitions. The subroutine must be before the current line by at most 0x100 nibbles (half-bytes)"},
     
     # C
     # if arg is 0:
@@ -201,7 +207,7 @@ music_opcodes = [
     # otherwise:
     #   sets $4A2 to (arg >> 2), then ANDS the current slide value with 0x40, and then ORS it with (arg & 1 << 1 | arg & 2 >> 1)
     #   that is, slide = (slide & 0x40) | ((arg & 1) << 1 | (arg & 2) >> 1)
-    {"name":"ctl", "argc": [1, 1], "doc": " Details are unknown."},
+    {"name":"ctl", "argc": [1, 1], "doc": "Details are unknown. (It seems that this is causing a reading frame shift, so we are likely misinterpreting it...)"},
     
     # D -- subtract 0xC from current key.
     {"name": "doct", "doc": "modulates down by an octave"},
@@ -368,8 +374,8 @@ object_names = [
     # 0
     ["none"],
     
-    ["boss-grim", "boss-grimmig", "boss-1"],
-    ["boss-thor", "boss-thorrix", "boss-2"],
+    ["boss-ghost", "boss-grim", "boss-grimmig", "boss-1"],
+    ["boss-thor", "boss-thorrix", "boss-viking", "boss-2"],
     ["boss-eye", "boss-4"],
     
     # 4
@@ -507,7 +513,7 @@ object_names = [
     ["gate", "boss-gate"],
     
     # 32
-    [""],
+    [],
     
     # 33
     ["pipe-C"],
@@ -516,29 +522,29 @@ object_names = [
     ["p-bone"], # bone projectile
     
     # 35
-    [""],
+    ["p-shot-charged"],
     
     # 36
     ["relic"],
     
     # 37
-    [""],
+    [],
     
     # 38
     ["p-fork"],
     
     # 39
-    [""],
+    [],
     
     # 3A
-    [""],
+    ["p-shot"],
     
     # 3B
     ["p-bubble"]
 ]
 
 while len(object_names) < 0x100:
-    object_names.append([""])
+    object_names.append([])
 
 object_data = [
     # 0
@@ -689,25 +695,42 @@ object_data = [
 
 # pad out list
 while len(object_data) < 0x100:
-    object_data.append({ })
+    object_data.append({})
 
 object_names_to_gid = {"": -1}
+
+for i in range(0x100):
+    object_names[i] += ["obj-" + hb(i), "unk-" + hb(i)]
 
 i = 0
 for names in object_names:
     for name in names:
-        object_names_to_gid[name] = i
+        if name != "":
+            assert name not in object_names_to_gid, f"objects w/ name collision ({name})"
+            object_names_to_gid[name] = i
     i += 1
     
-for i in range(0x100):
-    object_names_to_gid["unk-" + hb(i)] = i
-    
 # set object config
-import src.objects.cfg_hp, src.objects.obj_0E
+import src.objects.cfg_hp, src.objects.cfg_points, src.objects.cfg_flags, \
+    src.objects.cfg_bbox, src.objects.obj_0E, src.objects.obj_shot
+
+for i in range(0x100):
+    object_data[i]["config"] = []
 
 # first 0x19 objects have hitpoints
-for i in range(1, 0x19):
-    object_data[i]["config"] = src.objects.cfg_hp.ConfigHP
+for i in range(1, ram_object_hp_table_length):
+    object_data[i]["config"] += [src.objects.cfg_hp.ConfigHP]
+
+for i in range(1, ram_object_points_table_length):
+    object_data[i]["config"] += [src.objects.cfg_points.ConfigPoints]
+
+for i in range(1, ram_object_flags_table_length):
+    object_data[i]["config"] += [src.objects.cfg_flags.ConfigFlags]
+
+for i in range(1, ram_object_bbox_table_length):
+    object_data[i]["config"] += [src.objects.cfg_bbox.ConfigBBox]
 
 # skeleton has special config known
-object_data[0xE]["config"] = src.objects.obj_0E.Config0E
+object_data[0xE]["config"] += [src.objects.obj_0E.Config0E]
+object_data[0x35]["config"] += [src.objects.obj_shot.ConfigShot]
+object_data[0x3A]["config"] += [src.objects.obj_shot.ConfigShot]

@@ -55,7 +55,7 @@ mnemonics = {
 'rti': {'a': 0x40},
 'rts': {'a': 0x60},
 'sbc': ['adc', 0xe0-0x60],
-'sta': ['adc', 0x80-0x60, ['a']],
+'sta': ['adc', 0x80-0x60, ['imm']],
 'txs': {'a': 0x9a},
 'tsx': {'a': 0xba},
 'pha': {'a': 0x48},
@@ -69,6 +69,7 @@ mnemonics = {
 'las': {'aby': 0xbb},
 'lax': {'z': 0xa7, 'ay': 0xb7, 'abs': 0xaf, 'aby': 0xbf, 'zix': 0xa3, 'ziy': 0xb3},
 'sax': {'z': 0x87, 'zy': 0x97, 'abs': 0x8f, 'zix': 0x83},
+'sbx': {'imm': 0x83},
 #...add some more!
 
 # commands
@@ -458,6 +459,8 @@ def assemble(source):
                 # TODO: banks
                 if len(outbuff) > 0:
                     outbuffs.append({"addr": startaddr, "data": outbuff})
+                if type(value) != type(0):
+                    raise AsmException(f"org command must have numerical value")
                 addr = value
                 startaddr = addr
                 outbuff = []

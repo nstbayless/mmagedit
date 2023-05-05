@@ -1156,8 +1156,10 @@ class Gui:
             if type == "hack" and not save:
                 self.dirty = False
                 self.file[type] = path
-                rval = self.data.parse(path)
+                rval = self.data.parse(path)    
                 self.errorbox(rval)
+                if rval and len(self.data.message.strip()) > 0:
+                    self.showinfo(self.data.message)
                 return rval
             
             if type == "hack" and save:

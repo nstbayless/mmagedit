@@ -1796,6 +1796,9 @@ class MMData:
             # patch data
             self.patches = []
             
+            # message data
+            self.message = ""
+            
             # code data
             self.asm = """
 ; write simple asm code here
@@ -1950,6 +1953,34 @@ class MMData:
             addr += 1
             self.write_byte(addr, 0xA4)
             addr += 1
+            
+            if self.startlevel == 12:
+                # set special level script for level 12
+                # unclear why A847 is the value to use here.
+                
+                # LDA #$47
+                self.write_byte(addr, 0xA9)
+                addr += 1
+                self.write_byte(addr, 0x47)
+                addr += 1
+                
+                # STA $04CD
+                self.write_byte(addr, 0x8D)
+                addr += 1
+                self.write_word(addr, 0x04CD)
+                addr += 2
+                
+                # LDA #$A8
+                self.write_byte(addr, 0xA9)
+                addr += 1
+                self.write_byte(addr, 0xA8)
+                addr += 1
+                
+                # STA $04CE
+                self.write_byte(addr, 0x8D)
+                addr += 1
+                self.write_word(addr, 0x04CE)
+                addr += 2
             
             # get PPU scroll for startlevel
             ppuscroll = self.levels[self.startlevel-1].get_ppu_scroll_for_checkpoint(self.startflag)
@@ -2689,6 +2720,11 @@ class MMData:
             out()
             out("-- asm --")
             out(self.asm.rstrip())
+            out()
+            
+            out("-- message --")
+            out()
+            out(self.message.replace("-","&dash;").strip())
                 
             return True
         finally:
@@ -2744,16 +2780,21 @@ class MMData:
             fmt = None
             edname = None
             readasm = False
+            readmessage = False
             
             for line in f.readlines():
-                if "#" in line and not readasm:
+                if "#" in line and not readasm and not readmessage:
                     line = line[:line.index("#")]
-                if ";" in line and not readasm:
+                if ";" in line and not readasm and not readmessage:
                     line = line[:line.index(";")]
                 tokens = line.split()
                 if readasm:
                     if len(tokens) == 0 or tokens[0] != "--":
                         self.asm += line
+                        continue
+                if readmessage:
+                    if len(tokens) == 0 or tokens[0] != "--":
+                        self.message += line.replace("&dash;", "-")
                         continue
                 if len(tokens) > 0:
                     directive = tokens[0]
@@ -2831,6 +2872,10 @@ class MMData:
                         if tokens[1] == "asm":
                             self.asm = ""
                             readasm = True
+                        
+                        if tokens[1] == "message":
+                            self.message = ""
+                            readmessage = True
                     
                     # object config is different
                     elif len(cfgs) > 0:

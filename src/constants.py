@@ -31,36 +31,36 @@ Special thanks to Julius, Leaf_It, and Geek_Joystick.""" + emucredits() + """
 Please support Morphcat Games.
 """).strip()
 
-ram_object_i_gid_lookup = 0xdab1
-ram_level_table = 0xDAD0
-ram_med_tiles_table = 0xF883
-ram_macro_tiles_table = 0xF88b
-ram_world_macro_tiles_table = 0xaf10
-ram_mirror_pairs_table = 0xaf00
-ram_world_mirror_index_table = 0xaf0c
-ram_sprite_palette_table = 0xbd5f
-ram_chest_table = 0xC45B
+ram_object_i_gid_lookup = 0xDA36
+ram_level_table = 0xDA55
+ram_med_tiles_table = 0xF85A
+ram_macro_tiles_table = 0xF862
+ram_world_macro_tiles_table = 0xAEBF
+ram_mirror_pairs_table = 0xAEAF
+ram_world_mirror_index_table = 0xAEBB
+ram_sprite_palette_table = 0xBD10
+ram_chest_table = 0xC424
 ram_chest_table_length = 0xD
 ram_default_lives = 0xB8F1
 
-ram_object_flags_table = 0xBE6D # first entry omitted
+ram_object_flags_table = 0xBE1E # first entry omitted
 ram_object_flags_table_length = 0x46
-ram_object_bbox_table = 0xBEF9 # first entry omitted
+ram_object_bbox_table = 0xBEAA # first entry omitted
 ram_object_bbox_table_length = 0x3B
-ram_object_points_table = 0xBE56 # first entry omitted
+ram_object_points_table = 0xBE07 # first entry omitted
 ram_object_points_table_length = 0x19
-ram_object_hp_table = 0xBD9A # first entry omitted.
+ram_object_hp_table = 0xBD4B # first entry omitted.
 ram_object_hp_table_length = 0x19 # speculative
 
-ram_music_table = 0xdaa3 # music for each level
-ram_music_duration_table = 0x8d9d # length 0x8, the amount of time a wait command waits for.
-ram_music_channel_table = 0x92b3 # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
+ram_music_table = 0xDA28 # music for each level
+ram_music_duration_table = 0x8D7E # length 0x8, the amount of time a wait command waits for.
+ram_music_channel_table = 0x928E # seems to be the audio channel (square, square, tri, noise) assigned to each of the six virtual channels
 
 title_screen_tile_count = [0x340, 382]
 title_screen_palette_idx_count = [0x1b, 0x1b]
 title_screen_press_start_text_position = [0xA82A, 0xA82C]
 title_screen_players_text_position = [0xE793, 0xE795]
-ram_range_title_screen = [0xc5a2, 0xC737]
+ram_range_title_screen = [0xC56B, 0xC6B7]
 ram_range_title_screen_palette = [
     [0xc737, 0xc737 + 0x9],
     [0xc740, 0xc740 + 0x9]
@@ -71,11 +71,11 @@ text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
 
 # space available
 ram_range_music = [0x8000, 0x860A]
-ram_range_levels = [0xdaec, 0xe6c3+49]
-ram_range_text = [0xEC67, 0xEE67]
-ram_range_uncompressed_text = [0xEE67, 0xEE67+5] # pause text
+ram_range_levels = [0xDA71, 0xE6A9]
+ram_range_text = [0xEC51, 0xEE17]
+ram_range_uncompressed_text = [0xEE17, 0xEE17+5] # pause text
 ram_pause_text_offset = 0xBAD3
-ram_range_passwords = [0xE824, 0xE856]
+ram_range_passwords = [0xE80E, 0xE841]
 
 # ~ special mods ~
 # the source for these hacks: https://github.com/nstbayless/mm-patches

@@ -1,9 +1,9 @@
 from src.util import *
 from src import emulaunch
 
-mmname = "MMagEdit v1.42"
+mmname = "MMagEdit v1.43"
 mmrepo = "https://github.com/nstbayless/mmagedit"
-mmfmt = 202305051312
+mmfmt = 202401241542
 
 # this function is used as a "hello world" by libmmagedit to verify library integrity
 def get_version_and_date():
@@ -71,7 +71,7 @@ text_lookup = "EOSRATINMLDHYCGUFP-.W!V:'BKZ@X123456789"
 
 # space available
 ram_range_music = [0x8000, 0x860A]
-ram_range_levels = [0xdaec, 0xe6c3+49]
+ram_range_levels = [0xdaec, 0xe6ee+6]
 ram_range_text = [0xEC67, 0xEE67]
 ram_range_uncompressed_text = [0xEE67, 0xEE67+5] # pause text
 ram_pause_text_offset = 0xBAD3

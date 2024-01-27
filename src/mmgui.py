@@ -991,13 +991,13 @@ class Gui:
                             
         return None
         
-    def play_hack(self, currentlevel=False, difficulty=None, ending=False):
+    def play_hack(self, currentlevel=False, difficulty=None, ending=False, finale=False):
         if self.data is None:
             return False
         
         path = os.path.join(tempfile.gettempdir(), "mmagedit-hack.nes")
-        if currentlevel or ending:
-            self.data.startlevel = self.level.level_idx+1
+        if currentlevel or ending or finale:
+            self.data.startlevel = 0xe if finale else self.level.level_idx+1
             self.data.startdifficulty = difficulty if difficulty is not None else (1 if self.hard else 0)
             self.data.startscreen = ending
         if currentlevel and not ending:
@@ -2289,6 +2289,7 @@ Please remember to save frequently and make backups.
         ]
         self.playmenu.add_separator()
         self.menu_play += [
+            self.add_menu_command(self.playmenu, "Play Finale", partial(self.play_hack, False, 1, False, True)),
             self.add_menu_command(self.playmenu, "Play Ending", partial(self.play_hack, False, 0, True)),
             self.add_menu_command(self.playmenu, "Play Ending (Hard)", partial(self.play_hack, False, 1, True)),
             self.add_menu_command(self.playmenu, "Play Ending (Hell)", partial(self.play_hack, False, 2, True))

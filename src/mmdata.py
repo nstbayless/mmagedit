@@ -709,7 +709,7 @@ class Level:
         for i in range(len(ps.entries)):
             entry = ps.entries[i]
             self.data.write_byte(rom + 4 * self.macro_row_count + 1 + i, entry)
-        
+
         # write objects data
         bs = BitStream(self.data.bin, rom + 4 * self.macro_row_count + 1 + ps.length_bytes())
         for entry in os.entries:
@@ -723,9 +723,11 @@ class Level:
         # add objects to stream sorted by y and x position.
         for patch in sorted(self.hardmode_patches, key=lambda patch : patch.y * 4 + patch.x):
             ps.add_patch(patch)
+            
+        position_max = self.macro_row_count*4
         
-        if ps.position is None or ps.position < 0x80:
-            ps.advance_patch(0x80)
+        if ps.position is None or ps.position < position_max:
+            ps.advance_patch(position_max)
         
         return ps
         
@@ -2035,7 +2037,6 @@ class MMData:
     # edits the binary data to be in line with everything else
     # required before writing to a binary file.
     def commit(self):
-        print("committing")
         # restore bin to original.
         self.bin = bytearray(self.orgbin)
 

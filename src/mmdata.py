@@ -872,7 +872,7 @@ class World:
             
     def get_micro_tile(self, idx, hard=False):
         # world 2's special ice topping
-        if self.idx == 1 and hard:
+        if self.idx == self.data.hard_slippery_world and hard:
             if idx in range(0x12, 0x18):
                 return 0x10
         return idx
@@ -2051,6 +2051,9 @@ class MMData:
         # write number of lives
         self.write_byte(self.ram_to_rom(constants.ram_default_lives), self.default_lives)
         
+        # write index of hard mode slippery world
+        self.write_byte(self.ram_to_rom(constants.ram_hard_world_slippery), self.hard_slippery_world)
+        
         # write palettes
         bs = BitStream(self.bin, self.ram_to_rom(constants.ram_sprite_palette_table))
         for i in range(4):
@@ -2288,6 +2291,7 @@ class MMData:
     
     def __init__(self):
         self.mapper_extension = False
+        self.hard_slippery_world = 1
         self.bin = None
         self.errors = []
         self.startlevel = 0
@@ -2361,6 +2365,9 @@ class MMData:
             out('  # position of title screen text (in ppu ram address format)')
             out('  "title-press-start-text-position":', str(self.title_screen_press_start_text_position) + ",")
             out('  "title-players-text-position":', str(self.title_screen_players_text_position) + ",")
+            out()
+            out('  # index of world which is slippery on hard mode')
+            out('  "hard-slippery-world":', str(self.hard_slippery_world) + ",")
             out()
             out('  # some special mods that can be applied')
             out('  "mods": {')
@@ -3162,6 +3169,8 @@ class MMData:
                         self.title_screen_press_start_text_position = int(config["title-press-start-text-position"])
                     if "title-players-text-position" in config:
                         self.title_screen_players_text_position = int(config["title-players-text-position"])
+                    if "hard-slippery-world" in config:
+                        self.hard_slippery_world = int(config["hard-slippery-world"])
                     if "mods" in config:
                         for mod in config["mods"]:
                             if mod == "mapper-extension":
